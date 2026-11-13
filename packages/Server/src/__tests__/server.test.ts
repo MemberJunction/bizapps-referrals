@@ -10,12 +10,15 @@ import {
   LoadBizAppsReferralsServer,
   ReferralLifecycleProbe,
   ReferralsSlaSweepScheduler,
+  ShutdownBizAppsReferralsServer,
 } from '../index.js';
 
 describe('@mj-biz-apps/referrals-server', () => {
-  it('exports and registers LoadBizAppsReferralsServer and ReferralLifecycleProbe', () => {
+  it('exports and registers LoadBizAppsReferralsServer, ReferralLifecycleProbe, and starts automated SLA sweep scheduler', () => {
+    ReferralsSlaSweepScheduler.Stop();
     expect(typeof LoadBizAppsReferralsServer).toBe('function');
     expect(() => LoadBizAppsReferralsServer()).not.toThrow();
+    expect(ReferralsSlaSweepScheduler.IsRunning).toBe(true);
 
     const probe = MJGlobal.Instance.ClassFactory.CreateInstance<BaseLiveCrudVerifier>(
       BaseLiveCrudVerifier,
@@ -23,6 +26,9 @@ describe('@mj-biz-apps/referrals-server', () => {
     );
     expect(probe).toBeInstanceOf(ReferralLifecycleProbe);
     expect(probe?.OwnerApp).toBe('mj-bizapps-referrals');
+
+    ShutdownBizAppsReferralsServer();
+    expect(ReferralsSlaSweepScheduler.IsRunning).toBe(false);
   });
 
   it('starts and stops ReferralsSlaSweepScheduler cleanly', () => {

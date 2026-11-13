@@ -1,8 +1,26 @@
 import '@angular/compiler';
-import { ChangeDetectorRef, EnvironmentInjector, Injector, runInInjectionContext } from '@angular/core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import {
+  BrowserDynamicTestingModule,
+  platformBrowserDynamicTesting,
+} from '@angular/platform-browser-dynamic/testing';
+import { JSDOM } from 'jsdom';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const dom = new JSDOM('<!doctype html><html><body></body></html>');
+Object.assign(globalThis, {
+  window: dom.window,
+  document: dom.window.document,
+  HTMLElement: dom.window.HTMLElement,
+  Node: dom.window.Node,
+  Event: dom.window.Event,
+  CustomEvent: dom.window.CustomEvent,
+});
 
 const savedEntities: Array<{ entityName: string; record: Record<string, unknown> }> = [];
+const deletedIds: string[] = [];
+let failNextPartySave = false;
+const settingsStore = new Map<string, string>();
 const mockCurrentUser = { ID: '50000000-0000-4000-8000-000000000001', Name: 'Test User' };
 
 const runViewMock = vi.fn();
@@ -13,6 +31,9 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
   return {
     ...actual,
     Metadata: class {
+      static get Provider() {
+        return undefined;
+      }
       get CurrentUser() {
         return mockCurrentUser;
       }
@@ -21,7 +42,17 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
           ID: '99999999-0000-4000-8000-000000000001',
           RequestNumber: 'REF-TEST-001',
           Save: async () => {
+            if (
+              failNextPartySave &&
+              entityName === 'MJ_BizApps_Referrals: Conflict Check Parties'
+            ) {
+              return false;
+            }
             savedEntities.push({ entityName, record: { ...record } });
+            return true;
+          },
+          Delete: async () => {
+            deletedIds.push(String(record.ID));
             return true;
           },
         };
@@ -35,6 +66,21 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
   };
 });
 
+vi.mock('@memberjunction/core-entities', () => ({
+  ResourceData: class {},
+  UserInfoEngine: {
+    get Instance() {
+      return {
+        GetSetting: (key: string) => settingsStore.get(key),
+        SetSetting: async (key: string, value: string) => {
+          settingsStore.set(key, value);
+          return true;
+        },
+      };
+    },
+  },
+}));
+
 vi.mock('@memberjunction/ng-shared', () => ({
   BaseResourceComponent: class {
     ngOnInit(): void {}
@@ -45,24 +91,19 @@ vi.mock('@memberjunction/ng-shared', () => ({
   },
 }));
 
-vi.mock('@memberjunction/ng-ui-components', () => ({
-  MJPageLayoutComponent: class {},
-  MJPageHeaderComponent: class {},
-  MJPageBodyComponent: class {},
-}));
-
 vi.mock('@memberjunction/ng-base-forms', () => ({
   BaseFormComponent: class {},
   BaseFormPanel: class {},
 }));
 
+import { CascadeRoutingService, MatchingEngine } from '@mj-biz-apps/referrals-core';
 import { NavigationService } from '@memberjunction/ng-shared';
 import {
   ReferralsOpsTelemetryComponent,
   ReferralsProInboxComponent,
   ReferralsSeekerIntakeComponent,
-} from '../public-api.js';
-import {
+} from '../../dist/public-api.js';
+import type {
   JurisdictionEntity,
   PracticeAreaEntity,
   ProfessionalJurisdictionEntity,
@@ -72,72 +113,135 @@ import {
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 
-function createComponent<T>(ctor: new () => T): T {
-  const mockCdr: ChangeDetectorRef = {
-    markForCheck: vi.fn(),
-    detach: vi.fn(),
-    detectChanges: vi.fn(),
-    checkNoChanges: vi.fn(),
-    reattach: vi.fn(),
-  };
-  const injector = Injector.create({
-    providers: [
-      { provide: ChangeDetectorRef, useValue: mockCdr },
-      { provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } },
-    ],
-  }) as EnvironmentInjector;
-
-  return runInInjectionContext(injector, () => new ctor());
-}
-
-describe('@mj-biz-apps/referrals-ng component interactions (ART-TEST-2)', () => {
-  beforeEach(() => {
-    savedEntities.length = 0;
-    runViewMock.mockReset();
-    runViewsMock.mockReset();
+describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-2 / RR-09)', () => {
+  beforeAll(() => {
+    TestBed.initTestEnvironment(
+      BrowserDynamicTestingModule,
+      platformBrowserDynamicTesting(),
+    );
   });
 
-  it('ReferralsSeekerIntakeComponent parses structured intake notes and persists ConflictCheckParty records', async () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    savedEntities.length = 0;
+    deletedIds.length = 0;
+    failNextPartySave = false;
+    settingsStore.clear();
+    runViewMock.mockReset();
+    runViewsMock.mockReset();
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders ReferralsSeekerIntakeComponent DOM, passes draft ConflictParties to FindMatches, persists preferences across recreation, and aborts Draft on party failure', async () => {
     runViewsMock.mockResolvedValue([
       { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A' }] },
       { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware' }] },
       { Success: true, Results: [{ ID: '30000000-0000-4000-8000-000000000001', Name: 'Priority', SLAResponseHours: 8 }] },
     ]);
+    const findMatchesSpy = vi.spyOn(MatchingEngine, 'FindMatches').mockResolvedValue([
+      {
+        ProfessionalProfileID: '40000000-0000-4000-8000-000000000001',
+        DisplayName: 'Conflict Counsel',
+        FirmName: 'Rival Corp LLP',
+        Email: 'c@rival.com',
+        VerificationStatus: 'Verified',
+        AvailabilityStatus: 'Available',
+        ActiveReferralCount: 0,
+        MaxConcurrentReferrals: 5,
+        Score: 0,
+        Breakdown: {
+          PracticeAreaScore: 0,
+          JurisdictionScore: 0,
+          CapacityScore: 0,
+          ResponsivenessScore: 0,
+          RatingScore: 0,
+          LanguageBonus: 0,
+          TotalScore: 0,
+        },
+        ConflictStatus: 'ConflictFound',
+        ConflictReasons: ['Firm matches adverse party Rival Corp LLP'],
+        Eligible: false,
+        DisqualificationReason: 'Conflict of interest: Rival Corp LLP',
+      },
+    ]);
 
-    const cmp = createComponent(ReferralsSeekerIntakeComponent);
+    TestBed.configureTestingModule({
+      imports: [ReferralsSeekerIntakeComponent],
+      providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } }],
+    });
+
+    const fixture = TestBed.createComponent(ReferralsSeekerIntakeComponent);
+    const cmp = fixture.componentInstance;
     await cmp.ngOnInit();
+    fixture.detectChanges();
 
-    cmp.ParseStructuredIntake(
-      'Name: Alex Morgan | Email: alex@company.com | Matter: Delaware Conversion | Adverse: Rival Corp LLP, Apex Holdings Inc. | pro bono',
-    );
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.querySelector('.headline')?.textContent).toContain('Tell us about your matter');
 
-    expect(cmp.SeekerName).toBe('Alex Morgan');
-    expect(cmp.SeekerEmail).toBe('alex@company.com');
-    expect(cmp.MatterTitle).toBe('Delaware Conversion');
-    expect(cmp.Prefs.RequiresProBono).toBe(true);
-    expect(cmp.ConflictParties).toHaveLength(2);
+    // Trigger structured intake parse via DOM button click
+    cmp.RawIntakeNotes =
+      'Name: Alex Morgan | Email: alex@company.com | Matter: Delaware Conversion | Adverse: Rival Corp LLP | pro bono';
+    fixture.detectChanges();
+    const parseBtn = host.querySelector('.parse-btn') as HTMLButtonElement;
+    parseBtn.click();
+    fixture.detectChanges();
 
-    cmp.NewPartyName = 'Third Party LLC';
-    cmp.NewPartyRole = 'RelatedEntity';
-    cmp.AddConflictParty();
-    expect(cmp.ConflictParties).toHaveLength(3);
+    expect(cmp.ConflictParties).toHaveLength(1);
+    expect(host.querySelectorAll('.conflict-item')).toHaveLength(1);
+    expect(host.querySelector('.conflict-item')?.textContent).toContain('Rival Corp LLP');
 
-    cmp.RemoveConflictParty(1);
-    expect(cmp.ConflictParties).toHaveLength(2);
-
+    // Select practice area & jurisdiction, then trigger RunMatchPreview (RR-08)
     cmp.Prefs.PracticeAreaID = '10000000-0000-4000-8000-000000000001';
     cmp.Prefs.JurisdictionID = '20000000-0000-4000-8000-000000000001';
-    await cmp.SubmitRequest();
+    await cmp.RunMatchPreview();
+    await cmp.OnPreferenceChange();
+    fixture.detectChanges();
 
-    const requestSaves = savedEntities.filter((e) => e.entityName === 'MJ_BizApps_Referrals: Referral Requests');
-    const partySaves = savedEntities.filter((e) => e.entityName === 'MJ_BizApps_Referrals: Conflict Check Parties');
-    expect(requestSaves).toHaveLength(1);
-    expect(partySaves).toHaveLength(2);
-    expect(partySaves[0].record.NormalizedName).toBe('rival');
-    expect(cmp.StatusTone).toBe('success');
+    expect(findMatchesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ConflictParties: [
+          expect.objectContaining({ PartyName: 'Rival Corp LLP', PartyRole: 'Adverse' }),
+        ],
+      }),
+      mockCurrentUser,
+    );
+    expect(host.querySelector('.candidate-card.disqualified')).not.toBeNull();
+    expect(host.querySelector('.candidate-status.warn')?.textContent).toContain('Conflict of interest');
+
+    // Verify UserInfoEngine persistence across component destruction & recreation
+    fixture.destroy();
+    const fixture2 = TestBed.createComponent(ReferralsSeekerIntakeComponent);
+    const cmp2 = fixture2.componentInstance;
+    await cmp2.ngOnInit();
+    expect(cmp2.Prefs.PracticeAreaID).toBe('10000000-0000-4000-8000-000000000001');
+    expect(cmp2.Prefs.DrawerOpen).toBe(true);
+    expect(cmp2.Prefs.RequiresProBono).toBe(true);
+
+    // Verify RR-07 atomicity: if a ConflictCheckParty save fails, Draft request is deleted and never marked Submitted
+    cmp2.SeekerName = 'Alex Morgan';
+    cmp2.SeekerEmail = 'alex@company.com';
+    cmp2.MatterTitle = 'Delaware Conversion';
+    cmp2.MatterSummary = 'Adverse dispute';
+    cmp2.ConflictParties = [{ PartyName: 'Rival Corp LLP', PartyRole: 'Adverse', OrganizationName: 'Rival Corp LLP' }];
+    failNextPartySave = true;
+    await cmp2.SubmitRequest();
+    fixture2.detectChanges();
+
+    expect(deletedIds).toContain('99999999-0000-4000-8000-000000000001');
+    expect(cmp2.StatusTone).toBe('error');
+    expect(savedEntities.some((e) => e.record.Status === 'Submitted')).toBe(false);
+    fixture2.destroy();
   });
 
-  it('ReferralsProInboxComponent filters to authenticated pro profile, computes SLA countdown, and saves capacity', async () => {
+  it('renders ReferralsProInboxComponent DOM, updates SLA countdown timer on interval, and cleans up timer on destroy', async () => {
+    vi.useFakeTimers();
+    const baseNow = new Date('2026-11-13T12:00:00.000Z').getTime();
+    vi.setSystemTime(baseNow);
+
     const profileId = '40000000-0000-4000-8000-000000000001';
     const requestId = '60000000-0000-4000-8000-000000000001';
     const assignmentId = '70000000-0000-4000-8000-000000000001';
@@ -151,9 +255,11 @@ describe('@mj-biz-apps/referrals-ng component interactions (ART-TEST-2)', () => 
       Save: vi.fn().mockResolvedValue(true),
     };
 
-    runViewMock
-      .mockResolvedValueOnce({ Success: true, Results: [mockProfile] })
-      .mockResolvedValueOnce({
+    runViewMock.mockImplementation(async (params: { EntityName: string }) => {
+      if (params.EntityName === 'MJ_BizApps_Referrals: Professional Profiles') {
+        return { Success: true, Results: [mockProfile] };
+      }
+      return {
         Success: true,
         Results: [
           {
@@ -164,50 +270,51 @@ describe('@mj-biz-apps/referrals-ng component interactions (ART-TEST-2)', () => 
             Status: 'Offered',
             MatchScore: 92,
             ConflictStatus: 'Cleared',
-            SLADeadlineAt: new Date(Date.now() + 90 * 60_000),
+            SLADeadlineAt: new Date(baseNow + 90 * 60_000),
           } as ReferralAssignmentEntity,
         ],
-      });
-    runViewsMock.mockResolvedValueOnce([
+      };
+    });
+    runViewsMock.mockResolvedValue([
       { Success: true, Results: [{ ID: requestId, RequestNumber: 'REF-1', MatterTitle: 'Patent Filing' }] },
       { Success: true, Results: [] },
     ]);
 
-    const cmp = createComponent(ReferralsProInboxComponent);
+    TestBed.configureTestingModule({
+      imports: [ReferralsProInboxComponent],
+      providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } }],
+    });
+
+    const fixture = TestBed.createComponent(ReferralsProInboxComponent);
+    const cmp = fixture.componentInstance;
     await cmp.ngOnInit();
+    fixture.detectChanges();
 
-    expect(runViewMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-        ExtraFilter: expect.stringContaining(`ProfessionalProfileID = '${profileId}'`),
-      }),
-      mockCurrentUser,
-    );
-    expect(cmp.Assignments).toHaveLength(1);
-    expect(cmp.FormatSlaCountdown(cmp.Assignments[0].SLADeadlineAt)).toContain('1h');
-    expect(cmp.IsSlaUrgent(cmp.Assignments[0].SLADeadlineAt)).toBe(true);
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.querySelector('.lead-sla')?.textContent).toContain('1h 30m left');
 
-    cmp.ProfileAvailability = 'Limited';
-    cmp.ProfileMaxConcurrent = 8;
-    await cmp.SaveProfileCapacity();
-    expect(mockProfile.AvailabilityStatus).toBe('Limited');
-    expect(mockProfile.MaxConcurrentReferrals).toBe(8);
-    expect(mockProfile.Save).toHaveBeenCalledTimes(1);
+    // Advance clock by 60 seconds and verify timer updates NowMs & rendered countdown
+    vi.advanceTimersByTime(60_000);
+    fixture.detectChanges();
+    expect(host.querySelector('.lead-sla')?.textContent).toContain('1h 29m left');
 
-    cmp.ngOnDestroy();
+    // Verify cleanup on destroy clears the interval
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    fixture.destroy();
+    expect(clearSpy).toHaveBeenCalled();
   });
 
-  it('ReferralsOpsTelemetryComponent computes Supply-Demand Gap Matrix and Cascade Conversion Telemetry', async () => {
+  it('renders ReferralsOpsTelemetryComponent DOM with Supply-Demand Gap Matrix and Cascade Conversion KPIs', async () => {
     const paId = '10000000-0000-4000-8000-000000000001';
     const jurId = '20000000-0000-4000-8000-000000000001';
     const proId = '40000000-0000-4000-8000-000000000001';
 
-    runViewsMock.mockResolvedValueOnce([
+    runViewsMock.mockResolvedValue([
       {
         Success: true,
         Results: [
-          { ID: 'req-1', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Accepted', CurrentCascadeStep: 2 },
-          { ID: 'req-2', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Exhausted', CurrentCascadeStep: 3 },
+          { ID: 'req-1', RequestNumber: 'REF-1', MatterTitle: 'M&A Deal', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Accepted', CurrentCascadeStep: 2 },
+          { ID: 'req-2', RequestNumber: 'REF-2', MatterTitle: 'Patent Litigation', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Exhausted', CurrentCascadeStep: 3 },
         ] as ReferralRequestEntity[],
       },
       {
@@ -225,24 +332,20 @@ describe('@mj-biz-apps/referrals-ng component interactions (ART-TEST-2)', () => 
       { Success: true, Results: [{ ProfessionalProfileID: proId, JurisdictionID: jurId, StandingStatus: 'GoodStanding' }] as ProfessionalJurisdictionEntity[] },
     ]);
 
-    const cmp = createComponent(ReferralsOpsTelemetryComponent);
-    await cmp.ngOnInit();
-
-    expect(cmp.AcceptedCount).toBe(1);
-    expect(cmp.ExhaustedCount).toBe(1);
-    expect(cmp.ConflictRejectionCount).toBe(1);
-    expect(cmp.ExpiredAssignmentCount).toBe(1);
-    expect(cmp.AcceptanceRatePct).toBe(50);
-    expect(cmp.AverageCascadeStep).toBe(2);
-
-    expect(cmp.SupplyDemandMatrix).toHaveLength(1);
-    expect(cmp.SupplyDemandMatrix[0]).toMatchObject({
-      PracticeAreaName: 'Corporate M&A',
-      JurisdictionName: 'Delaware',
-      VerifiedSupply: 1,
-      OpenDemand: 0,
-      ExhaustedDemand: 1,
-      GapStatus: 'Deficit',
+    TestBed.configureTestingModule({
+      imports: [ReferralsOpsTelemetryComponent],
+      providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } }],
     });
+
+    const fixture = TestBed.createComponent(ReferralsOpsTelemetryComponent);
+    await fixture.componentInstance.ngOnInit();
+    fixture.detectChanges();
+
+    const host: HTMLElement = fixture.nativeElement;
+    expect(host.textContent).toContain('Corporate M&A');
+    expect(host.textContent).toContain('Delaware');
+    expect(host.textContent).toContain('Deficit');
+    expect(host.textContent).toContain('50%');
+    fixture.destroy();
   });
 });

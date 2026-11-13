@@ -19,6 +19,7 @@ import {
   InvalidUUIDError,
   MatchingEngine,
   NormalizePartyName,
+  PersistenceError,
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
@@ -155,6 +156,10 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
   };
 
   return {
+    BeginEntityTransaction: async () => ({
+      Commit: async () => {},
+      Rollback: async () => {},
+    }),
     RunView: runSingle,
     RunViews: async (views: RunViewParams[]) => Promise.all(views.map((v) => runSingle(v))),
     GetEntityObject: async <T>(entityName: string) => {
@@ -169,6 +174,9 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
       }
       if (entityName === 'MJ_BizApps_Referrals: Professional Profiles') {
         return makeEntity<ProfessionalProfileEntity>({ ID: nextUuid() } as ProfessionalProfileEntity, store.profiles) as unknown as T;
+      }
+      if (entityName === 'MJ_BizApps_Referrals: Conflict Check Parties') {
+        return makeEntity<ConflictCheckPartyEntity>({ ID: nextUuid() } as ConflictCheckPartyEntity, store.conflictParties) as unknown as T;
       }
       throw new Error(`Unsupported entity: ${entityName}`);
     },
@@ -403,20 +411,24 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       const rollbackTx = vi.fn().mockResolvedValue(undefined);
       const beginTx = vi.fn().mockResolvedValue({ Commit: commitTx, Rollback: rollbackTx });
       const executeSQL = vi.fn().mockImplementation(async (sql: string) => {
+        expect(sql).not.toContain('SubscriptionTier');
         if (sql.includes('TableCount')) {
           return [{ TableCount: 10 }];
         }
         if (sql.includes('PracticeArea') && sql.includes('SELECT')) {
           return [{ ID: 'A1000001-0000-4000-8000-000000000099' }];
         }
-        if (sql.includes('SubscriptionTier')) {
+        if (sql.includes('ReferralTier') && sql.includes('SELECT')) {
           return [{ ID: 'C1000001-0000-4000-8000-000000000001' }];
         }
-        if (sql.includes('Jurisdiction')) {
+        if (sql.includes('Jurisdiction') && sql.includes('SELECT')) {
           return [{ ID: 'B1000001-0000-4000-8000-000000000001' }];
         }
         if (sql.includes('ProfessionalProfile') && sql.includes('SELECT')) {
           return [{ ID: 'D1000001-0000-4000-8000-000000000001' }];
+        }
+        if (sql.includes('ReferralRequest') && sql.includes('SELECT')) {
+          return [{ ID: 'E1000001-0000-4000-8000-000000000001' }];
         }
         return [];
       });
@@ -458,5 +470,63 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
     expect(typeof ReferralsSlaSweepScheduler.Start).toBe('function');
     expect(typeof ReferralsSlaSweepScheduler.Stop).toBe('function');
     expect(typeof ReferralsSlaSweepScheduler.RunOnce).toBe('function');
+  });
+
+  it('requires a transaction-capable provider for mutations (RR-01)', async () => {
+    const nonTxProvider = {
+      RunView: vi.fn(),
+      RunViews: vi.fn(),
+      GetEntityObject: vi.fn(),
+    } as unknown as IMetadataProvider & IRunViewProvider;
+
+    await expect(
+      CascadeRoutingService.RouteReferralRequest(REQ_1_ID, pro3User, nonTxProvider),
+    ).rejects.toThrow(PersistenceError);
+
+    await expect(
+      CascadeRoutingService.SweepExpiredSLAs(new Date(), pro3User, nonTxProvider),
+    ).rejects.toThrow(PersistenceError);
+  });
+
+  it('enforces unexpired SLA and fresh conflict revalidation on Accept (RR-03) and atomic intake submission (RR-07)', async () => {
+    const store = buildSeededStore();
+    const provider = createInMemoryProvider(store);
+
+    const intake = await CascadeRoutingService.SubmitIntakeWithConflicts(
+      {
+        SeekerName: 'Taylor Client',
+        SeekerEmail: 'taylor@client.test',
+        PracticeAreaID: PRACTICE_AREA_ID,
+        JurisdictionID: JURISDICTION_ID,
+        ReferralTierID: TIER_ID,
+        MatterTitle: 'Atomic Intake Matter',
+        MatterSummary: 'Testing atomic party persistence.',
+        ConflictParties: [{ PartyName: 'Rival Corp Inc.', PartyRole: 'Adverse', OrganizationName: 'Rival Corp LLP' }],
+        AutoRoute: true,
+      },
+      pro3User,
+      provider,
+    );
+    expect(intake.Status).toBe('Routed');
+    expect(intake.RoutingResult?.ActiveProfessionalID).toBe(PRO_2_ID);
+
+    // Expire Pro-2's offer SLA and verify RespondToAssignment(Accept) rejects expired offer
+    const activeOffer = store.assignments.find(
+      (a) => a.ReferralRequestID === intake.RequestID && a.Status === 'Offered',
+    )!;
+    activeOffer.SLADeadlineAt = new Date(Date.now() - 60_000);
+    const pro2Admin = {
+      ID: '50000000-0000-4000-8000-000000000088',
+      Name: 'Admin',
+      UserRoles: [{ Role: 'Association Admin' }],
+    } as unknown as UserInfo;
+
+    await expect(
+      CascadeRoutingService.RespondToAssignment(
+        { ReferralAssignmentID: activeOffer.ID, Action: 'Accept' },
+        pro2Admin,
+        provider,
+      ),
+    ).rejects.toThrow(InvalidLifecycleStateError);
   });
 });

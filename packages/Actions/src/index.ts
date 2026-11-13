@@ -4,6 +4,7 @@ import {
   BaseRemotableOperation,
   IMetadataProvider,
   IRunViewProvider,
+  Metadata,
   RemoteOperationError,
   RemoteOpServerContext,
   UserInfo,
@@ -14,9 +15,11 @@ import {
   AssignmentResponseAction,
   CascadeRoutingService,
   CascadeRoutingResult,
+  ConflictPartyInput,
   MatchCandidateScore,
   MatchCriteria,
   MatchingEngine,
+  ReferralRequestStatus,
   ResponseOutcome,
   SweepResult,
 } from '@mj-biz-apps/referrals-core';
@@ -29,6 +32,28 @@ export interface MatchProfessionalsInput {
   SLAResponseHours?: number;
   MaxResults?: number;
   ReferralRequestID?: string;
+  ConflictParties?: ConflictPartyInput[];
+}
+
+export interface SubmitReferralIntakeInput {
+  SeekerName: string;
+  SeekerEmail: string;
+  PracticeAreaID: string;
+  JurisdictionID: string;
+  ReferralTierID: string;
+  MatterTitle: string;
+  MatterSummary: string;
+  RequiresProBono?: boolean;
+  PreferredLanguage?: string;
+  ConflictParties?: ConflictPartyInput[];
+  AutoRoute?: boolean;
+}
+
+export interface SubmitReferralIntakeOutput {
+  RequestID: string;
+  RequestNumber: string;
+  Status: ReferralRequestStatus;
+  RoutingResult?: CascadeRoutingResult;
 }
 
 export interface RouteReferralInput {
@@ -50,7 +75,15 @@ function resolveProvider(
   provider: IMetadataProvider,
   context?: RemoteOpServerContext,
 ): (IMetadataProvider & IRunViewProvider) | undefined {
-  const candidate = context?.provider ?? provider;
+  const candidate = context?.provider ?? provider ?? Metadata.Provider;
+  if (candidate && 'RunView' in candidate && 'GetEntityObject' in candidate) {
+    return candidate as IMetadataProvider & IRunViewProvider;
+  }
+  return undefined;
+}
+
+function resolveActionProvider(): (IMetadataProvider & IRunViewProvider) | undefined {
+  const candidate = Metadata.Provider;
   if (candidate && 'RunView' in candidate && 'GetEntityObject' in candidate) {
     return candidate as IMetadataProvider & IRunViewProvider;
   }
@@ -109,6 +142,7 @@ export class MatchProfessionalsOperation extends BaseRemotableOperation<
       PreferredLanguage: input.PreferredLanguage,
       SLAResponseHours: input.SLAResponseHours,
       MaxResults: input.MaxResults,
+      ConflictParties: input.ConflictParties,
     };
     const reqId = input.ReferralRequestID ? AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID') : undefined;
     return MatchingEngine.FindMatches(criteria, user, resolveProvider(provider, context), reqId);
@@ -193,7 +227,11 @@ export class RouteReferralAction extends BaseAction {
       };
     }
 
-    const result = await CascadeRoutingService.RouteReferralRequest(referralRequestId, params.ContextUser);
+    const result = await CascadeRoutingService.RouteReferralRequest(
+      referralRequestId,
+      params.ContextUser,
+      resolveActionProvider(),
+    );
     return {
       Success: true,
       ResultCode: 'SUCCESS',
@@ -259,6 +297,7 @@ export class RespondToReferralAction extends BaseAction {
         DeclineReason: getStringParam(params, 'DeclineReason'),
       },
       params.ContextUser,
+      resolveActionProvider(),
     );
 
     return {
@@ -299,7 +338,105 @@ export class SweepExpiredReferralSLAsAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const asOfIso = getStringParam(params, 'AsOfIso');
     const asOf = asOfIso ? new Date(asOfIso) : new Date();
-    const result = await CascadeRoutingService.SweepExpiredSLAs(asOf, params.ContextUser);
+    const result = await CascadeRoutingService.SweepExpiredSLAs(
+      asOf,
+      params.ContextUser,
+      resolveActionProvider(),
+    );
+    return {
+      Success: true,
+      ResultCode: 'SUCCESS',
+      Message: JSON.stringify(result),
+    };
+  }
+}
+
+// =============================================================================
+// 5. SubmitReferralIntake (BaseRemotableOperation + BaseAction)
+// =============================================================================
+@RegisterClass(BaseRemotableOperation, 'Referrals.SubmitReferralIntake')
+export class SubmitReferralIntakeOperation extends BaseRemotableOperation<
+  SubmitReferralIntakeInput,
+  SubmitReferralIntakeOutput
+> {
+  public readonly OperationKey = 'Referrals.SubmitReferralIntake';
+  public readonly ExposeAsAgentTool = true;
+  public readonly ExposeAsMCPTool = true;
+  public readonly ToolDescription =
+    'Atomically creates a ReferralRequest and all ConflictCheckParty records in one transaction, marks Submitted, and optionally routes.';
+
+  protected override async InternalExecute(
+    input: SubmitReferralIntakeInput,
+    provider: IMetadataProvider,
+    user: UserInfo,
+    context: RemoteOpServerContext,
+  ): Promise<SubmitReferralIntakeOutput> {
+    if (
+      !input.SeekerName ||
+      !input.SeekerEmail ||
+      !input.PracticeAreaID ||
+      !input.JurisdictionID ||
+      !input.ReferralTierID ||
+      !input.MatterTitle ||
+      !input.MatterSummary
+    ) {
+      throw new RemoteOperationError('INVALID_INPUT', 'Required intake fields are missing.');
+    }
+    return CascadeRoutingService.SubmitIntakeWithConflicts(
+      input,
+      user,
+      resolveProvider(provider, context),
+    );
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.SubmitReferralIntake')
+export class SubmitReferralIntakeAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const seekerName = getStringParam(params, 'SeekerName');
+    const seekerEmail = getStringParam(params, 'SeekerEmail');
+    const practiceAreaId = getStringParam(params, 'PracticeAreaID');
+    const jurisdictionId = getStringParam(params, 'JurisdictionID');
+    const tierId = getStringParam(params, 'ReferralTierID');
+    const matterTitle = getStringParam(params, 'MatterTitle');
+    const matterSummary = getStringParam(params, 'MatterSummary');
+    if (
+      !seekerName ||
+      !seekerEmail ||
+      !practiceAreaId ||
+      !jurisdictionId ||
+      !tierId ||
+      !matterTitle ||
+      !matterSummary
+    ) {
+      return {
+        Success: false,
+        ResultCode: 'INVALID_PARAMETERS',
+        Message: 'SeekerName, SeekerEmail, PracticeAreaID, JurisdictionID, ReferralTierID, MatterTitle, and MatterSummary are required.',
+      };
+    }
+
+    const partiesRaw = getStringParam(params, 'ConflictPartiesJSON');
+    const parties: ConflictPartyInput[] = partiesRaw ? (JSON.parse(partiesRaw) as ConflictPartyInput[]) : [];
+
+    const result = await CascadeRoutingService.SubmitIntakeWithConflicts(
+      {
+        SeekerName: seekerName,
+        SeekerEmail: seekerEmail,
+        PracticeAreaID: practiceAreaId,
+        JurisdictionID: jurisdictionId,
+        ReferralTierID: tierId,
+        MatterTitle: matterTitle,
+        MatterSummary: matterSummary,
+        RequiresProBono: getBooleanParam(params, 'RequiresProBono'),
+        PreferredLanguage: getStringParam(params, 'PreferredLanguage'),
+        ConflictParties: parties,
+        AutoRoute: getBooleanParam(params, 'AutoRoute'),
+      },
+      params.ContextUser,
+      resolveActionProvider(),
+    );
+
     return {
       Success: true,
       ResultCode: 'SUCCESS',

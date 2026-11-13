@@ -15,12 +15,13 @@ import {
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
-import { ActiveMatterPartyRecord, ConflictScreeningService } from './ConflictScreeningService.js';
+import { ActiveMatterPartyRecord, ConflictScreeningService, NormalizePartyName } from './ConflictScreeningService.js';
 import { MatchingEngine } from './MatchingEngine.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import {
   AssignmentResponseAction,
   CascadeRoutingResult,
+  ConflictPartyInput,
   ReferralRequestStatus,
   ResponseOutcome,
   SweepResult,
@@ -40,8 +41,19 @@ interface EntityTransactionHandle {
   Rollback(): Promise<void>;
 }
 
-interface TransactionalProvider {
-  BeginEntityTransaction(): Promise<EntityTransactionHandle>;
+type TransactionalProvider = IMetadataProvider &
+  IRunViewProvider & {
+    BeginEntityTransaction(): Promise<EntityTransactionHandle>;
+  };
+
+interface SqlCapableProvider {
+  ExecuteSQL<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+    options?: unknown,
+    user?: UserInfo,
+  ): Promise<T[]>;
+  PlatformKey?: string;
 }
 
 const TERMINAL_REQUEST_STATUSES: ReadonlySet<ReferralRequestStatus> = new Set([
@@ -67,16 +79,38 @@ function hasTransactionSupport(provider: unknown): provider is TransactionalProv
   );
 }
 
-async function withEntityTransaction<T>(
-  provider: unknown,
-  fn: () => Promise<T>,
-): Promise<T> {
-  if (!hasTransactionSupport(provider)) {
-    return fn();
+function hasSqlSupport(provider: unknown): provider is SqlCapableProvider {
+  return (
+    typeof provider === 'object' &&
+    provider !== null &&
+    'ExecuteSQL' in provider &&
+    typeof (provider as SqlCapableProvider).ExecuteSQL === 'function'
+  );
+}
+
+/**
+ * Resolves a transaction-capable provider (explicitly passed or `Metadata.Provider`).
+ * Never silently bypasses transactions: throws `PersistenceError` if unavailable.
+ */
+function resolveTransactionalProvider(
+  provider?: IMetadataProvider & IRunViewProvider,
+): TransactionalProvider {
+  const candidate = provider ?? (Metadata.Provider as (IMetadataProvider & IRunViewProvider) | undefined);
+  if (!hasTransactionSupport(candidate)) {
+    throw new PersistenceError(
+      'A transaction-capable provider (BeginEntityTransaction) is required for referral state mutations.',
+    );
   }
+  return candidate;
+}
+
+async function withEntityTransaction<T>(
+  provider: TransactionalProvider,
+  fn: (txProvider: TransactionalProvider) => Promise<T>,
+): Promise<T> {
   const tx = await provider.BeginEntityTransaction();
   try {
-    const result = await fn();
+    const result = await fn(provider);
     await tx.Commit();
     return result;
   } catch (err) {
@@ -87,6 +121,89 @@ async function withEntityTransaction<T>(
     }
     throw err;
   }
+}
+
+async function atomicClaimAssignmentOffer(
+  provider: TransactionalProvider,
+  assignment: ReferralAssignmentEntity,
+  nextStatus: ReferralAssignmentEntity['Status'],
+  respondedAt: Date,
+  notes: string | null,
+  contextUser: UserInfo,
+): Promise<void> {
+  if (hasSqlSupport(provider)) {
+    const isPostgres = provider.PlatformKey === 'postgresql';
+    const sql = isPostgres
+      ? `UPDATE __mj_BizAppsReferrals."ReferralAssignment"
+         SET "Status" = $1, "RespondedAt" = $2, "ResponseNotes" = COALESCE($3, "ResponseNotes")
+         WHERE "ID" = $4 AND "Status" = 'Offered'
+         RETURNING "ID"`
+      : `UPDATE [__mj_BizAppsReferrals].[ReferralAssignment]
+         SET [Status] = @p0, [RespondedAt] = @p1, [ResponseNotes] = COALESCE(@p2, [ResponseNotes])
+         OUTPUT INSERTED.[ID]
+         WHERE [ID] = @p3 AND [Status] = N'Offered'`;
+    const rows = await provider.ExecuteSQL<{ ID: string }>(
+      sql,
+      [nextStatus, respondedAt, notes, assignment.ID],
+      undefined,
+      contextUser,
+    );
+    if (rows.length !== 1) {
+      throw new ConcurrencyConflictError(
+        `ReferralAssignment '${assignment.ID}' could not be claimed from 'Offered' (concurrent modification).`,
+      );
+    }
+    return;
+  }
+
+  if (assignment.Status !== 'Offered') {
+    throw new ConcurrencyConflictError(
+      `ReferralAssignment '${assignment.ID}' is in status '${assignment.Status}', expected 'Offered'.`,
+    );
+  }
+  assignment.Status = nextStatus;
+  assignment.RespondedAt = respondedAt;
+  if (notes) {
+    assignment.ResponseNotes = notes;
+  }
+  await saveOrThrow(assignment, `${nextStatus} ReferralAssignment`);
+}
+
+async function atomicIncrementProCapacity(
+  provider: TransactionalProvider,
+  pro: ProfessionalProfileEntity,
+  contextUser: UserInfo,
+): Promise<void> {
+  if (hasSqlSupport(provider)) {
+    const isPostgres = provider.PlatformKey === 'postgresql';
+    const sql = isPostgres
+      ? `UPDATE __mj_BizAppsReferrals."ProfessionalProfile"
+         SET "ActiveReferralCount" = "ActiveReferralCount" + 1,
+             "TotalAcceptedCount" = "TotalAcceptedCount" + 1
+         WHERE "ID" = $1 AND "ActiveReferralCount" < "MaxConcurrentReferrals"
+         RETURNING "ID"`
+      : `UPDATE [__mj_BizAppsReferrals].[ProfessionalProfile]
+         SET [ActiveReferralCount] = [ActiveReferralCount] + 1,
+             [TotalAcceptedCount] = [TotalAcceptedCount] + 1
+         OUTPUT INSERTED.[ID]
+         WHERE [ID] = @p0 AND [ActiveReferralCount] < [MaxConcurrentReferrals]`;
+    const rows = await provider.ExecuteSQL<{ ID: string }>(sql, [pro.ID], undefined, contextUser);
+    if (rows.length !== 1) {
+      throw new InvalidLifecycleStateError(
+        `Professional '${pro.ID}' reached maximum concurrent referral capacity during acceptance.`,
+      );
+    }
+    return;
+  }
+
+  if (pro.ActiveReferralCount >= pro.MaxConcurrentReferrals) {
+    throw new InvalidLifecycleStateError(
+      `Professional '${pro.ID}' is at max concurrent referral capacity (${pro.ActiveReferralCount}/${pro.MaxConcurrentReferrals}).`,
+    );
+  }
+  pro.ActiveReferralCount = pro.ActiveReferralCount + 1;
+  pro.TotalAcceptedCount = pro.TotalAcceptedCount + 1;
+  await saveOrThrow(pro, 'ProfessionalProfile capacity update');
 }
 
 async function saveOrThrow(entity: BaseEntity, label: string): Promise<void> {
@@ -111,6 +228,93 @@ export class CascadeRoutingService {
    * - Idempotent when request is already `Routed`.
    * - Rejects terminal request statuses (`Accepted`, `Completed`, `Cancelled`, `Exhausted`).
    */
+  /**
+   * Atomically creates a ReferralRequest, persists all ConflictCheckParty records inside a single
+   * transaction, transitions the request to `Submitted`, and optionally routes it immediately.
+   */
+  public static async SubmitIntakeWithConflicts(
+    input: {
+      SeekerName: string;
+      SeekerEmail: string;
+      PracticeAreaID: string;
+      JurisdictionID: string;
+      ReferralTierID: string;
+      MatterTitle: string;
+      MatterSummary: string;
+      RequiresProBono?: boolean;
+      PreferredLanguage?: string | null;
+      UrgencyLevel?: ReferralRequestEntity['UrgencyLevel'];
+      ConflictParties?: ConflictPartyInput[];
+      AutoRoute?: boolean;
+    },
+    contextUser: UserInfo,
+    provider?: IMetadataProvider & IRunViewProvider,
+  ): Promise<{ RequestID: string; RequestNumber: string; Status: ReferralRequestStatus; RoutingResult?: CascadeRoutingResult }> {
+    const txProvider = resolveTransactionalProvider(provider);
+    const validPracticeId = AssertValidUUID(input.PracticeAreaID, 'PracticeAreaID');
+    const validJurisdictionId = AssertValidUUID(input.JurisdictionID, 'JurisdictionID');
+    const validTierId = AssertValidUUID(input.ReferralTierID, 'ReferralTierID');
+
+    const created = await withEntityTransaction(txProvider, async (tx) => {
+      const req = await tx.GetEntityObject<ReferralRequestEntity>(
+        'MJ_BizApps_Referrals: Referral Requests',
+        contextUser,
+      );
+      req.SeekerName = input.SeekerName;
+      req.SeekerEmail = input.SeekerEmail;
+      req.PracticeAreaID = validPracticeId;
+      req.JurisdictionID = validJurisdictionId;
+      req.ReferralTierID = validTierId;
+      req.MatterTitle = input.MatterTitle;
+      req.MatterSummary = input.MatterSummary;
+      req.RequiresProBono = Boolean(input.RequiresProBono);
+      if (input.PreferredLanguage) {
+        req.PreferredLanguage = input.PreferredLanguage;
+      }
+      if (input.UrgencyLevel) {
+        req.UrgencyLevel = input.UrgencyLevel;
+      }
+      req.Status = 'Draft';
+      await saveOrThrow(req, 'Draft ReferralRequest');
+
+      const parties = input.ConflictParties ?? [];
+      for (let i = 0; i < parties.length; i++) {
+        const draft = parties[i];
+        const party = await tx.GetEntityObject<ConflictCheckPartyEntity>(
+          'MJ_BizApps_Referrals: Conflict Check Parties',
+          contextUser,
+        );
+        party.ReferralRequestID = req.ID;
+        party.PartyName = draft.PartyName;
+        party.PartyRole = draft.PartyRole;
+        party.OrganizationName = draft.OrganizationName ?? null;
+        party.NormalizedName = NormalizePartyName(draft.PartyName);
+        await saveOrThrow(party, `ConflictCheckParty #${i + 1}`);
+      }
+
+      req.Status = 'Submitted';
+      req.SubmittedAt = new Date();
+      await saveOrThrow(req, 'Submitted ReferralRequest');
+
+      return { RequestID: req.ID, RequestNumber: req.RequestNumber, Status: req.Status as ReferralRequestStatus };
+    });
+
+    if (input.AutoRoute) {
+      const routingResult = await CascadeRoutingService.RouteReferralRequest(
+        created.RequestID,
+        contextUser,
+        txProvider,
+      );
+      return {
+        ...created,
+        Status: routingResult.Status,
+        RoutingResult: routingResult,
+      };
+    }
+
+    return created;
+  }
+
   public static async RouteReferralRequest(
     referralRequestId: string,
     contextUser: UserInfo,
@@ -118,10 +322,10 @@ export class CascadeRoutingService {
   ): Promise<CascadeRoutingResult> {
     const startMs = Date.now();
     const validRequestId = AssertValidUUID(referralRequestId, 'ReferralRequestID');
-    const md = provider ?? new Metadata();
-    const rv = new RunView(provider);
+    const txProvider = resolveTransactionalProvider(provider);
+    const rv = new RunView(txProvider);
 
-    return withEntityTransaction(provider, async () => {
+    return withEntityTransaction(txProvider, async (md) => {
       const request = await md.GetEntityObject<ReferralRequestEntity>(
         'MJ_BizApps_Referrals: Referral Requests',
         contextUser,
@@ -193,7 +397,7 @@ export class CascadeRoutingService {
           MaxResults: tier.MaxCascadeAttempts * 2,
         },
         contextUser,
-        provider,
+        txProvider,
         validRequestId,
       );
 
@@ -331,10 +535,10 @@ export class CascadeRoutingService {
   ): Promise<ResponseOutcome> {
     const startMs = Date.now();
     const validAssignmentId = AssertValidUUID(params.ReferralAssignmentID, 'ReferralAssignmentID');
-    const md = provider ?? new Metadata();
-    const rv = new RunView(provider);
+    const txProvider = resolveTransactionalProvider(provider);
+    const rv = new RunView(txProvider);
 
-    return withEntityTransaction(provider, async () => {
+    return withEntityTransaction(txProvider, async (md) => {
       const assignment = await md.GetEntityObject<ReferralAssignmentEntity>(
         'MJ_BizApps_Referrals: Referral Assignments',
         contextUser,
@@ -347,7 +551,7 @@ export class CascadeRoutingService {
         'MJ_BizApps_Referrals: Professional Profiles',
         contextUser,
       );
-      if (!(await pro.Load(assignment.ProfessionalProfileID))) {
+      if (!(await pro.Load(AssertValidUUID(assignment.ProfessionalProfileID, 'ProfessionalProfileID')))) {
         throw new PersistenceError(`ProfessionalProfile '${assignment.ProfessionalProfileID}' not found.`);
       }
 
@@ -367,39 +571,150 @@ export class CascadeRoutingService {
         'MJ_BizApps_Referrals: Referral Requests',
         contextUser,
       );
-      if (!(await request.Load(assignment.ReferralRequestID))) {
+      if (!(await request.Load(AssertValidUUID(assignment.ReferralRequestID, 'ReferralRequestID')))) {
         throw new PersistenceError(`ReferralRequest '${assignment.ReferralRequestID}' not found.`);
       }
 
-      const now = new Date();
-      assignment.RespondedAt = now;
-      if (params.Notes) {
-        assignment.ResponseNotes = params.Notes;
+      if (request.Status !== 'Routed') {
+        throw new InvalidLifecycleStateError(
+          `Cannot respond to assignment when ReferralRequest '${request.ID}' is in status '${request.Status}'.`,
+        );
       }
 
+      const now = new Date();
+
       if (params.Action === 'Accept') {
+        if (assignment.SLADeadlineAt != null && new Date(assignment.SLADeadlineAt).getTime() <= now.getTime()) {
+          throw new InvalidLifecycleStateError(
+            `ReferralAssignment '${validAssignmentId}' SLA deadline (${new Date(assignment.SLADeadlineAt).toISOString()}) has expired.`,
+          );
+        }
+
+        if (!pro.IsActive || pro.VerificationStatus !== 'Verified') {
+          throw new InvalidLifecycleStateError(
+            `Professional '${pro.ID}' is no longer active and verified (status: ${pro.VerificationStatus}).`,
+          );
+        }
+
+        if (pro.AvailabilityStatus === 'Unavailable' || pro.AvailabilityStatus === 'OnLeave') {
+          throw new InvalidLifecycleStateError(
+            `Professional '${pro.ID}' is currently ${pro.AvailabilityStatus} and cannot accept referrals.`,
+          );
+        }
+
         if (pro.ActiveReferralCount >= pro.MaxConcurrentReferrals) {
           throw new InvalidLifecycleStateError(
             `Professional '${pro.ID}' is at max concurrent referral capacity (${pro.ActiveReferralCount}/${pro.MaxConcurrentReferrals}).`,
           );
         }
 
-        assignment.Status = 'Accepted';
-        await saveOrThrow(assignment, 'Accepted ReferralAssignment');
+        const validProId = AssertValidUUID(pro.ID, 'ProfessionalProfileID');
+        const validRequestId = AssertValidUUID(request.ID, 'ReferralRequestID');
+        const validJurisdictionId = AssertValidUUID(request.JurisdictionID, 'JurisdictionID');
+
+        const revalBatch = await rv.RunViews(
+          [
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
+              ExtraFilter: `ProfessionalProfileID = '${validProId}' AND JurisdictionID = '${validJurisdictionId}'`,
+              ResultType: 'entity_object',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
+              ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
+              ResultType: 'entity_object',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+              ExtraFilter: "Status IN ('Offered', 'Accepted')",
+              ResultType: 'entity_object',
+            },
+          ],
+          contextUser,
+        );
+
+        if (!revalBatch[0]?.Success || !revalBatch[1]?.Success || !revalBatch[2]?.Success) {
+          throw new ConflictScreeningUnavailableError(
+            'Failed to load licensing standing and conflict screening context during acceptance.',
+          );
+        }
+
+        const jurLinks = revalBatch[0].Results as ProfessionalJurisdictionEntity[];
+        const standingOk = jurLinks.some(
+          (l) => l.StandingStatus === 'GoodStanding' || l.StandingStatus === 'ProHacVice',
+        );
+        if (!standingOk) {
+          throw new InvalidLifecycleStateError(
+            `Professional '${pro.ID}' does not hold active standing in jurisdiction '${validJurisdictionId}'.`,
+          );
+        }
+
+        const requestParties = revalBatch[1].Results as ConflictCheckPartyEntity[];
+        const otherActiveAssignments = (revalBatch[2].Results as ReferralAssignmentEntity[]).filter(
+          (a) => !UUIDsEqual(a.ID, assignment.ID),
+        );
+        const activeMatterParties: ActiveMatterPartyRecord[] = [];
+        if (otherActiveAssignments.length > 0) {
+          const otherReqIds = Array.from(
+            new Set(otherActiveAssignments.map((a) => `'${AssertValidUUID(a.ReferralRequestID, 'ReferralRequestID')}'`)),
+          ).join(',');
+          const otherPartiesRes = await rv.RunView<ConflictCheckPartyEntity>(
+            {
+              EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
+              ExtraFilter: `ReferralRequestID IN (${otherReqIds})`,
+              ResultType: 'entity_object',
+            },
+            contextUser,
+          );
+          if (!otherPartiesRes.Success) {
+            throw new ConflictScreeningUnavailableError(
+              `Failed loading active matter conflicts during acceptance: ${otherPartiesRes.ErrorMessage ?? 'Unknown error'}.`,
+            );
+          }
+          for (const party of otherPartiesRes.Results) {
+            for (const a of otherActiveAssignments) {
+              if (UUIDsEqual(a.ReferralRequestID, party.ReferralRequestID)) {
+                activeMatterParties.push({
+                  ProfessionalProfileID: a.ProfessionalProfileID,
+                  PartyName: party.PartyName,
+                  OrganizationName: party.OrganizationName,
+                });
+              }
+            }
+          }
+        }
+
+        const conflict = ConflictScreeningService.ScreenCandidate(pro, requestParties, activeMatterParties);
+        if (conflict.Status === 'Unavailable') {
+          throw new ConflictScreeningUnavailableError(
+            conflict.Reasons[0] ?? 'Conflict screening unavailable during acceptance.',
+          );
+        }
+        if (conflict.HasConflict) {
+          throw new InvalidLifecycleStateError(
+            `Conflict of interest detected during acceptance: ${conflict.Reasons.join('; ')}`,
+          );
+        }
+
+        await atomicClaimAssignmentOffer(
+          txProvider,
+          assignment,
+          'Accepted',
+          now,
+          params.Notes ?? null,
+          contextUser,
+        );
+        await atomicIncrementProCapacity(txProvider, pro, contextUser);
 
         request.Status = 'Accepted';
         request.AssignedProfessionalID = assignment.ProfessionalProfileID;
         request.AcceptedAt = now;
         await saveOrThrow(request, 'Accepted ReferralRequest');
 
-        pro.ActiveReferralCount = pro.ActiveReferralCount + 1;
-        pro.TotalAcceptedCount = pro.TotalAcceptedCount + 1;
-        await saveOrThrow(pro, 'ProfessionalProfile capacity update');
-
         const queuedRes = await rv.RunView<ReferralAssignmentEntity>(
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-            ExtraFilter: `ReferralRequestID = '${AssertValidUUID(assignment.ReferralRequestID, 'ReferralRequestID')}' AND Status = 'Queued'`,
+            ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Queued'`,
             ResultType: 'entity_object',
           },
           contextUser,
@@ -431,17 +746,30 @@ export class CascadeRoutingService {
         };
       }
 
+      const nextStatus: ReferralAssignmentEntity['Status'] =
+        params.Action === 'ConflictReject' ? 'ConflictRejected' : 'Declined';
+
+      await atomicClaimAssignmentOffer(
+        txProvider,
+        assignment,
+        nextStatus,
+        now,
+        params.Notes ?? null,
+        contextUser,
+      );
+
       if (params.Action === 'ConflictReject') {
         assignment.Status = 'ConflictRejected';
         assignment.ConflictStatus = 'ConflictFound';
         assignment.ConflictReason = params.DeclineReason ?? params.Notes ?? 'Self-reported conflict of interest.';
+        await saveOrThrow(assignment, 'ConflictRejected ReferralAssignment metadata');
       } else {
         assignment.Status = 'Declined';
         assignment.DeclineReason = params.DeclineReason ?? 'Declined by professional.';
+        await saveOrThrow(assignment, 'Declined ReferralAssignment metadata');
       }
-      await saveOrThrow(assignment, `${assignment.Status} ReferralAssignment`);
 
-      const nextOffer = await CascadeRoutingService.AdvanceCascade(request, contextUser, provider);
+      const nextOffer = await CascadeRoutingService.AdvanceCascade(request, contextUser, txProvider);
 
       ReferralTelemetry.RecordOperation({
         Operation: 'RespondToReferral',
@@ -635,8 +963,8 @@ export class CascadeRoutingService {
     provider?: IMetadataProvider & IRunViewProvider,
   ): Promise<SweepResult> {
     const startMs = Date.now();
-    const md = provider ?? new Metadata();
-    const rv = new RunView(provider);
+    const txProvider = resolveTransactionalProvider(provider);
+    const rv = new RunView(txProvider);
 
     const isoNow = asOfDate.toISOString();
     const expiredRes = await rv.RunView<ReferralAssignmentEntity>(
@@ -693,13 +1021,35 @@ export class CascadeRoutingService {
     let exhaustedCount = 0;
 
     for (const assignment of expiredList) {
-      await withEntityTransaction(provider, async () => {
-        if (assignment.Status !== 'Offered') {
-          return;
+      await withEntityTransaction(txProvider, async (md) => {
+        if (hasSqlSupport(txProvider)) {
+          const isPostgres = txProvider.PlatformKey === 'postgresql';
+          const claimSql = isPostgres
+            ? `UPDATE __mj_BizAppsReferrals."ReferralAssignment"
+               SET "Status" = 'Expired', "RespondedAt" = $1
+               WHERE "ID" = $2 AND "Status" = 'Offered' AND "SLADeadlineAt" < $1
+               RETURNING "ID"`
+            : `UPDATE [__mj_BizAppsReferrals].[ReferralAssignment]
+               SET [Status] = N'Expired', [RespondedAt] = @p0
+               OUTPUT INSERTED.[ID]
+               WHERE [ID] = @p1 AND [Status] = N'Offered' AND [SLADeadlineAt] < @p0`;
+          const claimed = await txProvider.ExecuteSQL<{ ID: string }>(
+            claimSql,
+            [asOfDate, assignment.ID],
+            undefined,
+            contextUser,
+          );
+          if (claimed.length !== 1) {
+            return;
+          }
+        } else {
+          if (assignment.Status !== 'Offered') {
+            return;
+          }
+          assignment.Status = 'Expired';
+          assignment.RespondedAt = asOfDate;
+          await saveOrThrow(assignment, 'Expired ReferralAssignment');
         }
-        assignment.Status = 'Expired';
-        assignment.RespondedAt = asOfDate;
-        await saveOrThrow(assignment, 'Expired ReferralAssignment');
         processedIds.push(assignment.ID);
 
         let request = requestById.get(assignment.ReferralRequestID.toLowerCase());
@@ -713,7 +1063,7 @@ export class CascadeRoutingService {
           }
         }
         if (request) {
-          const nextOffer = await CascadeRoutingService.AdvanceCascade(request, contextUser, provider);
+          const nextOffer = await CascadeRoutingService.AdvanceCascade(request, contextUser, txProvider);
           if (nextOffer) {
             cascadedCount++;
           } else {

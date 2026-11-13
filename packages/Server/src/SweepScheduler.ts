@@ -89,6 +89,15 @@ export class ReferralsSlaSweepScheduler {
       };
       this._lastRun = record;
       return record;
+    } catch (err) {
+      const record: SlaSweepRunRecord = {
+        Timestamp: new Date().toISOString(),
+        Success: false,
+        ResultCode: 'ERROR',
+        Message: err instanceof Error ? err.message : String(err),
+      };
+      this._lastRun = record;
+      return record;
     } finally {
       this._running = false;
     }

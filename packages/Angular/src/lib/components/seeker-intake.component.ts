@@ -11,6 +11,7 @@ import {
   MJPageLayoutComponent,
 } from '@memberjunction/ng-ui-components';
 import {
+  CascadeRoutingService,
   MatchCandidateScore,
   MatchingEngine,
   NormalizePartyName,
@@ -439,6 +440,11 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
           PracticeAreaID: this.Prefs.PracticeAreaID,
           JurisdictionID: this.Prefs.JurisdictionID,
           RequiresProBono: this.Prefs.RequiresProBono,
+          ConflictParties: this.ConflictParties.map((p) => ({
+            PartyName: p.PartyName,
+            PartyRole: p.PartyRole,
+            OrganizationName: p.OrganizationName || null,
+          })),
         },
         md.CurrentUser,
       );
@@ -529,6 +535,37 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     this.cdr.markForCheck();
     try {
       const md = new Metadata();
+      const provider = Metadata.Provider;
+      const hasTx =
+        provider != null &&
+        'BeginEntityTransaction' in provider &&
+        typeof (provider as { BeginEntityTransaction?: unknown }).BeginEntityTransaction === 'function';
+
+      if (hasTx) {
+        const result = await CascadeRoutingService.SubmitIntakeWithConflicts(
+          {
+            SeekerName: this.SeekerName,
+            SeekerEmail: this.SeekerEmail,
+            PracticeAreaID: this.Prefs.PracticeAreaID,
+            JurisdictionID: this.Prefs.JurisdictionID,
+            ReferralTierID: this.SelectedTierID,
+            MatterTitle: this.MatterTitle,
+            MatterSummary: this.MatterSummary,
+            RequiresProBono: this.Prefs.RequiresProBono,
+            ConflictParties: this.ConflictParties.map((p) => ({
+              PartyName: p.PartyName,
+              PartyRole: p.PartyRole,
+              OrganizationName: p.OrganizationName || null,
+            })),
+          },
+          md.CurrentUser,
+        );
+        this.StatusBanner = `Referral Request ${result.RequestNumber} submitted with ${this.ConflictParties.length} conflict-check party record(s).`;
+        this.StatusTone = 'success';
+        return;
+      }
+
+      // Client GraphQL fallback: create in Draft, persist and verify every ConflictCheckParty, then promote to Submitted
       const req = await md.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', md.CurrentUser);
       req.SeekerName = this.SeekerName;
       req.SeekerEmail = this.SeekerEmail;
@@ -538,26 +575,43 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       req.MatterTitle = this.MatterTitle;
       req.MatterSummary = this.MatterSummary;
       req.RequiresProBono = this.Prefs.RequiresProBono;
+      req.Status = 'Draft';
+      const draftSaved = await req.Save();
+      if (!draftSaved) {
+        this.StatusBanner = req.LatestResult?.CompleteMessage ?? 'Failed to create draft referral request.';
+        this.StatusTone = 'error';
+        return;
+      }
+
+      for (const draft of this.ConflictParties) {
+        const party = await md.GetEntityObject<ConflictCheckPartyEntity>(
+          'MJ_BizApps_Referrals: Conflict Check Parties',
+          md.CurrentUser,
+        );
+        party.ReferralRequestID = req.ID;
+        party.PartyName = draft.PartyName;
+        party.PartyRole = draft.PartyRole;
+        party.OrganizationName = draft.OrganizationName || null;
+        party.NormalizedName = NormalizePartyName(draft.PartyName);
+        const partySaved = await party.Save();
+        if (!partySaved) {
+          await req.Delete();
+          this.StatusBanner =
+            party.LatestResult?.CompleteMessage ??
+            `Failed to persist conflict-check party '${draft.PartyName}'. Request submission aborted.`;
+          this.StatusTone = 'error';
+          return;
+        }
+      }
+
       req.Status = 'Submitted';
       req.SubmittedAt = new Date();
-      const saved = await req.Save();
-      if (saved) {
-        for (const draft of this.ConflictParties) {
-          const party = await md.GetEntityObject<ConflictCheckPartyEntity>(
-            'MJ_BizApps_Referrals: Conflict Check Parties',
-            md.CurrentUser,
-          );
-          party.ReferralRequestID = req.ID;
-          party.PartyName = draft.PartyName;
-          party.PartyRole = draft.PartyRole;
-          party.OrganizationName = draft.OrganizationName || null;
-          party.NormalizedName = NormalizePartyName(draft.PartyName);
-          await party.Save();
-        }
+      const submittedSaved = await req.Save();
+      if (submittedSaved) {
         this.StatusBanner = `Referral Request ${req.RequestNumber} submitted with ${this.ConflictParties.length} conflict-check party record(s).`;
         this.StatusTone = 'success';
       } else {
-        this.StatusBanner = req.LatestResult?.CompleteMessage ?? 'Failed to save referral request.';
+        this.StatusBanner = req.LatestResult?.CompleteMessage ?? 'Failed to finalize referral request submission.';
         this.StatusTone = 'error';
       }
     } finally {

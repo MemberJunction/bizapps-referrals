@@ -47,7 +47,7 @@ CREATE TABLE __mj_BizAppsReferrals."PracticeArea" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_PracticeArea" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ParentID" UUID NULL
- CONSTRAINT "FK_PracticeArea_Parent" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
+ CONSTRAINT "FK_PracticeArea_Parent" REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
  "Name" VARCHAR(150) NOT NULL,
  "Code" VARCHAR(50) NOT NULL
  CONSTRAINT "UQ_PracticeArea_Code" UNIQUE,
@@ -69,7 +69,7 @@ CREATE TABLE __mj_BizAppsReferrals."Jurisdiction" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_Jurisdiction" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ParentID" UUID NULL
- CONSTRAINT "FK_Jurisdiction_Parent" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
+ CONSTRAINT "FK_Jurisdiction_Parent" REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
  "Name" VARCHAR(150) NOT NULL,
  "Code" VARCHAR(50) NOT NULL
  CONSTRAINT "UQ_Jurisdiction_Code" UNIQUE,
@@ -110,11 +110,11 @@ CREATE TABLE __mj_BizAppsReferrals."ProfessionalProfile" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ProfessionalProfile" PRIMARY KEY DEFAULT gen_random_uuid(),
  "PersonID" UUID NULL
- CONSTRAINT "FK_ProfessionalProfile_Person" FOREIGN KEY REFERENCES __mj_BizAppsCommon."Person"("ID"),
+ CONSTRAINT "FK_ProfessionalProfile_Person" REFERENCES __mj_BizAppsCommon."Person"("ID"),
  "OrganizationID" UUID NULL
- CONSTRAINT "FK_ProfessionalProfile_Organization" FOREIGN KEY REFERENCES __mj_BizAppsCommon."Organization"("ID"),
+ CONSTRAINT "FK_ProfessionalProfile_Organization" REFERENCES __mj_BizAppsCommon."Organization"("ID"),
  "UserID" UUID NULL
- CONSTRAINT "FK_ProfessionalProfile_User" FOREIGN KEY REFERENCES __mj."User"("ID"),
+ CONSTRAINT "FK_ProfessionalProfile_User" REFERENCES __mj."User"("ID"),
  "DisplayName" VARCHAR(200) NOT NULL,
  "FirmName" VARCHAR(200) NULL,
  "Email" VARCHAR(255) NOT NULL,
@@ -157,9 +157,9 @@ CREATE TABLE __mj_BizAppsReferrals."ProfessionalPracticeArea" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ProfessionalPracticeArea" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ProfessionalProfileID" UUID NOT NULL
- CONSTRAINT "FK_ProfessionalPracticeArea_Profile" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
+ CONSTRAINT "FK_ProfessionalPracticeArea_Profile" REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
  "PracticeAreaID" UUID NOT NULL
- CONSTRAINT "FK_ProfessionalPracticeArea_PracticeArea" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
+ CONSTRAINT "FK_ProfessionalPracticeArea_PracticeArea" REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
  "ProficiencyLevel" VARCHAR(30) NOT NULL DEFAULT 'Standard'
  CONSTRAINT "CK_ProfessionalPracticeArea_Proficiency" CHECK ("ProficiencyLevel" IN ('Primary', 'Standard', 'Emerging')),
  "YearsInPractice" INTEGER NOT NULL DEFAULT 0
@@ -177,9 +177,9 @@ CREATE TABLE __mj_BizAppsReferrals."ProfessionalJurisdiction" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ProfessionalJurisdiction" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ProfessionalProfileID" UUID NOT NULL
- CONSTRAINT "FK_ProfessionalJurisdiction_Profile" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
+ CONSTRAINT "FK_ProfessionalJurisdiction_Profile" REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
  "JurisdictionID" UUID NOT NULL
- CONSTRAINT "FK_ProfessionalJurisdiction_Jurisdiction" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
+ CONSTRAINT "FK_ProfessionalJurisdiction_Jurisdiction" REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
  "LicenseNumber" VARCHAR(100) NULL,
  "AdmissionYear" INTEGER NULL,
  "StandingStatus" VARCHAR(30) NOT NULL DEFAULT 'GoodStanding'
@@ -203,13 +203,13 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralRequest" (
  "SeekerPhone" VARCHAR(50) NULL,
  "SeekerCompany" VARCHAR(200) NULL,
  "SeekerPersonID" UUID NULL
- CONSTRAINT "FK_ReferralRequest_SeekerPerson" FOREIGN KEY REFERENCES __mj_BizAppsCommon."Person"("ID"),
+ CONSTRAINT "FK_ReferralRequest_SeekerPerson" REFERENCES __mj_BizAppsCommon."Person"("ID"),
  "PracticeAreaID" UUID NOT NULL
- CONSTRAINT "FK_ReferralRequest_PracticeArea" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
+ CONSTRAINT "FK_ReferralRequest_PracticeArea" REFERENCES __mj_BizAppsReferrals."PracticeArea"("ID"),
  "JurisdictionID" UUID NOT NULL
- CONSTRAINT "FK_ReferralRequest_Jurisdiction" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
+ CONSTRAINT "FK_ReferralRequest_Jurisdiction" REFERENCES __mj_BizAppsReferrals."Jurisdiction"("ID"),
  "ReferralTierID" UUID NOT NULL
- CONSTRAINT "FK_ReferralRequest_ReferralTier" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ReferralTier"("ID"),
+ CONSTRAINT "FK_ReferralRequest_ReferralTier" REFERENCES __mj_BizAppsReferrals."ReferralTier"("ID"),
  "MatterTitle" VARCHAR(255) NOT NULL,
  "MatterSummary" TEXT NOT NULL,
  "UrgencyLevel" VARCHAR(20) NOT NULL DEFAULT 'Standard'
@@ -220,7 +220,7 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralRequest" (
  "Status" VARCHAR(30) NOT NULL DEFAULT 'Draft'
  CONSTRAINT "CK_ReferralRequest_Status" CHECK ("Status" IN ('Draft', 'Submitted', 'Matching', 'Routed', 'Accepted', 'InProgress', 'Completed', 'Exhausted', 'Cancelled')),
  "AssignedProfessionalID" UUID NULL
- CONSTRAINT "FK_ReferralRequest_AssignedProfessional" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
+ CONSTRAINT "FK_ReferralRequest_AssignedProfessional" REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
  "CurrentCascadeStep" INTEGER NOT NULL DEFAULT 0,
  "SubmittedAt" TIMESTAMPTZ NULL,
  "AcceptedAt" TIMESTAMPTZ NULL,
@@ -238,7 +238,7 @@ CREATE TABLE __mj_BizAppsReferrals."ConflictCheckParty" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ConflictCheckParty" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ReferralRequestID" UUID NOT NULL
- CONSTRAINT "FK_ConflictCheckParty_Request" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
+ CONSTRAINT "FK_ConflictCheckParty_Request" REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
  "PartyName" VARCHAR(255) NOT NULL,
  "PartyRole" VARCHAR(30) NOT NULL DEFAULT 'Adverse'
  CONSTRAINT "CK_ConflictCheckParty_PartyRole" CHECK ("PartyRole" IN ('Client', 'Adverse', 'CoParty', 'RelatedEntity', 'Witness')),
@@ -258,9 +258,9 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralAssignment" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ReferralAssignment" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ReferralRequestID" UUID NOT NULL
- CONSTRAINT "FK_ReferralAssignment_Request" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
+ CONSTRAINT "FK_ReferralAssignment_Request" REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
  "ProfessionalProfileID" UUID NOT NULL
- CONSTRAINT "FK_ReferralAssignment_Profile" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
+ CONSTRAINT "FK_ReferralAssignment_Profile" REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
  "CascadeOrder" INTEGER NOT NULL DEFAULT 1
  CONSTRAINT "CK_ReferralAssignment_CascadeOrder" CHECK ("CascadeOrder" >= 1),
  "MatchScore" DECIMAL(5,2) NOT NULL DEFAULT 0.00,
@@ -290,11 +290,11 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralFeedback" (
  "ID" UUID NOT NULL
  CONSTRAINT "PK_ReferralFeedback" PRIMARY KEY DEFAULT gen_random_uuid(),
  "ReferralRequestID" UUID NOT NULL
- CONSTRAINT "FK_ReferralFeedback_Request" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
+ CONSTRAINT "FK_ReferralFeedback_Request" REFERENCES __mj_BizAppsReferrals."ReferralRequest"("ID"),
  "ReferralAssignmentID" UUID NULL
- CONSTRAINT "FK_ReferralFeedback_Assignment" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ReferralAssignment"("ID"),
+ CONSTRAINT "FK_ReferralFeedback_Assignment" REFERENCES __mj_BizAppsReferrals."ReferralAssignment"("ID"),
  "ProfessionalProfileID" UUID NOT NULL
- CONSTRAINT "FK_ReferralFeedback_Profile" FOREIGN KEY REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
+ CONSTRAINT "FK_ReferralFeedback_Profile" REFERENCES __mj_BizAppsReferrals."ProfessionalProfile"("ID"),
  "SubmittedByType" VARCHAR(20) NOT NULL DEFAULT 'Seeker'
  CONSTRAINT "CK_ReferralFeedback_SubmittedByType" CHECK ("SubmittedByType" IN ('Seeker', 'Professional', 'Operator')),
  "Rating" INTEGER NOT NULL
