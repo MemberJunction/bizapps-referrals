@@ -1,0 +1,5 @@
+{
+  "entity": "MJ: Applications",
+  "filePattern": "**/.*.json",
+  "ignoreFiles": [".mj-sync.json"]
+}

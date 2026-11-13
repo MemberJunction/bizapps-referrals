@@ -1,0 +1,5 @@
+{
+  "entity": "MJ_BizApps_Referrals: Practice Areas",
+  "filePattern": "**/.*.json",
+  "ignoreFiles": [".mj-sync.json"]
+}

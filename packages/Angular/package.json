@@ -1,0 +1,74 @@
+{
+  "name": "@mj-biz-apps/referrals-ng",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "BizApps Referrals Angular UI - Seeker Intake, Member Pro Lead Inbox, Ops Telemetry, and Custom BaseFormPanel Forms",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/public-api.d.ts",
+      "import": "./dist/public-api.js",
+      "default": "./dist/public-api.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "build": "ngc",
+    "test": "vitest run"
+  },
+  "author": "MemberJunction.com",
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@mj-biz-apps/referrals-core": "^1.0.0",
+    "@mj-biz-apps/referrals-entities": "^1.0.0",
+    "rxjs": "^7.8.2"
+  },
+  "peerDependencies": {
+    "@angular/animations": "^21.1.3",
+    "@angular/common": "^21.1.3",
+    "@angular/core": "^21.1.3",
+    "@angular/forms": "^21.1.3",
+    "@memberjunction/core": "^6.2.1",
+    "@memberjunction/core-entities": "^6.2.1",
+    "@memberjunction/global": "^6.2.1",
+    "@memberjunction/graphql-dataprovider": "^6.2.1",
+    "@memberjunction/ng-base-forms": "^6.2.1",
+    "@memberjunction/ng-base-types": "^6.2.1",
+    "@memberjunction/ng-entity-viewer": "^6.2.1",
+    "@memberjunction/ng-link-directives": "^6.2.1",
+    "@memberjunction/ng-shared": "^6.2.1",
+    "@memberjunction/ng-shared-generic": "^6.2.1",
+    "@memberjunction/ng-ui-components": "^6.2.1"
+  },
+  "devDependencies": {
+    "@angular/animations": "21.1.3",
+    "@angular/common": "21.1.3",
+    "@angular/compiler": "21.1.3",
+    "@angular/compiler-cli": "21.1.3",
+    "@angular/core": "21.1.3",
+    "@angular/forms": "21.1.3",
+    "@memberjunction/core": "6.2.1",
+    "@memberjunction/core-entities": "6.2.1",
+    "@memberjunction/global": "6.2.1",
+    "@memberjunction/graphql-dataprovider": "6.2.1",
+    "@memberjunction/ng-base-forms": "6.2.1",
+    "@memberjunction/ng-base-types": "6.2.1",
+    "@memberjunction/ng-entity-viewer": "6.2.1",
+    "@memberjunction/ng-link-directives": "6.2.1",
+    "@memberjunction/ng-shared": "6.2.1",
+    "@memberjunction/ng-shared-generic": "6.2.1",
+    "@memberjunction/ng-ui-components": "6.2.1",
+    "typescript": "^5.9.3",
+    "vitest": "1.6.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-referrals"
+  }
+}

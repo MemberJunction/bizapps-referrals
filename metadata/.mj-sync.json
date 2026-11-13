@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "push": {
+    "autoCreateMissingRecords": true
+  },
+  "directoryOrder": [
+    "practice-areas",
+    "jurisdictions",
+    "referral-tiers",
+    "action-categories",
+    "actions",
+    "applications"
+  ],
+  "emitSyncNotes": false,
+  "sqlLogging": {
+    "enabled": true,
+    "outputDirectory": "./sql_logging",
+    "formatAsMigration": true,
+    "filterPatterns": [
+      "*spCreateAIPromptRun*",
+      "*spUpdateAIPromptRun*"
+    ],
+    "filterType": "exclude"
+  }
+}

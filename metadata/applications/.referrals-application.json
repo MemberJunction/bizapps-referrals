@@ -1,0 +1,115 @@
+[
+  {
+    "fields": {
+      "Name": "Referrals",
+      "Description": "Professional Referral & Verified Member Directory Open App: AI-guided seeker intake, credentialed matching, conflict screening, SLA cascade routing, and ops telemetry.",
+      "Icon": "fa-solid fa-scale-balanced",
+      "DefaultForNewUser": true,
+      "DefaultNavItems": [
+        {
+          "Label": "Seeker Intake",
+          "Icon": "fa-solid fa-magnifying-glass",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsSeekerIntakeResource",
+          "isDefault": true
+        },
+        {
+          "Label": "Pro Lead Inbox",
+          "Icon": "fa-solid fa-inbox",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsProInboxResource"
+        },
+        {
+          "Label": "Ops Telemetry",
+          "Icon": "fa-solid fa-chart-line",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsOpsTelemetryResource"
+        }
+      ]
+    },
+    "relatedEntities": {
+      "MJ: Application Entities": [
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Requests",
+            "Sequence": 1,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000001"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Professional Profiles",
+            "Sequence": 2,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000002"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Assignments",
+            "Sequence": 3,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000003"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Practice Areas",
+            "Sequence": 4,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000004"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Jurisdictions",
+            "Sequence": 5,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000005"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Tiers",
+            "Sequence": 6,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000006"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Feedbacks",
+            "Sequence": 7,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000007"
+          }
+        }
+      ]
+    },
+    "primaryKey": {
+      "ID": "D1000001-0000-0000-0000-000000000001"
+    }
+  }
+]

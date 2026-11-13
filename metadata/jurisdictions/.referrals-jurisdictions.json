@@ -1,0 +1,52 @@
+[
+  {
+    "fields": {
+      "Name": "California",
+      "Code": "US-CA",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "CA",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "New York",
+      "Code": "US-NY",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "NY",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Texas",
+      "Code": "US-TX",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "TX",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Delaware",
+      "Code": "US-DE",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "DE",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "United States Federal",
+      "Code": "US-FED",
+      "JurisdictionType": "Federal",
+      "CountryCode": "US",
+      "StateProvinceCode": null,
+      "IsActive": true
+    }
+  }
+]

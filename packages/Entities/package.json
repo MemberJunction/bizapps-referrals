@@ -1,0 +1,46 @@
+{
+  "name": "@mj-biz-apps/referrals-entities",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "BizApps Referrals Entity Subclasses and Zod Schemas",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "vitest run"
+  },
+  "author": "MemberJunction.com",
+  "license": "BUSL-1.1",
+  "devDependencies": {
+    "@memberjunction/core": "6.2.1",
+    "@memberjunction/global": "6.2.1",
+    "@mj-biz-apps/common-entities": "5.62.0",
+    "typescript": "^5.9.3",
+    "vitest": "1.6.1"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "peerDependencies": {
+    "@memberjunction/core": "^6.2.1",
+    "@memberjunction/global": "^6.2.1",
+    "@mj-biz-apps/common-entities": "^5.62.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-referrals"
+  }
+}

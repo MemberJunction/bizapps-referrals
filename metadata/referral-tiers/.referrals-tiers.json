@@ -1,0 +1,38 @@
+[
+  {
+    "fields": {
+      "Name": "Standard Referral",
+      "Code": "STANDARD",
+      "SLAResponseHours": 24,
+      "MaxCascadeAttempts": 3,
+      "PriorityWeight": 1.0,
+      "RequireConflictCheck": true,
+      "Description": "Standard 24-hour SLA response window with up to 3 cascade attempts.",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Priority Concierge",
+      "Code": "PRIORITY",
+      "SLAResponseHours": 8,
+      "MaxCascadeAttempts": 5,
+      "PriorityWeight": 1.5,
+      "RequireConflictCheck": true,
+      "Description": "Accelerated 8-hour SLA response window with up to 5 cascade attempts.",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Pro Bono Network",
+      "Code": "PRO_BONO",
+      "SLAResponseHours": 48,
+      "MaxCascadeAttempts": 3,
+      "PriorityWeight": 1.0,
+      "RequireConflictCheck": true,
+      "Description": "Pro bono referral tier with 48-hour SLA response window.",
+      "IsActive": true
+    }
+  }
+]
