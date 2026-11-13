@@ -4,6 +4,9 @@
     "autoCreateMissingRecords": true
   },
   "directoryOrder": [
+    "practice-areas",
+    "jurisdictions",
+    "referral-tiers",
     "action-categories",
     "actions",
     "applications"

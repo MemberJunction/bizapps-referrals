@@ -1,0 +1,5 @@
+{
+  "entity": "MJ_BizApps_Referrals: Referral Tiers",
+  "filePattern": "**/.*.json",
+  "ignoreFiles": [".mj-sync.json"]
+}

@@ -1,0 +1,5 @@
+{
+  "entity": "MJ_BizApps_Referrals: Jurisdictions",
+  "filePattern": "**/.*.json",
+  "ignoreFiles": [".mj-sync.json"]
+}

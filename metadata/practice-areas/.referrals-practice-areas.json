@@ -1,0 +1,57 @@
+[
+  {
+    "fields": {
+      "Name": "Corporate & M&A",
+      "Code": "CORP_MA",
+      "Category": "Legal",
+      "Description": "Mergers, acquisitions, corporate governance, and entity structuring.",
+      "IconClass": "fa-solid fa-building",
+      "DisplayRank": 10,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Commercial Litigation",
+      "Code": "COMM_LIT",
+      "Category": "Legal",
+      "Description": "Business disputes, contract enforcement, and commercial arbitration.",
+      "IconClass": "fa-solid fa-gavel",
+      "DisplayRank": 20,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Employment & Labor",
+      "Code": "EMP_LABOR",
+      "Category": "Legal",
+      "Description": "Workplace compliance, executive compensation, and employment disputes.",
+      "IconClass": "fa-solid fa-users",
+      "DisplayRank": 30,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Intellectual Property",
+      "Code": "IP_LAW",
+      "Category": "Legal",
+      "Description": "Patents, trademarks, copyrights, and technology licensing.",
+      "IconClass": "fa-solid fa-lightbulb",
+      "DisplayRank": 40,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Real Estate & Land Use",
+      "Code": "REAL_ESTATE",
+      "Category": "Legal",
+      "Description": "Commercial leasing, acquisitions, zoning, and real property.",
+      "IconClass": "fa-solid fa-city",
+      "DisplayRank": 50,
+      "IsActive": true
+    }
+  }
+]
