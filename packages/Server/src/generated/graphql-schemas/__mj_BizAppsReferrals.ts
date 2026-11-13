@@ -80,13 +80,13 @@ export class CreatemjBizAppsReferralsConflictCheckPartyInput {
     @Field({ nullable: true })
     PartyRole?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     OrganizationName: string | null;
 
     @Field({ nullable: true })
     NormalizedName?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Notes: string | null;
 
     @Field(() => RestoreContextInput, { nullable: true })
@@ -111,13 +111,13 @@ export class UpdatemjBizAppsReferralsConflictCheckPartyInput {
     @Field({ nullable: true })
     PartyRole?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     OrganizationName?: string | null;
 
     @Field({ nullable: true })
     NormalizedName?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Notes?: string | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
@@ -278,7 +278,7 @@ export class CreatemjBizAppsReferralsJurisdictionInput {
     @Field({ nullable: true })
     ID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ParentID: string | null;
 
     @Field({ nullable: true })
@@ -293,7 +293,7 @@ export class CreatemjBizAppsReferralsJurisdictionInput {
     @Field({ nullable: true })
     CountryCode?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     StateProvinceCode: string | null;
 
     @Field(() => Boolean, { nullable: true })
@@ -312,7 +312,7 @@ export class UpdatemjBizAppsReferralsJurisdictionInput {
     @Field()
     ID: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ParentID?: string | null;
 
     @Field({ nullable: true })
@@ -327,7 +327,7 @@ export class UpdatemjBizAppsReferralsJurisdictionInput {
     @Field({ nullable: true })
     CountryCode?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     StateProvinceCode?: string | null;
 
     @Field(() => Boolean, { nullable: true })
@@ -487,7 +487,7 @@ export class CreatemjBizAppsReferralsPracticeAreaInput {
     @Field({ nullable: true })
     ID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ParentID: string | null;
 
     @Field({ nullable: true })
@@ -496,13 +496,13 @@ export class CreatemjBizAppsReferralsPracticeAreaInput {
     @Field({ nullable: true })
     Code?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Category: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Description: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     IconClass: string | null;
 
     @Field(() => Int, { nullable: true })
@@ -524,7 +524,7 @@ export class UpdatemjBizAppsReferralsPracticeAreaInput {
     @Field()
     ID: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ParentID?: string | null;
 
     @Field({ nullable: true })
@@ -533,13 +533,13 @@ export class UpdatemjBizAppsReferralsPracticeAreaInput {
     @Field({ nullable: true })
     Code?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Category?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Description?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     IconClass?: string | null;
 
     @Field(() => Int, { nullable: true })
@@ -701,7 +701,7 @@ export class CreatemjBizAppsReferralsProfessionalJurisdictionInput {
     @Field({ nullable: true })
     JurisdictionID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     LicenseNumber: string | null;
 
     @Field(() => Int, { nullable: true })
@@ -732,7 +732,7 @@ export class UpdatemjBizAppsReferralsProfessionalJurisdictionInput {
     @Field({ nullable: true })
     JurisdictionID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     LicenseNumber?: string | null;
 
     @Field(() => Int, { nullable: true })
@@ -1146,28 +1146,28 @@ export class CreatemjBizAppsReferralsProfessionalProfileInput {
     @Field({ nullable: true })
     ID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     PersonID: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     OrganizationID: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     UserID: string | null;
 
     @Field({ nullable: true })
     DisplayName?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     FirmName: string | null;
 
     @Field({ nullable: true })
     Email?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Phone: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     BarOrLicenseNumber: string | null;
 
     @Field({ nullable: true })
@@ -1176,13 +1176,13 @@ export class CreatemjBizAppsReferralsProfessionalProfileInput {
     @Field({ nullable: true })
     AvailabilityStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Bio: string | null;
 
     @Field(() => Int, { nullable: true })
     YearsExperience?: number;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Languages?: string | null;
 
     @Field(() => Float, { nullable: true })
@@ -1231,28 +1231,28 @@ export class UpdatemjBizAppsReferralsProfessionalProfileInput {
     @Field()
     ID: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     PersonID?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     OrganizationID?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     UserID?: string | null;
 
     @Field({ nullable: true })
     DisplayName?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     FirmName?: string | null;
 
     @Field({ nullable: true })
     Email?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Phone?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     BarOrLicenseNumber?: string | null;
 
     @Field({ nullable: true })
@@ -1261,13 +1261,13 @@ export class UpdatemjBizAppsReferralsProfessionalProfileInput {
     @Field({ nullable: true })
     AvailabilityStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Bio?: string | null;
 
     @Field(() => Int, { nullable: true })
     YearsExperience?: number;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Languages?: string | null;
 
     @Field(() => Float, { nullable: true })
@@ -1480,31 +1480,31 @@ export class CreatemjBizAppsReferralsReferralAssignmentInput {
     @Field(() => Float, { nullable: true })
     MatchScore?: number;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ScoreBreakdownJSON: string | null;
 
     @Field({ nullable: true })
     ConflictStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ConflictReason: string | null;
 
     @Field({ nullable: true })
     Status?: string;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     OfferedAt: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     SLADeadlineAt: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     RespondedAt: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ResponseNotes: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     DeclineReason: string | null;
 
     @Field(() => RestoreContextInput, { nullable: true })
@@ -1532,31 +1532,31 @@ export class UpdatemjBizAppsReferralsReferralAssignmentInput {
     @Field(() => Float, { nullable: true })
     MatchScore?: number;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ScoreBreakdownJSON?: string | null;
 
     @Field({ nullable: true })
     ConflictStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ConflictReason?: string | null;
 
     @Field({ nullable: true })
     Status?: string;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     OfferedAt?: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     SLADeadlineAt?: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     RespondedAt?: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ResponseNotes?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     DeclineReason?: string | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
@@ -1712,7 +1712,7 @@ export class CreatemjBizAppsReferralsReferralFeedbackInput {
     @Field({ nullable: true })
     ReferralRequestID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ReferralAssignmentID: string | null;
 
     @Field({ nullable: true })
@@ -1727,7 +1727,7 @@ export class CreatemjBizAppsReferralsReferralFeedbackInput {
     @Field({ nullable: true })
     OutcomeStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Comments: string | null;
 
     @Field({ nullable: true })
@@ -1749,7 +1749,7 @@ export class UpdatemjBizAppsReferralsReferralFeedbackInput {
     @Field({ nullable: true })
     ReferralRequestID?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     ReferralAssignmentID?: string | null;
 
     @Field({ nullable: true })
@@ -1764,7 +1764,7 @@ export class UpdatemjBizAppsReferralsReferralFeedbackInput {
     @Field({ nullable: true })
     OutcomeStatus?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Comments?: string | null;
 
     @Field({ nullable: true })
@@ -1994,13 +1994,13 @@ export class CreatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     SeekerEmail?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerPhone: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerCompany: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerPersonID: string | null;
 
     @Field({ nullable: true })
@@ -2021,10 +2021,10 @@ export class CreatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     UrgencyLevel?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     BudgetRange: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     PreferredLanguage?: string | null;
 
     @Field(() => Boolean, { nullable: true })
@@ -2033,19 +2033,19 @@ export class CreatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     Status?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     AssignedProfessionalID: string | null;
 
     @Field(() => Int, { nullable: true })
     CurrentCascadeStep?: number;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     SubmittedAt: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     AcceptedAt: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     CompletedAt: Date | null;
 
     @Field(() => RestoreContextInput, { nullable: true })
@@ -2070,13 +2070,13 @@ export class UpdatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     SeekerEmail?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerPhone?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerCompany?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     SeekerPersonID?: string | null;
 
     @Field({ nullable: true })
@@ -2097,10 +2097,10 @@ export class UpdatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     UrgencyLevel?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     BudgetRange?: string | null;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     PreferredLanguage?: string | null;
 
     @Field(() => Boolean, { nullable: true })
@@ -2109,19 +2109,19 @@ export class UpdatemjBizAppsReferralsReferralRequestInput {
     @Field({ nullable: true })
     Status?: string;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     AssignedProfessionalID?: string | null;
 
     @Field(() => Int, { nullable: true })
     CurrentCascadeStep?: number;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     SubmittedAt?: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     AcceptedAt?: Date | null;
 
-    @Field({ nullable: true })
+    @Field(() => Date, { nullable: true })
     CompletedAt?: Date | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
@@ -2289,7 +2289,7 @@ export class CreatemjBizAppsReferralsReferralTierInput {
     @Field(() => Boolean, { nullable: true })
     RequireConflictCheck?: boolean;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Description: string | null;
 
     @Field(() => Boolean, { nullable: true })
@@ -2326,7 +2326,7 @@ export class UpdatemjBizAppsReferralsReferralTierInput {
     @Field(() => Boolean, { nullable: true })
     RequireConflictCheck?: boolean;
 
-    @Field({ nullable: true })
+    @Field(() => String, { nullable: true })
     Description?: string | null;
 
     @Field(() => Boolean, { nullable: true })

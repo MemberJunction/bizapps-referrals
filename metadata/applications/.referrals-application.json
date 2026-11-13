@@ -38,6 +38,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000001"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.447Z",
+            "checksum": "be28b9cc8673f4683a468b70cc0be2b77a045be37f2c34a5dd7ff017eb697672"
           }
         },
         {
@@ -49,6 +53,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000002"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.470Z",
+            "checksum": "cf8b3108832faa14638ec14abe4ed9e128d252b79e8bfb9b4888ea63706bd93e"
           }
         },
         {
@@ -60,6 +68,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000003"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.498Z",
+            "checksum": "a328090fedd5fa3e71c72835eedaaeec4bc2e4073b774aad6146247bbca0d4a5"
           }
         },
         {
@@ -71,6 +83,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000004"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.522Z",
+            "checksum": "26493f2824e746b227d8df9783a0ec9d7c1c0531c170faf7964448c898bd36c6"
           }
         },
         {
@@ -82,6 +98,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000005"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.545Z",
+            "checksum": "abe1b4e08b0caf23b2e707fed510f4c469fdf2210eec93ac9354a50861018aa9"
           }
         },
         {
@@ -93,6 +113,10 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000006"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.568Z",
+            "checksum": "3a0a447c8be71b374e3ada234ca8db1f32fbceccc81d07a26eefc5b542aad470"
           }
         },
         {
@@ -104,12 +128,20 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000007"
+          },
+          "sync": {
+            "lastModified": "2026-11-13T23:24:58.591Z",
+            "checksum": "05ea38e22b7f1de5690c827fa801e79722e9ea3e47dde7d81397706977a13883"
           }
         }
       ]
     },
     "primaryKey": {
       "ID": "D1000001-0000-0000-0000-000000000001"
+    },
+    "sync": {
+      "lastModified": "2026-11-13T23:24:58.384Z",
+      "checksum": "76cb33169e7861e260c21ae6b883fe9428330378533ba57c0742d1458d7a2ab3"
     }
   }
 ]
