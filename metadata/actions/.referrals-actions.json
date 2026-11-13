@@ -1,0 +1,54 @@
+[
+  {
+    "fields": {
+      "Name": "Referrals.MatchProfessionals",
+      "Description": "Matches and ranks verified professionals for a referral request using multi-factor scoring and conflict screening.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.MatchProfessionals",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000001"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.RouteReferral",
+      "Description": "Routes a referral request through sequential SLA-backed cascade offers.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.RouteReferral",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000002"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.RespondToReferral",
+      "Description": "Processes a professional accept, decline, or conflict rejection on a referral assignment.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.RespondToReferral",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000003"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.SweepExpiredReferralSLAs",
+      "Description": "Sweeps expired SLA referral offers and cascades to the next eligible professional.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.SweepExpiredReferralSLAs",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000004"
+    }
+  }
+]

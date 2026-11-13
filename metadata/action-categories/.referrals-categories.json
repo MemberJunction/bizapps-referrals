@@ -1,0 +1,11 @@
+[
+  {
+    "fields": {
+      "Name": "BizApps Referrals",
+      "Description": "Professional matching, conflict screening, SLA cascade routing, and SLA sweep actions."
+    },
+    "primaryKey": {
+      "ID": "F1000001-0000-0000-0000-000000000001"
+    }
+  }
+]
