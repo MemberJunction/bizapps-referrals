@@ -1,0 +1,48 @@
+{
+  "name": "@mj-biz-apps/referrals-core",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "BizApps Referrals Core Services - Matching Engine, Conflict Screening, SLA Cascade Routing, and Telemetry",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "build": "tsc && tsc-alias -f",
+    "test": "vitest run"
+  },
+  "author": "MemberJunction.com",
+  "license": "BUSL-1.1",
+  "devDependencies": {
+    "@memberjunction/core": "6.2.1",
+    "@memberjunction/core-entities": "6.2.1",
+    "@memberjunction/global": "6.2.1",
+    "@memberjunction/health": "6.3.0-edge.0",
+    "typescript": "^5.9.3",
+    "vitest": "1.6.1"
+  },
+  "dependencies": {
+    "@mj-biz-apps/referrals-entities": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@memberjunction/core": "^6.2.1",
+    "@memberjunction/core-entities": "^6.2.1",
+    "@memberjunction/global": "^6.2.1",
+    "@memberjunction/health": "^6.2.1 || ^6.3.0-edge.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MemberJunction/bizapps-referrals"
+  }
+}
