@@ -10,6 +10,7 @@ import {
 } from '@memberjunction/core';
 import { RegisterClass } from '@memberjunction/global';
 import {
+  AssertValidUUID,
   AssignmentResponseAction,
   CascadeRoutingService,
   CascadeRoutingResult,
@@ -102,14 +103,15 @@ export class MatchProfessionalsOperation extends BaseRemotableOperation<
       throw new RemoteOperationError('INVALID_INPUT', 'PracticeAreaID and JurisdictionID are required.');
     }
     const criteria: MatchCriteria = {
-      PracticeAreaID: input.PracticeAreaID,
-      JurisdictionID: input.JurisdictionID,
+      PracticeAreaID: AssertValidUUID(input.PracticeAreaID, 'PracticeAreaID'),
+      JurisdictionID: AssertValidUUID(input.JurisdictionID, 'JurisdictionID'),
       RequiresProBono: input.RequiresProBono,
       PreferredLanguage: input.PreferredLanguage,
       SLAResponseHours: input.SLAResponseHours,
       MaxResults: input.MaxResults,
     };
-    return MatchingEngine.FindMatches(criteria, user, resolveProvider(provider, context), input.ReferralRequestID);
+    const reqId = input.ReferralRequestID ? AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID') : undefined;
+    return MatchingEngine.FindMatches(criteria, user, resolveProvider(provider, context), reqId);
   }
 }
 
@@ -172,7 +174,7 @@ export class RouteReferralOperation extends BaseRemotableOperation<
       throw new RemoteOperationError('INVALID_INPUT', 'ReferralRequestID is required.');
     }
     return CascadeRoutingService.RouteReferralRequest(
-      input.ReferralRequestID,
+      AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID'),
       user,
       resolveProvider(provider, context),
     );
@@ -225,7 +227,7 @@ export class RespondToReferralOperation extends BaseRemotableOperation<
     }
     return CascadeRoutingService.RespondToAssignment(
       {
-        ReferralAssignmentID: input.ReferralAssignmentID,
+        ReferralAssignmentID: AssertValidUUID(input.ReferralAssignmentID, 'ReferralAssignmentID'),
         Action: input.Action,
         Notes: input.Notes,
         DeclineReason: input.DeclineReason,

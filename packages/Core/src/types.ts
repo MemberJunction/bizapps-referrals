@@ -1,30 +1,24 @@
-export type VerificationStatus = 'Pending' | 'Verified' | 'Suspended' | 'Expired';
-export type AvailabilityStatus = 'Available' | 'Limited' | 'Unavailable' | 'OnLeave';
-export type ProficiencyLevel = 'Primary' | 'Standard' | 'Emerging';
-export type StandingStatus = 'GoodStanding' | 'Inactive' | 'ProHacVice' | 'Suspended';
-export type UrgencyLevel = 'Low' | 'Standard' | 'High' | 'Urgent';
-export type ReferralRequestStatus =
-  | 'Draft'
-  | 'Submitted'
-  | 'Matching'
-  | 'Routed'
-  | 'Accepted'
-  | 'InProgress'
-  | 'Completed'
-  | 'Exhausted'
-  | 'Cancelled';
-export type PartyRole = 'Client' | 'Adverse' | 'CoParty' | 'RelatedEntity' | 'Witness';
-export type ConflictStatus = 'Pending' | 'Cleared' | 'ConflictFound' | 'Waived';
-export type ReferralAssignmentStatus =
-  | 'Queued'
-  | 'Offered'
-  | 'Accepted'
-  | 'Declined'
-  | 'ConflictRejected'
-  | 'Expired'
-  | 'Withdrawn';
-export type FeedbackSubmittedByType = 'Seeker' | 'Professional' | 'Operator';
-export type FeedbackOutcomeStatus = 'Engaged' | 'ConsultedOnly' | 'NoResponse' | 'NotAFit' | 'Resolved';
+import type {
+  ConflictCheckPartyEntity,
+  ProfessionalJurisdictionEntity,
+  ProfessionalPracticeAreaEntity,
+  ProfessionalProfileEntity,
+  ReferralAssignmentEntity,
+  ReferralFeedbackEntity,
+  ReferralRequestEntity,
+} from '@mj-biz-apps/referrals-entities';
+
+export type VerificationStatus = ProfessionalProfileEntity['VerificationStatus'];
+export type AvailabilityStatus = ProfessionalProfileEntity['AvailabilityStatus'];
+export type ProficiencyLevel = ProfessionalPracticeAreaEntity['ProficiencyLevel'];
+export type StandingStatus = ProfessionalJurisdictionEntity['StandingStatus'];
+export type UrgencyLevel = ReferralRequestEntity['UrgencyLevel'];
+export type ReferralRequestStatus = ReferralRequestEntity['Status'];
+export type PartyRole = ConflictCheckPartyEntity['PartyRole'];
+export type ConflictStatus = ReferralAssignmentEntity['ConflictStatus'];
+export type ReferralAssignmentStatus = ReferralAssignmentEntity['Status'];
+export type FeedbackSubmittedByType = ReferralFeedbackEntity['SubmittedByType'];
+export type FeedbackOutcomeStatus = ReferralFeedbackEntity['OutcomeStatus'];
 
 export interface ScoreBreakdown {
   PracticeAreaScore: number;
@@ -47,7 +41,7 @@ export interface MatchCandidateScore {
   MaxConcurrentReferrals: number;
   Score: number;
   Breakdown: ScoreBreakdown;
-  ConflictStatus: ConflictStatus;
+  ConflictStatus: ConflictStatus | 'Unavailable';
   ConflictReasons: string[];
   Eligible: boolean;
   DisqualificationReason: string | null;
@@ -71,7 +65,7 @@ export interface ConflictPartyInput {
 
 export interface ConflictScreeningResult {
   HasConflict: boolean;
-  Status: ConflictStatus;
+  Status: ConflictStatus | 'Unavailable';
   Reasons: string[];
 }
 

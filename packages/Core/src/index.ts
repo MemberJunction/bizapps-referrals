@@ -1,3 +1,4 @@
+export * from './validation.js';
 export * from './types.js';
 export * from './ReferralTelemetry.js';
 export * from './ConflictScreeningService.js';

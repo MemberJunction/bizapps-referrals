@@ -10,14 +10,26 @@ import {
   MJPageHeaderComponent,
   MJPageLayoutComponent,
 } from '@memberjunction/ng-ui-components';
-import { MatchCandidateScore, MatchingEngine, ReferralTelemetry } from '@mj-biz-apps/referrals-core';
 import {
+  MatchCandidateScore,
+  MatchingEngine,
+  NormalizePartyName,
+  ReferralTelemetry,
+} from '@mj-biz-apps/referrals-core';
+import {
+  ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { ReferralsUiStateHelper, SeekerFilterPreferences } from '../services/referrals-ui-state.service.js';
+
+export interface ConflictCheckPartyDraft {
+  PartyName: string;
+  PartyRole: ConflictCheckPartyEntity['PartyRole'];
+  OrganizationName: string;
+}
 
 /**
  * Tab 1: Seeker Intake — Variant A Editorial Concierge + Filter Drawer.
@@ -59,6 +71,22 @@ import { ReferralsUiStateHelper, SeekerFilterPreferences } from '../services/ref
             @if (StatusBanner) {
               <div class="status-banner" [attr.data-tone]="StatusTone">{{ StatusBanner }}</div>
             }
+
+            <div class="structured-parse-box">
+              <label class="field full-width">
+                <span>Quick Parse Structured Intake Notes (Optional)</span>
+                <div class="parse-row">
+                  <textarea
+                    rows="2"
+                    [(ngModel)]="RawIntakeNotes"
+                    placeholder="Paste notes e.g. Name: Alex Morgan | Email: alex@co.com | Matter: M&A Dispute | Adverse: Rival Corp LLP"
+                  ></textarea>
+                  <button type="button" class="btn-outline parse-btn" (click)="ParseStructuredIntake()">
+                    Parse Notes
+                  </button>
+                </div>
+              </label>
+            </div>
 
             <div class="intake-grid">
               <label class="field">
@@ -105,6 +133,35 @@ import { ReferralsUiStateHelper, SeekerFilterPreferences } from '../services/ref
               <span>Matter Summary *</span>
               <textarea rows="4" [(ngModel)]="MatterSummary" placeholder="Describe key facts, timeline, and adverse parties..."></textarea>
             </label>
+
+            <div class="conflict-parties-box">
+              <div class="conflict-header">
+                <strong>Conflict-Check Parties ({{ ConflictParties.length }})</strong>
+                <span class="hint">Add adverse, opposing, or related entities for automated conflict screening.</span>
+              </div>
+              <div class="conflict-add-row">
+                <input type="text" [(ngModel)]="NewPartyName" placeholder="Party name (e.g. Rival Corp Inc.)" />
+                <select [(ngModel)]="NewPartyRole">
+                  <option value="Adverse">Adverse</option>
+                  <option value="Client">Client</option>
+                  <option value="RelatedEntity">RelatedEntity</option>
+                  <option value="CoParty">CoParty</option>
+                  <option value="Witness">Witness</option>
+                </select>
+                <input type="text" [(ngModel)]="NewPartyOrg" placeholder="Organization / Firm (optional)" />
+                <button type="button" class="btn-outline" (click)="AddConflictParty()">Add Party</button>
+              </div>
+              @if (ConflictParties.length > 0) {
+                <ul class="conflict-list">
+                  @for (party of ConflictParties; track $index) {
+                    <li class="conflict-item">
+                      <span><strong>{{ party.PartyName }}</strong> ({{ party.PartyRole }}) @if (party.OrganizationName) { — {{ party.OrganizationName }} }</span>
+                      <button type="button" class="btn-link" (click)="RemoveConflictParty($index)">Remove</button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
 
             <div class="intake-footer">
               <label class="checkbox-row">
@@ -190,6 +247,39 @@ import { ReferralsUiStateHelper, SeekerFilterPreferences } from '../services/ref
       font-size: 0.88rem;
     }
     .full-width { margin-bottom: 1rem; }
+    .structured-parse-box { margin-bottom: 0.75rem; }
+    .parse-row { display: flex; gap: 0.5rem; align-items: stretch; }
+    .parse-row textarea { flex: 1; }
+    .parse-btn { white-space: nowrap; }
+    .conflict-parties-box {
+      border: 1px solid var(--mj-border-default);
+      border-radius: var(--mj-radius-sm, 6px);
+      padding: 0.85rem;
+      margin-bottom: 1rem;
+      background: var(--mj-bg-surface);
+    }
+    .conflict-header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
+    .conflict-header .hint { color: var(--mj-text-secondary); font-size: 0.78rem; }
+    .conflict-add-row { display: grid; grid-template-columns: 1.4fr 0.9fr 1.2fr auto; gap: 0.5rem; }
+    .conflict-add-row input, .conflict-add-row select {
+      background: var(--mj-bg-surface-card, var(--mj-bg-surface));
+      border: 1px solid var(--mj-border-default);
+      border-radius: var(--mj-radius-sm, 6px);
+      padding: 0.4rem 0.55rem;
+      color: var(--mj-text-primary);
+      font-size: 0.84rem;
+    }
+    .conflict-list { list-style: none; padding: 0; margin: 0.65rem 0 0 0; display: flex; flex-direction: column; gap: 0.35rem; }
+    .conflict-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: var(--mj-radius-sm, 4px);
+      background: var(--mj-bg-surface-card, var(--mj-bg-surface));
+      border: 1px solid var(--mj-border-default);
+    }
     .intake-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
     .checkbox-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--mj-text-secondary); }
     .btn-primary {
@@ -278,6 +368,11 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   public SelectedTierID = '';
   public MatterTitle = '';
   public MatterSummary = '';
+  public RawIntakeNotes = '';
+  public ConflictParties: ConflictCheckPartyDraft[] = [];
+  public NewPartyName = '';
+  public NewPartyRole: ConflictCheckPartyEntity['PartyRole'] = 'Adverse';
+  public NewPartyOrg = '';
   public IsMatching = false;
   public IsSubmitting = false;
   public StatusBanner = '';
@@ -353,6 +448,76 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     }
   }
 
+  public ParseStructuredIntake(rawText?: string): void {
+    const source = (rawText ?? this.RawIntakeNotes).trim();
+    if (!source) {
+      return;
+    }
+
+    const extractField = (labelRegex: RegExp): string | undefined => {
+      const m = labelRegex.exec(source);
+      return m?.[1]?.trim();
+    };
+
+    const nameMatch = extractField(/(?:Name|Seeker)\s*:\s*([^|\n]+)/i);
+    if (nameMatch) this.SeekerName = nameMatch;
+
+    const emailMatch =
+      extractField(/Email\s*:\s*([^|\n]+)/i) ??
+      /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i.exec(source)?.[1];
+    if (emailMatch) this.SeekerEmail = emailMatch;
+
+    const matterMatch = extractField(/(?:Matter|Title|Subject)\s*:\s*([^|\n]+)/i);
+    if (matterMatch) this.MatterTitle = matterMatch;
+
+    const summaryMatch = extractField(/(?:Summary|Details|Facts)\s*:\s*([^|\n]+)/i);
+    this.MatterSummary = summaryMatch ?? (this.MatterSummary || source);
+
+    if (/\bpro\s*bono\b/i.test(source)) {
+      this.Prefs.RequiresProBono = true;
+    }
+
+    const adverseMatch = extractField(/(?:Adverse|Opposing|Conflict)\s*(?:Party)?\s*:\s*([^|\n]+)/i);
+    if (adverseMatch) {
+      for (const rawParty of adverseMatch.split(/[,;]+/)) {
+        const partyName = rawParty.trim();
+        if (partyName && !this.ConflictParties.some((p) => p.PartyName.toLowerCase() === partyName.toLowerCase())) {
+          this.ConflictParties.push({
+            PartyName: partyName,
+            PartyRole: 'Adverse',
+            OrganizationName: partyName,
+          });
+        }
+      }
+    }
+
+    this.StatusBanner = 'Parsed structured intake fields. Please review before submitting.';
+    this.StatusTone = 'info';
+    this.cdr.markForCheck();
+  }
+
+  public AddConflictParty(): void {
+    const name = this.NewPartyName.trim();
+    if (!name) {
+      return;
+    }
+    this.ConflictParties.push({
+      PartyName: name,
+      PartyRole: this.NewPartyRole,
+      OrganizationName: this.NewPartyOrg.trim(),
+    });
+    this.NewPartyName = '';
+    this.NewPartyOrg = '';
+    this.cdr.markForCheck();
+  }
+
+  public RemoveConflictParty(index: number): void {
+    if (index >= 0 && index < this.ConflictParties.length) {
+      this.ConflictParties.splice(index, 1);
+      this.cdr.markForCheck();
+    }
+  }
+
   public async SubmitRequest(): Promise<void> {
     if (!this.SeekerName || !this.SeekerEmail || !this.Prefs.PracticeAreaID || !this.Prefs.JurisdictionID || !this.MatterTitle || !this.MatterSummary) {
       this.StatusBanner = 'Please complete all required intake fields.';
@@ -377,7 +542,19 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       req.SubmittedAt = new Date();
       const saved = await req.Save();
       if (saved) {
-        this.StatusBanner = `Referral Request ${req.RequestNumber} submitted.`;
+        for (const draft of this.ConflictParties) {
+          const party = await md.GetEntityObject<ConflictCheckPartyEntity>(
+            'MJ_BizApps_Referrals: Conflict Check Parties',
+            md.CurrentUser,
+          );
+          party.ReferralRequestID = req.ID;
+          party.PartyName = draft.PartyName;
+          party.PartyRole = draft.PartyRole;
+          party.OrganizationName = draft.OrganizationName || null;
+          party.NormalizedName = NormalizePartyName(draft.PartyName);
+          await party.Save();
+        }
+        this.StatusBanner = `Referral Request ${req.RequestNumber} submitted with ${this.ConflictParties.length} conflict-check party record(s).`;
         this.StatusTone = 'success';
       } else {
         this.StatusBanner = req.LatestResult?.CompleteMessage ?? 'Failed to save referral request.';

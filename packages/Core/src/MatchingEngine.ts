@@ -9,6 +9,7 @@ import {
 import { ActiveMatterPartyRecord, ConflictScreeningService } from './ConflictScreeningService.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import { MatchCandidateScore, MatchCriteria, ScoreBreakdown } from './types.js';
+import { AssertValidUUID, ConflictScreeningUnavailableError, UUIDsEqual } from './validation.js';
 
 export class MatchingEngine {
   /**
@@ -24,14 +25,12 @@ export class MatchingEngine {
   }): MatchCandidateScore {
     const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties } = params;
 
-    // Screen conflicts first
     const allParties = [
       ...conflictParties,
       ...(criteria.ConflictParties ?? []),
     ];
     const conflictResult = ConflictScreeningService.ScreenCandidate(profile, allParties, activeMatterParties);
 
-    // Check hard eligibility gates
     let disqualificationReason: string | null = null;
     if (!profile.IsActive) {
       disqualificationReason = 'Profile is inactive.';
@@ -47,11 +46,12 @@ export class MatchingEngine {
       disqualificationReason = 'Professional is not in good standing in the requested jurisdiction.';
     } else if (criteria.RequiresProBono && !profile.AcceptsProBono) {
       disqualificationReason = 'Professional does not accept pro bono matters.';
+    } else if (conflictResult.Status === 'Unavailable') {
+      disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict screening unavailable.';
     } else if (conflictResult.HasConflict) {
       disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict of interest detected.';
     }
 
-    // 1. Practice Area Score (0-35)
     let practiceAreaScore = 0;
     if (practiceLink) {
       const base =
@@ -64,7 +64,6 @@ export class MatchingEngine {
       practiceAreaScore = base + yearsBonus;
     }
 
-    // 2. Jurisdiction Standing Score (0-25)
     let jurisdictionScore = 0;
     if (jurisdictionLink) {
       if (jurisdictionLink.StandingStatus === 'GoodStanding') {
@@ -74,7 +73,6 @@ export class MatchingEngine {
       }
     }
 
-    // 3. Capacity & Availability Score (0-15)
     let capacityScore = 0;
     if (profile.MaxConcurrentReferrals > 0) {
       const headroomRatio = Math.max(0, (profile.MaxConcurrentReferrals - profile.ActiveReferralCount) / profile.MaxConcurrentReferrals);
@@ -82,9 +80,8 @@ export class MatchingEngine {
       capacityScore = Math.round(headroomRatio * 15 * availMultiplier * 100) / 100;
     }
 
-    // 4. Responsiveness & SLA Track Record Score (0-15)
     const targetSla = criteria.SLAResponseHours ?? 24;
-    let responsivenessScore = 10; // default neutral score if no history yet
+    let responsivenessScore = 10;
     if (profile.AverageResponseHours != null) {
       const ratio = profile.AverageResponseHours / targetSla;
       if (ratio <= 0.25) responsivenessScore = 15;
@@ -93,12 +90,10 @@ export class MatchingEngine {
       else responsivenessScore = Math.max(2, 10 - (ratio - 1) * 4);
     }
 
-    // 5. Quality / Rating Score (0-10)
     const ratingScore = profile.AverageRating != null
       ? Math.round(((profile.AverageRating / 5) * 10) * 100) / 100
       : 7;
 
-    // 6. Language Bonus (0-5)
     let languageBonus = 0;
     if (criteria.PreferredLanguage && profile.Languages) {
       const langs = profile.Languages.toLowerCase().split(',').map((l) => l.trim());
@@ -142,6 +137,7 @@ export class MatchingEngine {
 
   /**
    * Finds and ranks matching professionals using a single batched `RunViews` round-trip.
+   * Validates all UUID inputs and fails closed if any conflict-screening query fails.
    */
   public static async FindMatches(
     criteria: MatchCriteria,
@@ -150,6 +146,10 @@ export class MatchingEngine {
     referralRequestId?: string,
   ): Promise<MatchCandidateScore[]> {
     const startMs = Date.now();
+    const practiceAreaId = AssertValidUUID(criteria.PracticeAreaID, 'PracticeAreaID');
+    const jurisdictionId = AssertValidUUID(criteria.JurisdictionID, 'JurisdictionID');
+    const validatedRequestId = referralRequestId ? AssertValidUUID(referralRequestId, 'ReferralRequestID') : undefined;
+
     const rv = new RunView(provider);
 
     const viewsToRun = [
@@ -160,12 +160,12 @@ export class MatchingEngine {
       },
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
-        ExtraFilter: `PracticeAreaID = '${criteria.PracticeAreaID}'`,
+        ExtraFilter: `PracticeAreaID = '${practiceAreaId}'`,
         ResultType: 'entity_object' as const,
       },
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
-        ExtraFilter: `JurisdictionID = '${criteria.JurisdictionID}'`,
+        ExtraFilter: `JurisdictionID = '${jurisdictionId}'`,
         ResultType: 'entity_object' as const,
       },
       {
@@ -175,48 +175,54 @@ export class MatchingEngine {
       },
     ];
 
-    if (referralRequestId) {
+    if (validatedRequestId) {
       viewsToRun.push({
         EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
-        ExtraFilter: `ReferralRequestID = '${referralRequestId}'`,
+        ExtraFilter: `ReferralRequestID = '${validatedRequestId}'`,
         ResultType: 'entity_object' as const,
       });
     }
 
     const results = await rv.RunViews(viewsToRun, contextUser);
 
-    const profiles = (results[0]?.Success ? results[0].Results : []) as ProfessionalProfileEntity[];
-    const practiceLinks = (results[1]?.Success ? results[1].Results : []) as ProfessionalPracticeAreaEntity[];
-    const jurisdictionLinks = (results[2]?.Success ? results[2].Results : []) as ProfessionalJurisdictionEntity[];
-    const activeAssignments = (results[3]?.Success ? results[3].Results : []) as ReferralAssignmentEntity[];
-    const requestConflictParties = referralRequestId && results[4]?.Success
+    for (let i = 0; i < viewsToRun.length; i++) {
+      if (!results[i]?.Success) {
+        throw new ConflictScreeningUnavailableError(
+          `Batched matching query '${viewsToRun[i].EntityName}' failed: ${results[i]?.ErrorMessage ?? 'Unknown error'}.`,
+        );
+      }
+    }
+
+    const profiles = results[0].Results as ProfessionalProfileEntity[];
+    const practiceLinks = results[1].Results as ProfessionalPracticeAreaEntity[];
+    const jurisdictionLinks = results[2].Results as ProfessionalJurisdictionEntity[];
+    const activeAssignments = results[3].Results as ReferralAssignmentEntity[];
+    const requestConflictParties = validatedRequestId
       ? (results[4].Results as ConflictCheckPartyEntity[])
       : [];
 
-    // Load conflict parties for active assignments in a single batched query if any exist
     const activeMatterParties: ActiveMatterPartyRecord[] = [];
     if (activeAssignments.length > 0) {
-      const activeReqIds = Array.from(new Set(activeAssignments.map((a) => `'${a.ReferralRequestID}'`))).join(',');
+      const validReqIds = activeAssignments.map((a) => AssertValidUUID(a.ReferralRequestID, 'ReferralRequestID'));
+      const activeReqIdsSql = Array.from(new Set(validReqIds.map((id) => `'${id}'`))).join(',');
       const activePartiesResult = await rv.RunView<ConflictCheckPartyEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
-          ExtraFilter: `ReferralRequestID IN (${activeReqIds})`,
+          ExtraFilter: `ReferralRequestID IN (${activeReqIdsSql})`,
           ResultType: 'entity_object',
         },
         contextUser,
       );
-      if (activePartiesResult.Success) {
-        const reqToPros = new Map<string, string[]>();
-        for (const a of activeAssignments) {
-          const list = reqToPros.get(a.ReferralRequestID) ?? [];
-          list.push(a.ProfessionalProfileID);
-          reqToPros.set(a.ReferralRequestID, list);
-        }
-        for (const party of activePartiesResult.Results) {
-          const proIds = reqToPros.get(party.ReferralRequestID) ?? [];
-          for (const proId of proIds) {
+      if (!activePartiesResult.Success) {
+        throw new ConflictScreeningUnavailableError(
+          `Active matter conflict query failed: ${activePartiesResult.ErrorMessage ?? 'Unknown error'}.`,
+        );
+      }
+      for (const party of activePartiesResult.Results) {
+        for (const assignment of activeAssignments) {
+          if (UUIDsEqual(assignment.ReferralRequestID, party.ReferralRequestID)) {
             activeMatterParties.push({
-              ProfessionalProfileID: proId,
+              ProfessionalProfileID: assignment.ProfessionalProfileID,
               PartyName: party.PartyName,
               OrganizationName: party.OrganizationName,
             });
@@ -227,19 +233,19 @@ export class MatchingEngine {
 
     const practiceByPro = new Map<string, ProfessionalPracticeAreaEntity>();
     for (const link of practiceLinks) {
-      practiceByPro.set(link.ProfessionalProfileID, link);
+      practiceByPro.set(link.ProfessionalProfileID.toLowerCase(), link);
     }
 
     const jurisdictionByPro = new Map<string, ProfessionalJurisdictionEntity>();
     for (const link of jurisdictionLinks) {
-      jurisdictionByPro.set(link.ProfessionalProfileID, link);
+      jurisdictionByPro.set(link.ProfessionalProfileID.toLowerCase(), link);
     }
 
     const scored = profiles.map((profile) =>
       MatchingEngine.ScoreCandidate({
         profile,
-        practiceLink: practiceByPro.get(profile.ID),
-        jurisdictionLink: jurisdictionByPro.get(profile.ID),
+        practiceLink: practiceByPro.get(profile.ID.toLowerCase()),
+        jurisdictionLink: jurisdictionByPro.get(profile.ID.toLowerCase()),
         criteria,
         conflictParties: requestConflictParties,
         activeMatterParties,

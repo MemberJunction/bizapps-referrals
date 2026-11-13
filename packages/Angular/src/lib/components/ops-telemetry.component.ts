@@ -10,9 +10,28 @@ import {
   MJPageHeaderComponent,
   MJPageLayoutComponent,
 } from '@memberjunction/ng-ui-components';
-import { CascadeRoutingService, ReferralTelemetry } from '@mj-biz-apps/referrals-core';
-import { ReferralAssignmentEntity, ReferralRequestEntity } from '@mj-biz-apps/referrals-entities';
+import { CascadeRoutingService, ReferralTelemetry, UUIDsEqual } from '@mj-biz-apps/referrals-core';
+import {
+  JurisdictionEntity,
+  PracticeAreaEntity,
+  ProfessionalJurisdictionEntity,
+  ProfessionalPracticeAreaEntity,
+  ProfessionalProfileEntity,
+  ReferralAssignmentEntity,
+  ReferralRequestEntity,
+} from '@mj-biz-apps/referrals-entities';
 import { OpsTelemetryPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
+
+export interface SupplyDemandGapRow {
+  PracticeAreaID: string;
+  PracticeAreaName: string;
+  JurisdictionID: string;
+  JurisdictionName: string;
+  VerifiedSupply: number;
+  OpenDemand: number;
+  ExhaustedDemand: number;
+  GapStatus: 'Surplus' | 'Balanced' | 'Deficit';
+}
 
 /**
  * Tab 3: Ops Telemetry — Variant C Ops Command.
@@ -66,6 +85,54 @@ import { OpsTelemetryPreferences, ReferralsUiStateHelper } from '../services/ref
               <span class="kpi-label">Exhausted</span>
               <strong class="kpi-value">{{ ExhaustedCount }}</strong>
             </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Acceptance Rate</span>
+              <strong class="kpi-value">{{ AcceptanceRatePct | number:'1.0-1' }}%</strong>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Avg Cascade Step</span>
+              <strong class="kpi-value">{{ AverageCascadeStep | number:'1.1-1' }}</strong>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Conflict Rejections</span>
+              <strong class="kpi-value">{{ ConflictRejectionCount }}</strong>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Expired SLAs</span>
+              <strong class="kpi-value">{{ ExpiredAssignmentCount }}</strong>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <h3>Supply-Demand Gap Matrix (Practice Area × Jurisdiction)</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Practice Area</th>
+                  <th>Jurisdiction</th>
+                  <th>Verified Supply</th>
+                  <th>Open Demand</th>
+                  <th>Exhausted</th>
+                  <th>Coverage</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of SupplyDemandMatrix; track row.PracticeAreaID + ':' + row.JurisdictionID) {
+                  <tr>
+                    <td>{{ row.PracticeAreaName }}</td>
+                    <td>{{ row.JurisdictionName }}</td>
+                    <td>{{ row.VerifiedSupply }}</td>
+                    <td>{{ row.OpenDemand }}</td>
+                    <td>{{ row.ExhaustedDemand }}</td>
+                    <td><span class="badge" [attr.data-gap]="row.GapStatus">{{ row.GapStatus }}</span></td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="empty-cell">No supply-demand activity recorded yet.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
 
           <div class="table-card">
@@ -157,8 +224,9 @@ import { OpsTelemetryPreferences, ReferralsUiStateHelper } from '../services/ref
       background: var(--mj-status-info-bg);
       color: var(--mj-status-info-text);
     }
-    .badge[data-status="Accepted"] { background: var(--mj-status-success-bg); color: var(--mj-status-success-text); }
-    .badge[data-status="Exhausted"] { background: var(--mj-status-error-bg); color: var(--mj-status-error-text); }
+    .badge[data-status="Accepted"], .badge[data-gap="Surplus"] { background: var(--mj-status-success-bg); color: var(--mj-status-success-text); }
+    .badge[data-status="Exhausted"], .badge[data-gap="Deficit"] { background: var(--mj-status-error-bg); color: var(--mj-status-error-text); }
+    .table-card { margin-bottom: 1.25rem; }
     .empty-cell { text-align: center; color: var(--mj-text-secondary); padding: 1.5rem; }
   `],
 })
@@ -168,6 +236,11 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
 
   public Requests: ReferralRequestEntity[] = [];
   public Assignments: ReferralAssignmentEntity[] = [];
+  public PracticeAreas: PracticeAreaEntity[] = [];
+  public Jurisdictions: JurisdictionEntity[] = [];
+  public Profiles: ProfessionalProfileEntity[] = [];
+  public PracticeLinks: ProfessionalPracticeAreaEntity[] = [];
+  public JurisdictionLinks: ProfessionalJurisdictionEntity[] = [];
   public Prefs: OpsTelemetryPreferences = { ShowExhaustedOnly: false };
   public IsSweeping = false;
   public SweepSummary = '';
@@ -182,6 +255,83 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
 
   public get ExhaustedCount(): number {
     return this.Requests.filter((r) => r.Status === 'Exhausted').length;
+  }
+
+  public get ConflictRejectionCount(): number {
+    return this.Assignments.filter((a) => a.Status === 'ConflictRejected').length;
+  }
+
+  public get ExpiredAssignmentCount(): number {
+    return this.Assignments.filter((a) => a.Status === 'Expired').length;
+  }
+
+  public get AcceptanceRatePct(): number {
+    const routedOrDone = this.Requests.filter((r) => r.Status !== 'Draft').length;
+    return routedOrDone === 0 ? 0 : (this.AcceptedCount / routedOrDone) * 100;
+  }
+
+  public get AverageCascadeStep(): number {
+    const accepted = this.Requests.filter((r) => r.Status === 'Accepted' || r.Status === 'Completed');
+    if (accepted.length === 0) return 0;
+    const sum = accepted.reduce((acc, r) => acc + (r.CurrentCascadeStep || 1), 0);
+    return sum / accepted.length;
+  }
+
+  public get SupplyDemandMatrix(): SupplyDemandGapRow[] {
+    const verifiedIds = new Set(
+      this.Profiles.filter((p) => p.IsActive && p.VerificationStatus === 'Verified').map((p) => p.ID.toLowerCase()),
+    );
+    const pairs = new Map<string, { paId: string; jurId: string }>();
+
+    for (const req of this.Requests) {
+      const key = `${req.PracticeAreaID.toLowerCase()}:${req.JurisdictionID.toLowerCase()}`;
+      if (!pairs.has(key)) {
+        pairs.set(key, { paId: req.PracticeAreaID, jurId: req.JurisdictionID });
+      }
+    }
+
+    const rows: SupplyDemandGapRow[] = [];
+    for (const pair of pairs.values()) {
+      const paName = this.PracticeAreas.find((pa) => UUIDsEqual(pa.ID, pair.paId))?.Name ?? pair.paId;
+      const jurName = this.Jurisdictions.find((j) => UUIDsEqual(j.ID, pair.jurId))?.Name ?? pair.jurId;
+
+      const paPros = new Set(
+        this.PracticeLinks.filter((l) => UUIDsEqual(l.PracticeAreaID, pair.paId)).map((l) => l.ProfessionalProfileID.toLowerCase()),
+      );
+      const verifiedSupply = this.JurisdictionLinks.filter(
+        (l) =>
+          UUIDsEqual(l.JurisdictionID, pair.jurId) &&
+          l.StandingStatus === 'GoodStanding' &&
+          paPros.has(l.ProfessionalProfileID.toLowerCase()) &&
+          verifiedIds.has(l.ProfessionalProfileID.toLowerCase()),
+      ).length;
+
+      const matchingReqs = this.Requests.filter(
+        (r) => UUIDsEqual(r.PracticeAreaID, pair.paId) && UUIDsEqual(r.JurisdictionID, pair.jurId),
+      );
+      const openDemand = matchingReqs.filter((r) => r.Status === 'Submitted' || r.Status === 'Routed').length;
+      const exhaustedDemand = matchingReqs.filter((r) => r.Status === 'Exhausted').length;
+
+      const gapStatus: SupplyDemandGapRow['GapStatus'] =
+        exhaustedDemand > 0 || verifiedSupply < openDemand
+          ? 'Deficit'
+          : verifiedSupply > openDemand + 1
+            ? 'Surplus'
+            : 'Balanced';
+
+      rows.push({
+        PracticeAreaID: pair.paId,
+        PracticeAreaName: paName,
+        JurisdictionID: pair.jurId,
+        JurisdictionName: jurName,
+        VerifiedSupply: verifiedSupply,
+        OpenDemand: openDemand,
+        ExhaustedDemand: exhaustedDemand,
+        GapStatus: gapStatus,
+      });
+    }
+
+    return rows.sort((a, b) => b.ExhaustedDemand - a.ExhaustedDemand || b.OpenDemand - a.OpenDemand);
   }
 
   public get VisibleRequests(): ReferralRequestEntity[] {
@@ -216,11 +366,21 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
       [
         { EntityName: 'MJ_BizApps_Referrals: Referral Requests', OrderBy: '__mj_CreatedAt DESC', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', OrderBy: '__mj_CreatedAt DESC', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'entity_object' },
       ],
       md.CurrentUser,
     );
     this.Requests = results[0]?.Success ? (results[0].Results as ReferralRequestEntity[]) : [];
     this.Assignments = results[1]?.Success ? (results[1].Results as ReferralAssignmentEntity[]) : [];
+    this.PracticeAreas = results[2]?.Success ? (results[2].Results as PracticeAreaEntity[]) : [];
+    this.Jurisdictions = results[3]?.Success ? (results[3].Results as JurisdictionEntity[]) : [];
+    this.Profiles = results[4]?.Success ? (results[4].Results as ProfessionalProfileEntity[]) : [];
+    this.PracticeLinks = results[5]?.Success ? (results[5].Results as ProfessionalPracticeAreaEntity[]) : [];
+    this.JurisdictionLinks = results[6]?.Success ? (results[6].Results as ProfessionalJurisdictionEntity[]) : [];
     this.cdr.markForCheck();
   }
 

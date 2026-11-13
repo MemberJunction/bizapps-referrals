@@ -1,1 +1,1 @@
-export * from './ReferralLifecycleProbe.js';
+export { ReferralLifecycleProbe } from '@mj-biz-apps/referrals-server';
