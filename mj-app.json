@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.memberjunction.org/mj-app/v1.json",
+  "manifestVersion": 1,
+  "name": "mj-bizapps-referrals",
+  "displayName": "Referrals",
+  "description": "Professional Referral & Verified Member Directory Open App ('Find a Lawyer / Find a Pro'): AI-guided client intake, credentialed professional matching, conflict-of-interest checks, SLA-backed referral routing, confidential messaging, and association conversion telemetry.",
+  "version": "1.0.0",
+  "license": "BUSL-1.1",
+  "icon": "fa-solid fa-scale-balanced",
+  "publisher": {
+    "name": "MemberJunction",
+    "email": "info@memberjunction.com",
+    "url": "https://memberjunction.com"
+  },
+  "repository": "https://github.com/MemberJunction/bizapps-referrals",
+  "mjVersionRange": ">=6.2.1 <7.0.0",
+  "dependencies": {
+    "mj-bizapps-common": {
+      "version": ">=5.62.0 <6.0.0",
+      "repository": "https://github.com/MemberJunction/bizapps-common"
+    },
+    "mj-bizapps-tasks": {
+      "version": ">=1.10.0 <2.0.0",
+      "repository": "https://github.com/MemberJunction/bizapps-tasks"
+    }
+  },
+  "schema": {
+    "name": "__mj_BizAppsReferrals",
+    "createIfNotExists": true
+  },
+  "migrations": {
+    "directory": "migrations",
+    "engine": "skyway",
+    "teardownDirectory": "teardown"
+  },
+  "metadata": {
+    "directory": "metadata"
+  },
+  "packages": {
+    "shared": [
+      {
+        "name": "@mj-biz-apps/referrals-entities",
+        "role": "library"
+      },
+      {
+        "name": "@mj-biz-apps/referrals-core",
+        "role": "library"
+      }
+    ],
+    "server": [
+      {
+        "name": "@mj-biz-apps/referrals-server",
+        "role": "bootstrap",
+        "startupExport": "LoadBizAppsReferralsServer"
+      },
+      {
+        "name": "@mj-biz-apps/referrals-entities-server",
+        "role": "library"
+      },
+      {
+        "name": "@mj-biz-apps/referrals-actions",
+        "role": "actions"
+      }
+    ],
+    "client": [
+      {
+        "name": "@mj-biz-apps/referrals-ng",
+        "role": "bootstrap",
+        "startupExport": "LoadBizAppsReferralsClient"
+      }
+    ]
+  },
+  "code": {
+    "visibility": "public",
+    "sourceDirectory": "packages"
+  },
+  "categories": [
+    "Business",
+    "Associations",
+    "Directory"
+  ],
+  "tags": [
+    "referrals",
+    "directory",
+    "find-a-lawyer",
+    "matching",
+    "associations",
+    "intake",
+    "sla"
+  ]
+}

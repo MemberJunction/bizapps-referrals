@@ -1,0 +1,23 @@
+linkWorkspacePackages: true
+strictPeerDependencies: false
+
+onlyBuiltDependencies:
+  - '@apollo/protobufjs'
+  - '@google/genai'
+  - '@parcel/watcher'
+  - '@zoom/rtms'
+  - browser-tabs-lock
+  - core-js
+  - core-js-pure
+  - esbuild
+  - isolated-vm
+  - lmdb
+  - msgpackr-extract
+  - oracledb
+  - protobufjs
+  - rete
+  - sharp
+  - tesseract.js
+
+packages:
+  - 'packages/*'
