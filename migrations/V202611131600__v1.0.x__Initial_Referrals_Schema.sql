@@ -116,7 +116,7 @@ CREATE TABLE [__mj_BizAppsReferrals].[ProfessionalProfile] (
     [FirmName] NVARCHAR(200) NULL,
     [Email] NVARCHAR(255) NOT NULL,
     [Phone] NVARCHAR(50) NULL,
-    [BarOrLicenseNumber] NVARCHAR(100) NULL,
+    [LicenseNumber] NVARCHAR(100) NULL,
     [VerificationStatus] NVARCHAR(30) NOT NULL
         CONSTRAINT [DF_ProfessionalProfile_VerificationStatus] DEFAULT (N'Pending')
         CONSTRAINT [CK_ProfessionalProfile_VerificationStatus] CHECK ([VerificationStatus] IN (N'Pending', N'Verified', N'Suspended', N'Expired')),
@@ -2786,7 +2786,7 @@ GO
          )
       END;
 
-      IF NOT EXISTS (SELECT 1 FROM [${flyway:defaultSchema}].[EntityField] WHERE ID = '2d5623e6-5975-41e8-8b29-69384f906dae' OR (EntityID = '7492A921-FFCF-4A3E-B59A-56C88D16DDE1' AND Name = 'BarOrLicenseNumber')) BEGIN
+      IF NOT EXISTS (SELECT 1 FROM [${flyway:defaultSchema}].[EntityField] WHERE ID = '2d5623e6-5975-41e8-8b29-69384f906dae' OR (EntityID = '7492A921-FFCF-4A3E-B59A-56C88D16DDE1' AND Name = 'LicenseNumber')) BEGIN
          INSERT INTO [${flyway:defaultSchema}].[EntityField]
          (
             [ID],
@@ -2822,7 +2822,7 @@ GO
             '2d5623e6-5975-41e8-8b29-69384f906dae',
             '7492A921-FFCF-4A3E-B59A-56C88D16DDE1', -- Entity: MJ_BizApps_Referrals: Professional Profiles
             (SELECT COALESCE(MAX([Sequence]), 0) + 1 FROM [${flyway:defaultSchema}].[EntityField] WHERE [EntityID] = '7492A921-FFCF-4A3E-B59A-56C88D16DDE1'),
-            'BarOrLicenseNumber',
+            'LicenseNumber',
             'Bar Or License Number',
             NULL,
             'nvarchar',
@@ -12311,8 +12311,8 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spCreateProfessionalProfile]
     @Email nvarchar(255),
     @Phone_Clear bit = 0,
     @Phone nvarchar(50) = NULL,
-    @BarOrLicenseNumber_Clear bit = 0,
-    @BarOrLicenseNumber nvarchar(100) = NULL,
+    @LicenseNumber_Clear bit = 0,
+    @LicenseNumber nvarchar(100) = NULL,
     @VerificationStatus nvarchar(30) = NULL,
     @AvailabilityStatus nvarchar(30) = NULL,
     @Bio_Clear bit = 0,
@@ -12353,7 +12353,7 @@ BEGIN
                 [FirmName],
                 [Email],
                 [Phone],
-                [BarOrLicenseNumber],
+                [LicenseNumber],
                 [VerificationStatus],
                 [AvailabilityStatus],
                 [Bio],
@@ -12382,7 +12382,7 @@ BEGIN
                 CASE WHEN @FirmName_Clear = 1 THEN NULL ELSE ISNULL(@FirmName, NULL) END,
                 @Email,
                 CASE WHEN @Phone_Clear = 1 THEN NULL ELSE ISNULL(@Phone, NULL) END,
-                CASE WHEN @BarOrLicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@BarOrLicenseNumber, NULL) END,
+                CASE WHEN @LicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@LicenseNumber, NULL) END,
                 ISNULL(@VerificationStatus, 'Pending'),
                 ISNULL(@AvailabilityStatus, 'Available'),
                 CASE WHEN @Bio_Clear = 1 THEN NULL ELSE ISNULL(@Bio, NULL) END,
@@ -12413,7 +12413,7 @@ BEGIN
                 [FirmName],
                 [Email],
                 [Phone],
-                [BarOrLicenseNumber],
+                [LicenseNumber],
                 [VerificationStatus],
                 [AvailabilityStatus],
                 [Bio],
@@ -12441,7 +12441,7 @@ BEGIN
                 CASE WHEN @FirmName_Clear = 1 THEN NULL ELSE ISNULL(@FirmName, NULL) END,
                 @Email,
                 CASE WHEN @Phone_Clear = 1 THEN NULL ELSE ISNULL(@Phone, NULL) END,
-                CASE WHEN @BarOrLicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@BarOrLicenseNumber, NULL) END,
+                CASE WHEN @LicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@LicenseNumber, NULL) END,
                 ISNULL(@VerificationStatus, 'Pending'),
                 ISNULL(@AvailabilityStatus, 'Available'),
                 CASE WHEN @Bio_Clear = 1 THEN NULL ELSE ISNULL(@Bio, NULL) END,
@@ -12501,8 +12501,8 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spUpdateProfessionalProfile]
     @Email nvarchar(255) = NULL,
     @Phone_Clear bit = 0,
     @Phone nvarchar(50) = NULL,
-    @BarOrLicenseNumber_Clear bit = 0,
-    @BarOrLicenseNumber nvarchar(100) = NULL,
+    @LicenseNumber_Clear bit = 0,
+    @LicenseNumber nvarchar(100) = NULL,
     @VerificationStatus nvarchar(30) = NULL,
     @AvailabilityStatus nvarchar(30) = NULL,
     @Bio_Clear bit = 0,
@@ -12538,7 +12538,7 @@ BEGIN
         [FirmName] = CASE WHEN @FirmName_Clear = 1 THEN NULL ELSE ISNULL(@FirmName, [FirmName]) END,
         [Email] = ISNULL(@Email, [Email]),
         [Phone] = CASE WHEN @Phone_Clear = 1 THEN NULL ELSE ISNULL(@Phone, [Phone]) END,
-        [BarOrLicenseNumber] = CASE WHEN @BarOrLicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@BarOrLicenseNumber, [BarOrLicenseNumber]) END,
+        [LicenseNumber] = CASE WHEN @LicenseNumber_Clear = 1 THEN NULL ELSE ISNULL(@LicenseNumber, [LicenseNumber]) END,
         [VerificationStatus] = ISNULL(@VerificationStatus, [VerificationStatus]),
         [AvailabilityStatus] = ISNULL(@AvailabilityStatus, [AvailabilityStatus]),
         [Bio] = CASE WHEN @Bio_Clear = 1 THEN NULL ELSE ISNULL(@Bio, [Bio]) END,
@@ -16367,7 +16367,7 @@ SET
 WHERE 
    ID = 'ECD37B36-34A0-42A7-9B3D-A7CCD0EBB22C';
 
--- UPDATE Entity Field Category Info MJ_BizApps_Referrals: Professional Profiles.BarOrLicenseNumber 
+-- UPDATE Entity Field Category Info MJ_BizApps_Referrals: Professional Profiles.LicenseNumber 
 UPDATE [${flyway:defaultSchema}].[EntityField]
 SET 
    Category = 'Professional Details',

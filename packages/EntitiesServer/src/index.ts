@@ -3,6 +3,7 @@ import { RegisterClass, ValidationErrorInfo, ValidationErrorType } from '@member
 import { NormalizePartyName } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalCredentialEntity,
   ProfessionalProfileEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -50,6 +51,42 @@ export class ReferralRequestServerEntity extends ReferralRequestEntity {
       const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
       this.RequestNumber = `REF-${stamp}-${suffix}`;
+    }
+    return super.Save(options);
+  }
+}
+
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Credentials')
+export class ProfessionalCredentialServerEntity extends ProfessionalCredentialEntity {
+  public override Validate(): ValidationResult {
+    const result = super.Validate();
+    if (!this.CredentialCode || !this.CredentialCode.trim()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('CredentialCode', 'CredentialCode is required.', this.CredentialCode, ValidationErrorType.Failure),
+      );
+    }
+    if (!this.CredentialName || !this.CredentialName.trim()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('CredentialName', 'CredentialName is required.', this.CredentialName, ValidationErrorType.Failure),
+      );
+    }
+    if (this.IssuedAt && this.ExpiresAt && new Date(this.ExpiresAt).getTime() < new Date(this.IssuedAt).getTime()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('ExpiresAt', 'ExpiresAt must be on or after IssuedAt.', this.ExpiresAt, ValidationErrorType.Failure),
+      );
+    }
+    return result;
+  }
+
+  public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+    if (this.VerificationStatus === 'Verified' && !this.VerifiedAt) {
+      this.VerifiedAt = new Date();
+    }
+    if (!this.ProviderKey || !this.ProviderKey.trim()) {
+      this.ProviderKey = 'Manual';
     }
     return super.Save(options);
   }
