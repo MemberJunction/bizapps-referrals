@@ -4,9 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MJGlobal } from '@memberjunction/global';
-import { BaseFormComponent } from '@memberjunction/ng-base-forms';
+import { BaseFormComponent, BaseFormPanel } from '@memberjunction/ng-base-forms';
 import { BaseResourceComponent } from '@memberjunction/ng-shared';
-import { LoadBizAppsReferralsClient } from '../public-api.js';
+import {
+  LoadBizAppsReferralsClient,
+  REFERRALS_ENTITY_FORM_COMPONENTS,
+} from '../public-api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../../..');
@@ -27,19 +30,73 @@ function walkFiles(dir: string, exts: string[]): string[] {
 }
 
 describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
-  it('registers Professional Credentials BaseFormComponent and ReferralsCredentialDirectoryResource in ClassFactory', () => {
+  it('registers all 11 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
     LoadBizAppsReferralsClient();
-    const credFormReg = MJGlobal.Instance.ClassFactory.GetRegistration(
-      BaseFormComponent,
-      'MJ_BizApps_Referrals: Professional Credentials',
-    );
-    expect(credFormReg).toBeDefined();
 
-    const dirResourceReg = MJGlobal.Instance.ClassFactory.GetRegistration(
-      BaseResourceComponent,
-      'ReferralsCredentialDirectoryResource',
+    const expectedEntities = [
+      'MJ_BizApps_Referrals: Referral Requests',
+      'MJ_BizApps_Referrals: Professional Profiles',
+      'MJ_BizApps_Referrals: Referral Assignments',
+      'MJ_BizApps_Referrals: Conflict Check Parties',
+      'MJ_BizApps_Referrals: Practice Areas',
+      'MJ_BizApps_Referrals: Jurisdictions',
+      'MJ_BizApps_Referrals: Referral Tiers',
+      'MJ_BizApps_Referrals: Professional Practice Areas',
+      'MJ_BizApps_Referrals: Professional Jurisdictions',
+      'MJ_BizApps_Referrals: Referral Feedbacks',
+      'MJ_BizApps_Referrals: Professional Credentials',
+    ];
+    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(11);
+    for (const entityName of expectedEntities) {
+      expect(
+        MJGlobal.Instance.ClassFactory.GetRegistration(BaseFormComponent, entityName),
+        `Missing BaseFormComponent registration for ${entityName}`,
+      ).toBeDefined();
+    }
+
+    const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
+    expect(panelRegs.length).toBeGreaterThan(0);
+
+    const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
+    const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{
+      fields: { DefaultNavItems: Array<{ Label: string; DriverClass: string; Icon: string }> };
+    }>;
+    const navItems = parsed[0].fields.DefaultNavItems;
+    expect(navItems).toHaveLength(5);
+    for (const item of navItems) {
+      expect(
+        MJGlobal.Instance.ClassFactory.GetRegistration(BaseResourceComponent, item.DriverClass),
+        `Missing BaseResourceComponent registration for DefaultNavItem '${item.Label}' (${item.DriverClass})`,
+      ).toBeDefined();
+    }
+  });
+
+  it('verifies dual-dialect Wave 2 migration DDL and valid PostgreSQL FK syntax', () => {
+    const sqlV2 = fs.readFileSync(
+      path.join(repoRoot, 'migrations/V202611141200__v1.1.0__Credentials_And_License_Normalization.sql'),
+      'utf8',
     );
-    expect(dirResourceReg).toBeDefined();
+    const pgV1 = fs.readFileSync(
+      path.join(repoRoot, 'migrations-pg/V202611131600__v1.0.x__Initial_Referrals_Schema.pg.sql'),
+      'utf8',
+    );
+    const pgV2 = fs.readFileSync(
+      path.join(repoRoot, 'migrations-pg/V202611141200__v1.1.0__Credentials_And_License_Normalization.pg.sql'),
+      'utf8',
+    );
+
+    expect(sqlV2).toContain('vwProfessionalCredentials');
+    expect(sqlV2).toContain('spCreateProfessionalCredential');
+    expect(sqlV2).toContain('spUpdateProfessionalCredential');
+    expect(sqlV2).toContain('spDeleteProfessionalCredential');
+    expect(sqlV2).toContain('__mj_CreatedAt');
+    expect(sqlV2).toContain('__mj_UpdatedAt');
+
+    expect(pgV1).not.toMatch(/FOREIGN KEY REFERENCES/);
+    expect(pgV2).toContain('vwProfessionalCredentials');
+    expect(pgV2).toContain('spCreateProfessionalCredential');
+    expect(pgV2).toContain('spUpdateProfessionalCredential');
+    expect(pgV2).toContain('spDeleteProfessionalCredential');
   });
 
   it('wires Directory & Pros nav item in metadata/applications/.referrals-application.json', () => {
