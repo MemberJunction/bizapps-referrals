@@ -66,35 +66,65 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
   };
 });
 
-vi.mock('@memberjunction/core-entities', () => ({
-  ResourceData: class {},
-  UserInfoEngine: {
-    get Instance() {
-      return {
-        GetSetting: (key: string) => settingsStore.get(key),
-        SetSetting: async (key: string, value: string) => {
-          settingsStore.set(key, value);
-          return true;
-        },
-      };
+vi.mock('@memberjunction/core-entities', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@memberjunction/core-entities')>();
+  const { of } = await import('rxjs');
+  return {
+    ...actual,
+    UserInfoEngine: {
+      ...actual.UserInfoEngine,
+      get Instance() {
+        return {
+          UserNotifications$: of([]),
+          UserNotificationsIfPermitted: [],
+          GetSetting: (key: string) => settingsStore.get(key),
+          SetSetting: async (key: string, value: string) => {
+            settingsStore.set(key, value);
+            return true;
+          },
+        };
+      },
     },
-  },
-}));
+  };
+});
 
-vi.mock('@memberjunction/ng-shared', () => ({
-  BaseResourceComponent: class {
-    ngOnInit(): void {}
-    NotifyLoadComplete(): void {}
-  },
-  NavigationService: class {
-    OpenEntityRecord = vi.fn();
-  },
-}));
+vi.mock('@memberjunction/ng-shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@memberjunction/ng-shared')>();
+  return {
+    ...actual,
+    BaseResourceComponent: class {
+      ngOnInit(): void {}
+      NotifyLoadComplete(): void {}
+    },
+    NavigationService: class {
+      OpenEntityRecord = vi.fn();
+    },
+  };
+});
 
-vi.mock('@memberjunction/ng-base-forms', () => ({
-  BaseFormComponent: class {},
-  BaseFormPanel: class {},
-}));
+vi.mock('@memberjunction/ng-base-forms', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@memberjunction/ng-base-forms')>();
+  return {
+    ...actual,
+    BaseFormComponent: class {
+      public record: unknown;
+      public EditMode = false;
+      public formContext: unknown;
+      public initSections(): void {}
+      public BuildRelationshipViewParamsByEntityName(): unknown { return {}; }
+      public NewRecordValues(): unknown { return {}; }
+      public IsSectionExpanded(): boolean { return false; }
+      public GetSectionRowCount(): number { return 0; }
+      public SetSectionRowCount(): void {}
+      public OnFormNavigate(): void {}
+      public OnDeleteRequested(): void {}
+      public OnFavoriteToggled(): void {}
+      public OnHistoryRequested(): void {}
+      public OnListManagementRequested(): void {}
+    },
+    BaseFormPanel: class {},
+  };
+});
 
 import { CascadeRoutingService, MatchingEngine } from '@mj-biz-apps/referrals-core';
 import { NavigationService } from '@memberjunction/ng-shared';
