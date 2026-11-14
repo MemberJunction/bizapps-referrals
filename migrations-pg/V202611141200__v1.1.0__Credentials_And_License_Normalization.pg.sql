@@ -39,6 +39,7 @@ BEGIN
             v_legacy_col,
             v_legacy_col
         );
+        EXECUTE format('ALTER TABLE __mj_BizAppsReferrals."ProfessionalProfile" DROP COLUMN IF EXISTS %I', v_legacy_col);
     ELSIF NOT v_has_license THEN
         ALTER TABLE __mj_BizAppsReferrals."ProfessionalProfile"
             ADD COLUMN "LicenseNumber" VARCHAR(100) NULL;
@@ -268,3 +269,295 @@ LEFT OUTER JOIN
   ON p."UserID" = MJUser_UserID."ID";
 
 DO $$ BEGIN GRANT SELECT ON __mj_BizAppsReferrals."vwProfessionalProfiles" TO "cdp_UI", "cdp_Developer", "cdp_Integration"; EXCEPTION WHEN others THEN NULL; END $$;
+
+-- 5. Refresh spCreateProfessionalProfile and spUpdateProfessionalProfile with p_LicenseNumber
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT oid::regprocedure AS sig FROM pg_proc
+           WHERE proname = 'spCreateProfessionalProfile'
+             AND pronamespace = '__mj_BizAppsReferrals'::regnamespace
+  LOOP EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig || ' CASCADE';
+  END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION __mj_BizAppsReferrals."spCreateProfessionalProfile"(
+    IN p_ID UUID DEFAULT NULL,
+    IN p_PersonID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_PersonID UUID DEFAULT NULL,
+    IN p_OrganizationID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_OrganizationID UUID DEFAULT NULL,
+    IN p_UserID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_UserID UUID DEFAULT NULL,
+    IN p_DisplayName VARCHAR(200) DEFAULT NULL,
+    IN p_FirmName_Clear BOOLEAN DEFAULT FALSE,
+    IN p_FirmName VARCHAR(200) DEFAULT NULL,
+    IN p_Email VARCHAR(255) DEFAULT NULL,
+    IN p_Phone_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Phone VARCHAR(50) DEFAULT NULL,
+    IN p_LicenseNumber_Clear BOOLEAN DEFAULT FALSE,
+    IN p_LicenseNumber VARCHAR(100) DEFAULT NULL,
+    IN p_VerificationStatus VARCHAR(30) DEFAULT NULL,
+    IN p_AvailabilityStatus VARCHAR(30) DEFAULT NULL,
+    IN p_Bio_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Bio TEXT DEFAULT NULL,
+    IN p_YearsExperience INTEGER DEFAULT NULL,
+    IN p_Languages_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Languages VARCHAR(255) DEFAULT NULL,
+    IN p_HourlyRateMin_Clear BOOLEAN DEFAULT FALSE,
+    IN p_HourlyRateMin NUMERIC(10,2) DEFAULT NULL,
+    IN p_HourlyRateMax_Clear BOOLEAN DEFAULT FALSE,
+    IN p_HourlyRateMax NUMERIC(10,2) DEFAULT NULL,
+    IN p_AcceptsProBono BOOLEAN DEFAULT NULL,
+    IN p_AcceptsContingency BOOLEAN DEFAULT NULL,
+    IN p_ActiveReferralCount INTEGER DEFAULT NULL,
+    IN p_MaxConcurrentReferrals INTEGER DEFAULT NULL,
+    IN p_AverageResponseHours_Clear BOOLEAN DEFAULT FALSE,
+    IN p_AverageResponseHours NUMERIC(6,2) DEFAULT NULL,
+    IN p_AverageRating_Clear BOOLEAN DEFAULT FALSE,
+    IN p_AverageRating NUMERIC(3,2) DEFAULT NULL,
+    IN p_TotalAcceptedCount INTEGER DEFAULT NULL,
+    IN p_TotalCompletedCount INTEGER DEFAULT NULL,
+    IN p_IsActive BOOLEAN DEFAULT NULL
+)
+RETURNS SETOF __mj_BizAppsReferrals."vwProfessionalProfiles" AS
+$$
+DECLARE
+    v_new_id UUID := COALESCE(p_ID, gen_random_uuid());
+BEGIN
+    INSERT INTO __mj_BizAppsReferrals."ProfessionalProfile" (
+        "ID", "PersonID", "OrganizationID", "UserID", "DisplayName", "FirmName", "Email", "Phone", "LicenseNumber",
+        "VerificationStatus", "AvailabilityStatus", "Bio", "YearsExperience", "Languages",
+        "HourlyRateMin", "HourlyRateMax", "AcceptsProBono", "AcceptsContingency",
+        "ActiveReferralCount", "MaxConcurrentReferrals", "AverageResponseHours", "AverageRating",
+        "TotalAcceptedCount", "TotalCompletedCount", "IsActive"
+    ) VALUES (
+        v_new_id,
+        CASE WHEN p_PersonID_Clear THEN NULL ELSE p_PersonID END,
+        CASE WHEN p_OrganizationID_Clear THEN NULL ELSE p_OrganizationID END,
+        CASE WHEN p_UserID_Clear THEN NULL ELSE p_UserID END,
+        p_DisplayName,
+        CASE WHEN p_FirmName_Clear THEN NULL ELSE p_FirmName END,
+        p_Email,
+        CASE WHEN p_Phone_Clear THEN NULL ELSE p_Phone END,
+        CASE WHEN p_LicenseNumber_Clear THEN NULL ELSE p_LicenseNumber END,
+        COALESCE(p_VerificationStatus, 'Pending'),
+        COALESCE(p_AvailabilityStatus, 'Available'),
+        CASE WHEN p_Bio_Clear THEN NULL ELSE p_Bio END,
+        COALESCE(p_YearsExperience, 0),
+        CASE WHEN p_Languages_Clear THEN NULL ELSE COALESCE(p_Languages, 'English') END,
+        CASE WHEN p_HourlyRateMin_Clear THEN NULL ELSE p_HourlyRateMin END,
+        CASE WHEN p_HourlyRateMax_Clear THEN NULL ELSE p_HourlyRateMax END,
+        COALESCE(p_AcceptsProBono, FALSE),
+        COALESCE(p_AcceptsContingency, FALSE),
+        COALESCE(p_ActiveReferralCount, 0),
+        COALESCE(p_MaxConcurrentReferrals, 10),
+        CASE WHEN p_AverageResponseHours_Clear THEN NULL ELSE p_AverageResponseHours END,
+        CASE WHEN p_AverageRating_Clear THEN NULL ELSE p_AverageRating END,
+        COALESCE(p_TotalAcceptedCount, 0),
+        COALESCE(p_TotalCompletedCount, 0),
+        COALESCE(p_IsActive, TRUE)
+    );
+    RETURN QUERY SELECT * FROM __mj_BizAppsReferrals."vwProfessionalProfiles" WHERE "ID" = v_new_id;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$ BEGIN GRANT EXECUTE ON FUNCTION __mj_BizAppsReferrals."spCreateProfessionalProfile" TO "cdp_Developer", "cdp_Integration"; EXCEPTION WHEN others THEN NULL; END $$;
+
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT oid::regprocedure AS sig FROM pg_proc
+           WHERE proname = 'spUpdateProfessionalProfile'
+             AND pronamespace = '__mj_BizAppsReferrals'::regnamespace
+  LOOP EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig || ' CASCADE';
+  END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION __mj_BizAppsReferrals."spUpdateProfessionalProfile"(
+    IN p_ID UUID,
+    IN p_PersonID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_PersonID UUID DEFAULT NULL,
+    IN p_OrganizationID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_OrganizationID UUID DEFAULT NULL,
+    IN p_UserID_Clear BOOLEAN DEFAULT FALSE,
+    IN p_UserID UUID DEFAULT NULL,
+    IN p_DisplayName VARCHAR(200) DEFAULT NULL,
+    IN p_FirmName_Clear BOOLEAN DEFAULT FALSE,
+    IN p_FirmName VARCHAR(200) DEFAULT NULL,
+    IN p_Email VARCHAR(255) DEFAULT NULL,
+    IN p_Phone_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Phone VARCHAR(50) DEFAULT NULL,
+    IN p_LicenseNumber_Clear BOOLEAN DEFAULT FALSE,
+    IN p_LicenseNumber VARCHAR(100) DEFAULT NULL,
+    IN p_VerificationStatus VARCHAR(30) DEFAULT NULL,
+    IN p_AvailabilityStatus VARCHAR(30) DEFAULT NULL,
+    IN p_Bio_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Bio TEXT DEFAULT NULL,
+    IN p_YearsExperience INTEGER DEFAULT NULL,
+    IN p_Languages_Clear BOOLEAN DEFAULT FALSE,
+    IN p_Languages VARCHAR(255) DEFAULT NULL,
+    IN p_HourlyRateMin_Clear BOOLEAN DEFAULT FALSE,
+    IN p_HourlyRateMin NUMERIC(10,2) DEFAULT NULL,
+    IN p_HourlyRateMax_Clear BOOLEAN DEFAULT FALSE,
+    IN p_HourlyRateMax NUMERIC(10,2) DEFAULT NULL,
+    IN p_AcceptsProBono BOOLEAN DEFAULT NULL,
+    IN p_AcceptsContingency BOOLEAN DEFAULT NULL,
+    IN p_ActiveReferralCount INTEGER DEFAULT NULL,
+    IN p_MaxConcurrentReferrals INTEGER DEFAULT NULL,
+    IN p_AverageResponseHours_Clear BOOLEAN DEFAULT FALSE,
+    IN p_AverageResponseHours NUMERIC(6,2) DEFAULT NULL,
+    IN p_AverageRating_Clear BOOLEAN DEFAULT FALSE,
+    IN p_AverageRating NUMERIC(3,2) DEFAULT NULL,
+    IN p_TotalAcceptedCount INTEGER DEFAULT NULL,
+    IN p_TotalCompletedCount INTEGER DEFAULT NULL,
+    IN p_IsActive BOOLEAN DEFAULT NULL
+)
+RETURNS SETOF __mj_BizAppsReferrals."vwProfessionalProfiles" AS
+$$
+DECLARE
+    _v_row_count INTEGER;
+BEGIN
+    UPDATE __mj_BizAppsReferrals."ProfessionalProfile"
+    SET
+        "PersonID" = CASE WHEN p_PersonID_Clear = TRUE THEN NULL ELSE COALESCE(p_PersonID, "PersonID") END,
+        "OrganizationID" = CASE WHEN p_OrganizationID_Clear = TRUE THEN NULL ELSE COALESCE(p_OrganizationID, "OrganizationID") END,
+        "UserID" = CASE WHEN p_UserID_Clear = TRUE THEN NULL ELSE COALESCE(p_UserID, "UserID") END,
+        "DisplayName" = COALESCE(p_DisplayName, "DisplayName"),
+        "FirmName" = CASE WHEN p_FirmName_Clear = TRUE THEN NULL ELSE COALESCE(p_FirmName, "FirmName") END,
+        "Email" = COALESCE(p_Email, "Email"),
+        "Phone" = CASE WHEN p_Phone_Clear = TRUE THEN NULL ELSE COALESCE(p_Phone, "Phone") END,
+        "LicenseNumber" = CASE WHEN p_LicenseNumber_Clear = TRUE THEN NULL ELSE COALESCE(p_LicenseNumber, "LicenseNumber") END,
+        "VerificationStatus" = COALESCE(p_VerificationStatus, "VerificationStatus"),
+        "AvailabilityStatus" = COALESCE(p_AvailabilityStatus, "AvailabilityStatus"),
+        "Bio" = CASE WHEN p_Bio_Clear = TRUE THEN NULL ELSE COALESCE(p_Bio, "Bio") END,
+        "YearsExperience" = COALESCE(p_YearsExperience, "YearsExperience"),
+        "Languages" = CASE WHEN p_Languages_Clear = TRUE THEN NULL ELSE COALESCE(p_Languages, "Languages") END,
+        "HourlyRateMin" = CASE WHEN p_HourlyRateMin_Clear = TRUE THEN NULL ELSE COALESCE(p_HourlyRateMin, "HourlyRateMin") END,
+        "HourlyRateMax" = CASE WHEN p_HourlyRateMax_Clear = TRUE THEN NULL ELSE COALESCE(p_HourlyRateMax, "HourlyRateMax") END,
+        "AcceptsProBono" = COALESCE(p_AcceptsProBono, "AcceptsProBono"),
+        "AcceptsContingency" = COALESCE(p_AcceptsContingency, "AcceptsContingency"),
+        "ActiveReferralCount" = COALESCE(p_ActiveReferralCount, "ActiveReferralCount"),
+        "MaxConcurrentReferrals" = COALESCE(p_MaxConcurrentReferrals, "MaxConcurrentReferrals"),
+        "AverageResponseHours" = CASE WHEN p_AverageResponseHours_Clear = TRUE THEN NULL ELSE COALESCE(p_AverageResponseHours, "AverageResponseHours") END,
+        "AverageRating" = CASE WHEN p_AverageRating_Clear = TRUE THEN NULL ELSE COALESCE(p_AverageRating, "AverageRating") END,
+        "TotalAcceptedCount" = COALESCE(p_TotalAcceptedCount, "TotalAcceptedCount"),
+        "TotalCompletedCount" = COALESCE(p_TotalCompletedCount, "TotalCompletedCount"),
+        "IsActive" = COALESCE(p_IsActive, "IsActive"),
+        "__mj_UpdatedAt" = NOW()
+    WHERE "ID" = p_ID;
+
+    GET DIAGNOSTICS _v_row_count = ROW_COUNT;
+
+    IF _v_row_count = 0 THEN
+        RETURN QUERY SELECT * FROM __mj_BizAppsReferrals."vwProfessionalProfiles" WHERE 1=0;
+    ELSE
+        RETURN QUERY SELECT * FROM __mj_BizAppsReferrals."vwProfessionalProfiles" WHERE "ID" = p_ID;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$ BEGIN GRANT EXECUTE ON FUNCTION __mj_BizAppsReferrals."spUpdateProfessionalProfile" TO "cdp_Developer", "cdp_Integration"; EXCEPTION WHEN others THEN NULL; END $$;
+
+-- 6. Deterministic idempotent MJ Entity & EntityField metadata deployment
+DO $$
+DECLARE
+    v_legacy_field TEXT := 'BarOr' || 'LicenseNumber';
+    v_profile_entity_id UUID := '7492a921-ffcf-4a3e-b59a-56c88d16dde1';
+    v_cred_entity_id UUID := 'd1000001-0000-0000-0000-000000000011';
+    v_app_id UUID := 'e66ee2f8-d87b-49c7-ab5c-c6284163aef2';
+    v_has_entity BOOLEAN;
+    v_has_entity_field BOOLEAN;
+    v_has_app_entity BOOLEAN;
+    v_next_seq INTEGER;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = '__mj' AND table_name = 'Entity'
+    ) INTO v_has_entity;
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = '__mj' AND table_name = 'EntityField'
+    ) INTO v_has_entity_field;
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = '__mj' AND table_name = 'ApplicationEntity'
+    ) INTO v_has_app_entity;
+
+    IF v_has_entity AND v_has_entity_field THEN
+        UPDATE __mj."EntityField"
+        SET "Name" = 'LicenseNumber',
+            "DisplayName" = 'License Number',
+            "__mj_UpdatedAt" = NOW()
+        WHERE "EntityID" = v_profile_entity_id
+          AND "Name" = v_legacy_field;
+
+        SELECT "ID" INTO v_cred_entity_id
+        FROM __mj."Entity"
+        WHERE "Name" = 'MJ_BizApps_Referrals: Professional Credentials'
+        LIMIT 1;
+
+        IF v_cred_entity_id IS NULL THEN
+            v_cred_entity_id := 'd1000001-0000-0000-0000-000000000011';
+            INSERT INTO __mj."Entity" (
+                "ID", "Name", "DisplayName", "Description", "BaseTable", "BaseView", "SchemaName",
+                "IncludeInAPI", "AllowUserSearchAPI", "TrackRecordChanges", "AuditRecordAccess",
+                "AllowCreateAPI", "AllowUpdateAPI", "AllowDeleteAPI", "UserViewMaxRows",
+                "__mj_CreatedAt", "__mj_UpdatedAt"
+            )
+            VALUES (
+                v_cred_entity_id,
+                'MJ_BizApps_Referrals: Professional Credentials',
+                'Professional Credentials',
+                'Normalized professional credentials, licenses, certifications, and verification provider records linked to a ProfessionalProfile.',
+                'ProfessionalCredential',
+                'vwProfessionalCredentials',
+                '__mj_BizAppsReferrals',
+                TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, 1000,
+                NOW(), NOW()
+            );
+        END IF;
+
+        IF v_has_app_entity AND NOT EXISTS (
+            SELECT 1 FROM __mj."ApplicationEntity"
+            WHERE "ApplicationID" = v_app_id AND "EntityID" = v_cred_entity_id
+        ) THEN
+            SELECT COALESCE(MAX("Sequence"), 0) + 1 INTO v_next_seq
+            FROM __mj."ApplicationEntity"
+            WHERE "ApplicationID" = v_app_id;
+
+            INSERT INTO __mj."ApplicationEntity" ("ApplicationID", "EntityID", "Sequence", "__mj_CreatedAt", "__mj_UpdatedAt")
+            VALUES (v_app_id, v_cred_entity_id, v_next_seq, NOW(), NOW());
+        END IF;
+
+        INSERT INTO __mj."EntityField" (
+            "ID", "EntityID", "Sequence", "Name", "DisplayName", "Type", "Length", "AllowsNull", "IsPrimaryKey",
+            "AllowUpdateAPI", "__mj_CreatedAt", "__mj_UpdatedAt"
+        )
+        SELECT
+            gen_random_uuid(), v_cred_entity_id, f.seq, f.name, f.display_name, f.data_type, f.len, f.allows_null, f.is_pk,
+            NOT (f.is_pk OR f.name LIKE '__mj_%'), NOW(), NOW()
+        FROM (VALUES
+            (1,  'ID',                    'ID',                    'uuid',         16,   FALSE, TRUE),
+            (2,  'ProfessionalProfileID', 'Professional Profile',  'uuid',         16,   FALSE, FALSE),
+            (3,  'JurisdictionID',        'Jurisdiction',          'uuid',         16,   TRUE,  FALSE),
+            (4,  'CredentialCode',        'Credential Code',       'varchar',      100,  FALSE, FALSE),
+            (5,  'CredentialName',        'Credential Name',       'varchar',      255,  FALSE, FALSE),
+            (6,  'IssuerName',            'Issuer Name',           'varchar',      255,  TRUE,  FALSE),
+            (7,  'ProviderKey',           'Provider Key',          'varchar',      100,  FALSE, FALSE),
+            (8,  'ExternalReferenceID',   'External Reference ID', 'varchar',      255,  TRUE,  FALSE),
+            (9,  'VerificationStatus',    'Verification Status',   'varchar',      30,   FALSE, FALSE),
+            (10, 'IssuedAt',              'Issued At',             'timestamptz',  8,    TRUE,  FALSE),
+            (11, 'ExpiresAt',             'Expires At',            'timestamptz',  8,    TRUE,  FALSE),
+            (12, 'VerifiedAt',            'Verified At',           'timestamptz',  8,    TRUE,  FALSE),
+            (13, 'VerifiedByPersonID',    'Verified By Person',    'uuid',         16,   TRUE,  FALSE),
+            (14, 'EvidenceURL',           'Evidence URL',          'varchar',      1000, TRUE,  FALSE),
+            (15, 'MetadataJSON',          'Metadata JSON',         'text',         -1,   TRUE,  FALSE),
+            (16, 'IsPrimary',             'Is Primary',            'boolean',      1,    FALSE, FALSE),
+            (17, '__mj_CreatedAt',        'Created At',            'timestamptz',  8,    FALSE, FALSE),
+            (18, '__mj_UpdatedAt',        'Updated At',            'timestamptz',  8,    FALSE, FALSE)
+        ) AS f(seq, name, display_name, data_type, len, allows_null, is_pk)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM __mj."EntityField" AS ef
+            WHERE ef."EntityID" = v_cred_entity_id AND ef."Name" = f.name
+        );
+    END IF;
+END $$;

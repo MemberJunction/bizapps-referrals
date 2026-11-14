@@ -128,6 +128,28 @@
         {
           "fields": {
             "ActionID": "@parent:ID",
+            "Name": "LicenseNumber",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional license number associated with the credential."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "IssuerName",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Name of the licensing board or issuing authority."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
             "Name": "ProviderKey",
             "Type": "Input",
             "ValueType": "Scalar",
