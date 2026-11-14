@@ -53,5 +53,82 @@
       "DisplayRank": 50,
       "IsActive": true
     }
+  },
+  {
+    "fields": {
+      "Name": "Cloud Architecture & FinOps",
+      "Code": "IT_CLOUD_ARCH",
+      "Category": "IT Consulting",
+      "Description": "Multi-cloud migrations, Kubernetes platform engineering, AWS/Azure landing zones, and cloud cost optimization.",
+      "IconClass": "fa-solid fa-cloud",
+      "DisplayRank": 60,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Cybersecurity & SOC2 Compliance",
+      "Code": "IT_CYBER_SOC2",
+      "Category": "IT Consulting",
+      "Description": "Zero-trust architecture, penetration testing, SOC2 Type II / ISO 27001 readiness, and incident response.",
+      "IconClass": "fa-solid fa-shield-halved",
+      "DisplayRank": 70,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Enterprise AI & LLM Engineering",
+      "Code": "IT_AI_LLM",
+      "Category": "IT Consulting",
+      "Description": "Production RAG pipelines, agentic AI workflows, model evaluation, and AI governance.",
+      "IconClass": "fa-solid fa-brain",
+      "DisplayRank": 80,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Data Engineering & Lakehouse",
+      "Code": "IT_DATA_ENG",
+      "Category": "IT Consulting",
+      "Description": "Modern data warehouses, dbt/Spark pipelines, real-time streaming, and BI modernization.",
+      "IconClass": "fa-solid fa-database",
+      "DisplayRank": 90,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "ERP & Enterprise Integration",
+      "Code": "IT_ERP_INT",
+      "Category": "IT Consulting",
+      "Description": "NetSuite, SAP, Salesforce, and API middleware modernization for mid-market and enterprise.",
+      "IconClass": "fa-solid fa-diagram-project",
+      "DisplayRank": 100,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Corporate Tax & R&D Credits",
+      "Code": "ACCT_TAX_RD",
+      "Category": "Accounting",
+      "Description": "Section 174 R&D tax credits, multi-state nexus compliance, and M&A tax structuring.",
+      "IconClass": "fa-solid fa-calculator",
+      "DisplayRank": 110,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Clinical Informatics & Telehealth",
+      "Code": "MED_INFORMATICS",
+      "Category": "Medical",
+      "Description": "HIPAA-compliant telehealth workflows, EHR interoperability (FHIR), and clinical decision support.",
+      "IconClass": "fa-solid fa-stethoscope",
+      "DisplayRank": 120,
+      "IsActive": true
+    }
   }
 ]

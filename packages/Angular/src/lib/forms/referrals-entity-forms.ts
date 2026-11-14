@@ -17,8 +17,7 @@ import {
 /**
  * 1. Referral Requests Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Requests')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Requests')
 @Component({
   standalone: false,
   selector: 'mj-referrals-referral-request-form',
@@ -370,8 +369,7 @@ export class ReferralRequestFormComponent extends BaseFormComponent {
 /**
  * 2. Professional Profiles Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Profiles')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Profiles')
 @Component({
   standalone: false,
   selector: 'mj-referrals-professional-profile-form',
@@ -805,8 +803,7 @@ export class ProfessionalProfileFormComponent extends BaseFormComponent {
 /**
  * 3. Referral Assignments Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Assignments')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Assignments')
 @Component({
   standalone: false,
   selector: 'mj-referrals-referral-assignment-form',
@@ -1034,8 +1031,7 @@ export class ReferralAssignmentFormComponent extends BaseFormComponent {
 /**
  * 4. Conflict Check Parties Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Conflict Check Parties')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Conflict Check Parties')
 @Component({
   standalone: false,
   selector: 'mj-referrals-conflict-check-party-form',
@@ -1160,8 +1156,7 @@ export class ConflictCheckPartyFormComponent extends BaseFormComponent {
 /**
  * 5. Practice Areas Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Practice Areas')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Practice Areas')
 @Component({
   standalone: false,
   selector: 'mj-referrals-practice-area-form',
@@ -1378,8 +1373,7 @@ export class PracticeAreaFormComponent extends BaseFormComponent {
 /**
  * 6. Jurisdictions Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Jurisdictions')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Jurisdictions')
 @Component({
   standalone: false,
   selector: 'mj-referrals-jurisdiction-form',
@@ -1588,8 +1582,7 @@ export class JurisdictionFormComponent extends BaseFormComponent {
 /**
  * 7. Referral Tiers Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Tiers')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Tiers')
 @Component({
   standalone: false,
   selector: 'mj-referrals-referral-tier-form',
@@ -1755,8 +1748,7 @@ export class ReferralTierFormComponent extends BaseFormComponent {
 /**
  * 8. Professional Practice Areas Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Practice Areas')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Practice Areas')
 @Component({
   standalone: false,
   selector: 'mj-referrals-professional-practice-area-form',
@@ -1874,8 +1866,7 @@ export class ProfessionalPracticeAreaFormComponent extends BaseFormComponent {
 /**
  * 9. Professional Jurisdictions Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Jurisdictions')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Jurisdictions')
 @Component({
   standalone: false,
   selector: 'mj-referrals-professional-jurisdiction-form',
@@ -2001,8 +1992,7 @@ export class ProfessionalJurisdictionFormComponent extends BaseFormComponent {
 /**
  * 10. Referral Feedbacks Left-Rail Form
  */
-// Refactored to metadata-driven generated left-nav form
-// @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Feedbacks')
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Feedbacks')
 @Component({
   standalone: false,
   selector: 'mj-referrals-referral-feedback-form',
