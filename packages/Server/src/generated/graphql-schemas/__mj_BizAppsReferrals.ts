@@ -2491,10 +2491,10 @@ export class mjBizAppsReferralsProfessionalCredential_ {
     IsPrimary: boolean;
 
     @Field(() => Date)
-    __mj_CreatedAt: Date;
+    _mj__CreatedAt: Date;
 
     @Field(() => Date)
-    __mj_UpdatedAt: Date;
+    _mj__UpdatedAt: Date;
 
     @Field({nullable: true})
     ProfessionalProfile?: string;
