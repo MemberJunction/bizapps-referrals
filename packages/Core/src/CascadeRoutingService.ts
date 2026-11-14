@@ -369,6 +369,9 @@ export class CascadeRoutingService {
         'MJ_BizApps_Referrals: Referral Requests',
         contextUser,
       );
+      if (!request) {
+        throw new PersistenceError('Unable to instantiate ReferralRequest entity.');
+      }
       if (!(await request.Load(validRequestId))) {
         throw new PersistenceError(`ReferralRequest '${validRequestId}' not found.`);
       }
@@ -1014,9 +1017,9 @@ export class CascadeRoutingService {
       },
       contextUser,
     );
-    if (!expiredRes.Success) {
+    if (!expiredRes || !expiredRes.Success) {
       throw new PersistenceError(
-        `Failed querying expired SLA assignments: ${expiredRes.ErrorMessage ?? 'Unknown error'}.`,
+        `Failed querying expired SLA assignments: ${expiredRes?.ErrorMessage ?? 'Unknown error'}.`,
       );
     }
 

@@ -16,9 +16,12 @@ import {
   CascadeRoutingService,
   CascadeRoutingResult,
   ConflictPartyInput,
+  CredentialVerificationStatus,
+  LoadCredentialProviders,
   MatchCandidateScore,
   MatchCriteria,
   MatchingEngine,
+  ReferralCredentialService,
   ReferralRequestStatus,
   ResponseOutcome,
   SweepResult,
@@ -445,6 +448,89 @@ export class SubmitReferralIntakeAction extends BaseAction {
   }
 }
 
+@RegisterClass(BaseAction, 'Referrals.VerifyCredential')
+export class VerifyCredentialAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const profileId = getStringParam(params, 'ProfessionalProfileID');
+    const credentialCode = getStringParam(params, 'CredentialCode');
+    if (!profileId || !credentialCode) {
+      return {
+        Success: false,
+        ResultCode: 'INVALID_PARAMETERS',
+        Message: 'ProfessionalProfileID and CredentialCode are required.',
+      };
+    }
+
+    const forceStatusRaw = getStringParam(params, 'ForceStatus');
+    const forceStatus = forceStatusRaw as CredentialVerificationStatus | undefined;
+
+    const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
+      {
+        ProfessionalProfileID: profileId,
+        ProfessionalCredentialID: getStringParam(params, 'ProfessionalCredentialID'),
+        CredentialCode: credentialCode,
+        CredentialName: getStringParam(params, 'CredentialName'),
+        LicenseNumber: getStringParam(params, 'LicenseNumber'),
+        IssuerName: getStringParam(params, 'IssuerName'),
+        JurisdictionID: getStringParam(params, 'JurisdictionID'),
+        ExternalReferenceID: getStringParam(params, 'ExternalReferenceID'),
+        EvidenceURL: getStringParam(params, 'EvidenceURL'),
+        ProviderKey: getStringParam(params, 'ProviderKey') ?? 'Manual',
+        VerifiedByPersonID: getStringParam(params, 'VerifiedByPersonID'),
+        ForceStatus: forceStatus,
+      },
+      params.ContextUser,
+      resolveActionProvider(),
+    );
+
+    return {
+      Success: true,
+      ResultCode: 'SUCCESS',
+      Message: JSON.stringify(result),
+    };
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.SyncProfileCredentials')
+export class SyncProfileCredentialsAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const profileId = getStringParam(params, 'ProfessionalProfileID');
+    if (!profileId) {
+      return {
+        Success: false,
+        ResultCode: 'INVALID_PARAMETERS',
+        Message: 'ProfessionalProfileID is required.',
+      };
+    }
+
+    const providerKey = getStringParam(params, 'ProviderKey') ?? 'Manual';
+    const result = await ReferralCredentialService.Instance.SyncProfileCredentials(
+      profileId,
+      providerKey,
+      params.ContextUser,
+      resolveActionProvider(),
+    );
+
+    return {
+      Success: true,
+      ResultCode: 'SUCCESS',
+      Message: JSON.stringify(result),
+    };
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.ListCredentialProviders')
+export class ListCredentialProvidersAction extends BaseAction {
+  protected override async InternalRunAction(): Promise<ActionResultSimple> {
+    const providers = ReferralCredentialService.Instance.ListProviders(resolveActionProvider());
+    return {
+      Success: true,
+      ResultCode: 'SUCCESS',
+      Message: JSON.stringify(providers),
+    };
+  }
+}
+
 export function LoadReferralsActions(): void {
-  // Ensures module side-effect class registrations are preserved by bundlers.
+  LoadCredentialProviders();
 }

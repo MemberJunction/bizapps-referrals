@@ -66,5 +66,44 @@
       "lastModified": "2026-11-13T23:25:07.112Z",
       "checksum": "14e0833e673c120ba2b408401260a71a497d50195306b8d8914a351f1bf98b22"
     }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.VerifyCredential",
+      "Description": "Verifies a professional credential using a pluggable verification provider and persists the normalized result.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.VerifyCredential",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000005"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.SyncProfileCredentials",
+      "Description": "Synchronizes normalized credentials for a professional profile from a specified verification provider.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.SyncProfileCredentials",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000006"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.ListCredentialProviders",
+      "Description": "Lists all registered credential verification providers and their runtime availability.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.ListCredentialProviders",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000007"
+    }
   }
 ]
