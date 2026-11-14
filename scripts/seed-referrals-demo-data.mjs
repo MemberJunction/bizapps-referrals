@@ -49,7 +49,7 @@ if (!cfg.pass) {
 console.log(`Seeding Referrals demo data into ${cfg.db} on ${cfg.host}:${cfg.port}...`);
 const out = execFileSync(
   'sqlcmd',
-  ['-S', `${cfg.host},${cfg.port}`, '-U', cfg.user, '-P', cfg.pass, '-d', cfg.db, '-C', '-i', sqlFile],
-  { encoding: 'utf8' },
+  ['-S', `${cfg.host},${cfg.port}`, '-U', cfg.user, '-d', cfg.db, '-C', '-i', sqlFile],
+  { encoding: 'utf8', env: { ...process.env, SQLCMDPASSWORD: cfg.pass } },
 );
 console.log(out);

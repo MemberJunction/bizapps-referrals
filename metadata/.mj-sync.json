@@ -9,6 +9,8 @@
     "referral-tiers",
     "action-categories",
     "actions",
+    "prompts",
+    "agents",
     "applications"
   ],
   "emitSyncNotes": false,

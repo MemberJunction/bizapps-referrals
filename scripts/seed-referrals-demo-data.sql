@@ -141,7 +141,7 @@ INSERT INTO @Pros VALUES
 ('D2000001-0000-0000-0000-000000000118',NULL,N'Victoria Sterling, Esq.',N'Sterling Delaware Counsel',N'v.sterling@sterlingde.law',N'DE-BAR-55190',N'Verified',N'Available',N'Delaware corporate governance, Series A-C venture financings, and cross-border M&A transactions.',16,N'English, French',450,650,0,2,7,1.4,4.92,24,22,@PA_CORP,N'Primary',@J_DE);
 
 INSERT INTO [__mj_BizAppsReferrals].[ProfessionalProfile]
-  ([ID],[OrganizationID],[DisplayName],[FirmName],[Email],[BarOrLicenseNumber],[VerificationStatus],[AvailabilityStatus],[Bio],[YearsExperience],[Languages],[HourlyRateMin],[HourlyRateMax],[AcceptsProBono],[AcceptsContingency],[ActiveReferralCount],[MaxConcurrentReferrals],[AverageResponseHours],[AverageRating],[TotalAcceptedCount],[TotalCompletedCount],[IsActive])
+  ([ID],[OrganizationID],[DisplayName],[FirmName],[Email],[LicenseNumber],[VerificationStatus],[AvailabilityStatus],[Bio],[YearsExperience],[Languages],[HourlyRateMin],[HourlyRateMax],[AcceptsProBono],[AcceptsContingency],[ActiveReferralCount],[MaxConcurrentReferrals],[AverageResponseHours],[AverageRating],[TotalAcceptedCount],[TotalCompletedCount],[IsActive])
 SELECT p.ID, p.OrgID, p.DisplayName, p.FirmName, p.Email, p.BarLic, p.Verif, p.Avail, p.Bio, p.Yrs, p.Langs, p.MinR, p.MaxR, p.ProBono, 0, p.ActiveCnt, p.MaxCnt, p.AvgResp, p.AvgRat, p.AcceptedCnt, p.CompletedCnt, 1
 FROM @Pros p
 WHERE NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalProfile] existing WHERE existing.[ID] = p.ID);
@@ -295,6 +295,55 @@ INSERT INTO [__mj_BizAppsReferrals].[ReferralFeedback]
 SELECT f.ID, f.ReqID, f.AssignID, f.ProID, f.SubType, f.Rating, f.Outcome, f.Comments, DATEADD(DAY, -f.DaysAgo, SYSDATETIMEOFFSET())
 FROM @Feedbacks f
 WHERE NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralFeedback] existing WHERE existing.[ID] = f.ID);
+
+-- 10. Seed 20 Normalized ProfessionalCredential records across IT, Legal, Accounting, and Medical
+DECLARE @Creds TABLE (
+  ID UNIQUEIDENTIFIER, ProID UNIQUEIDENTIFIER, JurID UNIQUEIDENTIFIER,
+  Code NVARCHAR(100), Name NVARCHAR(255), Issuer NVARCHAR(255),
+  ProviderKey NVARCHAR(100), ExtRef NVARCHAR(255), Status NVARCHAR(30),
+  IsPrimary BIT, DaysValid INT
+);
+
+INSERT INTO @Creds VALUES
+('82000001-0000-0000-0000-000000000101','D2000001-0000-0000-0000-000000000101',@J_CA,N'AWS-SAP-C02',N'AWS Certified Solutions Architect - Professional',N'Amazon Web Services',N'ExternalAction',N'AWS-SAP-99812',N'Verified',1,730),
+('82000001-0000-0000-0000-000000000102','D2000001-0000-0000-0000-000000000101',@J_CA,N'CKA-2025',N'Certified Kubernetes Administrator',N'CNCF',N'Manual',N'CNCF-CKA-4410',N'Verified',0,540),
+('82000001-0000-0000-0000-000000000103','D2000001-0000-0000-0000-000000000102',@J_NY,N'GCP-PCA-441',N'Google Cloud Professional Cloud Architect',N'Google Cloud',N'ExternalAction',N'GCP-PCA-441',N'Verified',1,600),
+('82000001-0000-0000-0000-000000000104','D2000001-0000-0000-0000-000000000103',@J_TX,N'AZ-305-882',N'Microsoft Certified: Azure Solutions Architect Expert',N'Microsoft',N'Manual',N'MS-AZ305-882',N'Verified',1,365),
+('82000001-0000-0000-0000-000000000105','D2000001-0000-0000-0000-000000000104',@J_FED,N'CISSP-77219',N'Certified Information Systems Security Professional',N'ISC2',N'ExternalAction',N'ISC2-77219',N'Verified',1,900),
+('82000001-0000-0000-0000-000000000106','D2000001-0000-0000-0000-000000000104',@J_FED,N'OSCP-3110',N'Offensive Security Certified Professional',N'OffSec',N'Manual',N'OSCP-3110',N'Verified',0,720),
+('82000001-0000-0000-0000-000000000107','D2000001-0000-0000-0000-000000000105',@J_EU,N'CISM-66104',N'Certified Information Security Manager',N'ISACA',N'ExternalAction',N'ISACA-66104',N'Verified',1,800),
+('82000001-0000-0000-0000-000000000108','D2000001-0000-0000-0000-000000000106',@J_UK,N'CIPP-E-5012',N'Certified Information Privacy Professional / Europe',N'IAPP',N'Manual',NULL,N'Pending',1,365),
+('82000001-0000-0000-0000-000000000109','D2000001-0000-0000-0000-000000000107',@J_CA,N'AWS-MLS-309',N'AWS Certified Machine Learning - Specialty',N'Amazon Web Services',N'ExternalAction',N'AWS-MLS-309',N'Verified',1,700),
+('82000001-0000-0000-0000-000000000110','D2000001-0000-0000-0000-000000000108',@J_NY,N'DEEP-AI-114',N'Enterprise AI Governance & Safety Specialist',N'AI Standards Institute',N'Manual',NULL,N'Pending',1,365),
+('82000001-0000-0000-0000-000000000111','D2000001-0000-0000-0000-000000000109',@J_DE,N'DB-DE-992',N'Databricks Certified Data Engineer Professional',N'Databricks',N'ExternalAction',N'DB-992',N'Verified',1,500),
+('82000001-0000-0000-0000-000000000112','D2000001-0000-0000-0000-000000000110',@J_IL,N'SNOW-PRO-41',N'SnowPro Core & Advanced Architect',N'Snowflake',N'Manual',N'SNOW-41',N'Verified',1,450),
+('82000001-0000-0000-0000-000000000113','D2000001-0000-0000-0000-000000000111',@J_WA,N'SF-CTA-881',N'Salesforce Certified Technical Architect',N'Salesforce',N'ExternalAction',N'SF-CTA-881',N'Verified',1,1095),
+('82000001-0000-0000-0000-000000000114','D2000001-0000-0000-0000-000000000112',@J_NY,N'NS-ERP-204',N'Oracle NetSuite Certified ERP Consultant',N'Oracle NetSuite',N'Manual',N'NS-204',N'Verified',1,600),
+('82000001-0000-0000-0000-000000000115','D2000001-0000-0000-0000-000000000113',@J_CA,N'CA-BAR-298410',N'State Bar of California License',N'State Bar of California',N'ExternalAction',N'CABAR-298410',N'Verified',1,1095),
+('82000001-0000-0000-0000-000000000116','D2000001-0000-0000-0000-000000000114',@J_NY,N'CPA-NY-091283',N'New York Certified Public Accountant',N'NYSED Office of the Professions',N'BizAppsCredentialingBridge',N'NYCPA-091283',N'Verified',1,730),
+('82000001-0000-0000-0000-000000000117','D2000001-0000-0000-0000-000000000115',@J_TX,N'CPA-TX-114902',N'Texas State Board of Public Accountancy CPA',N'TSBPA',N'Manual',NULL,N'Pending',1,365),
+('82000001-0000-0000-0000-000000000118','D2000001-0000-0000-0000-000000000116',@J_MA,N'MD-MA-448210',N'Massachusetts Board of Registration in Medicine',N'Mass.gov BORIM',N'ExternalAction',N'BORIM-448210',N'Verified',1,730),
+('82000001-0000-0000-0000-000000000119','D2000001-0000-0000-0000-000000000117',@J_FL,N'MD-FL-771829',N'Florida Board of Medicine License',N'Florida Department of Health',N'Manual',N'FLDOH-771829',N'Verified',1,730),
+('82000001-0000-0000-0000-000000000120','D2000001-0000-0000-0000-000000000118',@J_DE,N'DE-BAR-55190',N'Delaware Supreme Court Bar Admission',N'Delaware Board of Bar Examiners',N'ExternalAction',N'DEBAR-55190',N'Verified',1,1095);
+
+INSERT INTO [__mj_BizAppsReferrals].[ProfessionalCredential]
+  ([ID],[ProfessionalProfileID],[JurisdictionID],[CredentialCode],[CredentialName],[IssuerName],[ProviderKey],[ExternalReferenceID],[VerificationStatus],[IssuedAt],[ExpiresAt],[VerifiedAt],[IsPrimary])
+SELECT
+  c.ID,
+  c.ProID,
+  c.JurID,
+  c.Code,
+  c.Name,
+  c.Issuer,
+  c.ProviderKey,
+  c.ExtRef,
+  c.Status,
+  DATEADD(DAY, -180, SYSDATETIMEOFFSET()),
+  DATEADD(DAY, c.DaysValid, SYSDATETIMEOFFSET()),
+  CASE WHEN c.Status = N'Verified' THEN DATEADD(DAY, -30, SYSDATETIMEOFFSET()) ELSE NULL END,
+  c.IsPrimary
+FROM @Creds c
+WHERE NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalCredential] existing WHERE existing.[ID] = c.ID);
 
 PRINT N'Referrals demo seed complete.';
 GO

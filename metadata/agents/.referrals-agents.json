@@ -1,0 +1,101 @@
+[
+  {
+    "fields": {
+      "Name": "Referrals Triage & Concierge",
+      "Description": "AI triage and concierge agent for seeker intake, conflict-aware professional matching, credential verification, and SLA cascade routing.",
+      "IconClass": "fa-solid fa-scale-balanced",
+      "Status": "Active",
+      "TypeID": "@lookup:MJ: AI Agent Types.Name=Loop"
+    },
+    "relatedEntities": {
+      "MJ: AI Agent Prompts": [
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "PromptID": "@lookup:MJ: AI Prompts.Name=Referrals Triage & Concierge System Prompt",
+            "ExecutionOrder": 0,
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000002-0000-0000-0000-000000000001"
+          }
+        }
+      ],
+      "MJ: AI Agent Actions": [
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.MatchProfessionals",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000001"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RouteReferral",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000002"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RespondToReferral",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000003"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SweepExpiredReferralSLAs",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000004"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.VerifyCredential",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000005"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SyncProfileCredentials",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000006"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.ListCredentialProviders",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000007"
+          }
+        }
+      ]
+    },
+    "primaryKey": {
+      "ID": "A4000001-0000-0000-0000-000000000002"
+    }
+  }
+]
