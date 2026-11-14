@@ -19,7 +19,12 @@ export * from '@mj-biz-apps/referrals-core';
 export * from '@mj-biz-apps/referrals-entities-server';
 export * from '@mj-biz-apps/referrals-actions';
 export * from './generated/generated.js';
-export { ReferralLifecycleProbe } from './probes/ReferralLifecycleProbe.js';
+export {
+  BaseLiveCrudVerifier,
+  ReferralLifecycleProbe,
+  type HealthProbeContext,
+  type LiveCrudVerifierResult,
+} from './probes/ReferralLifecycleProbe.js';
 export { ReferralsSlaSweepScheduler, type SlaSweepRunRecord } from './SweepScheduler.js';
 
 export interface LoadBizAppsReferralsServerOptions {

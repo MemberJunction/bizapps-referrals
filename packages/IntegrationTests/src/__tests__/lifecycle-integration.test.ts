@@ -10,7 +10,11 @@ import {
   RunViewResult,
   UserInfo,
 } from '@memberjunction/core';
-import { BaseHealthProbe, HealthProbeContext, LiveEntityCrudProbe } from '@memberjunction/health';
+import {
+  type HealthProbeContext,
+  ReferralLifecycleProbe,
+  ReferralsSlaSweepScheduler,
+} from '@mj-biz-apps/referrals-server';
 import {
   AuthorizationError,
   CascadeRoutingService,
@@ -31,7 +35,6 @@ import {
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
-import { ReferralLifecycleProbe, ReferralsSlaSweepScheduler } from '@mj-biz-apps/referrals-server';
 
 const PRACTICE_AREA_ID = '10000000-0000-4000-8000-000000000001';
 const JURISDICTION_ID = '20000000-0000-4000-8000-000000000001';
@@ -481,16 +484,17 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
         SystemUser: pro3User,
       };
 
-      const hostProbe = new LiveEntityCrudProbe();
-      interface ProbeWithTxHelper {
-        WithRolledBackTransaction: <T>(
-          ctx: HealthProbeContext,
-          fn: (tx: DatabaseProviderBase) => Promise<T>,
-        ) => Promise<T>;
+      const tx = await (
+        mockDbProvider as Partial<DatabaseProviderBase> & {
+          BeginEntityTransaction: () => Promise<{ Commit: () => Promise<void>; Rollback: () => Promise<void> }>;
+        }
+      ).BeginEntityTransaction();
+      let result: Awaited<ReturnType<typeof probe.Verify>>;
+      try {
+        result = await probe.Verify(context, mockDbProvider);
+      } finally {
+        await tx.Rollback();
       }
-      const withTx = (hostProbe as object as ProbeWithTxHelper).WithRolledBackTransaction.bind(hostProbe);
-
-      const result = await withTx(context, (txProvider) => probe.Verify(context, txProvider));
       expect(result.Success).toBe(true);
       expect(result.ObservedMetrics?.Platform).toBe(platform);
       expect(result.ObservedMetrics?.TableCount).toBe(10);
