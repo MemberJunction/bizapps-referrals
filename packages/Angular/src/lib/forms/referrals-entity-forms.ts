@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RegisterClass } from '@memberjunction/global';
 import { BaseFormComponent } from '@memberjunction/ng-base-forms';
 import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
@@ -429,7 +430,7 @@ export class ReferralRequestFormComponent extends BaseFormComponent {
         <mj-form-field
           [Record]="record"
           [ShowLabel]="true"
-          FieldName="BarOrLicenseNumber"
+          FieldName="LicenseNumber"
           Type="textbox"
           [EditMode]="EditMode"
           [FormContext]="formContext">
@@ -2132,9 +2133,69 @@ export class ReferralFeedbackFormComponent extends BaseFormComponent {
   }
 }
 
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Credentials')
+@Component({
+  standalone: false,
+  selector: 'mj-professional-credential-form',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <mj-record-form-container [Record]="record" [FormComponent]="this" (Navigate)="OnFormNavigate($event)">
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="before-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+
+      <mj-collapsible-panel
+        SectionKey="credentialDetails"
+        SectionName="Credential &amp; Verification Details"
+        Icon="fa-solid fa-certificate"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="JurisdictionID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CredentialCode" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CredentialName" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IssuerName" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProviderKey" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ExternalReferenceID" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="VerificationStatus" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IssuedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ExpiresAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="VerifiedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="VerifiedByPersonID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EvidenceURL" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="MetadataJSON" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IsPrimary" Type="checkbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="systemMetadata"
+        SectionName="System Metadata"
+        Icon="fa-solid fa-info-circle"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_CreatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_UpdatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-related" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+    </mj-record-form-container>
+  `,
+})
+export class ProfessionalCredentialFormComponent extends BaseFormComponent {
+  public declare record: ProfessionalCredentialEntity;
+
+  override async ngOnInit(): Promise<void> {
+    await super.ngOnInit();
+    this.initSections([
+      { sectionKey: 'credentialDetails', sectionName: 'Credential & Verification Details', isExpanded: true },
+      { sectionKey: 'systemMetadata', sectionName: 'System Metadata', isExpanded: false },
+    ]);
+  }
+}
+
 export const REFERRALS_ENTITY_FORM_COMPONENTS = [
   ReferralRequestFormComponent,
   ProfessionalProfileFormComponent,
+  ProfessionalCredentialFormComponent,
   ReferralAssignmentFormComponent,
   ConflictCheckPartyFormComponent,
   PracticeAreaFormComponent,

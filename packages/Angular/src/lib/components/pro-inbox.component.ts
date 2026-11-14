@@ -14,6 +14,9 @@ import {
   AssertValidUUID,
   AssignmentResponseAction,
   CascadeRoutingService,
+  FeedbackOutcomeStatus,
+  FeedbackSubmittedByType,
+  ReferralCredentialService,
   ReferralTelemetry,
   UUIDsEqual,
 } from '@mj-biz-apps/referrals-core';
@@ -21,6 +24,7 @@ import {
   ConflictCheckPartyEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralFeedbackEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
@@ -150,6 +154,62 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                   </div>
                 </div>
               }
+
+              @if (active.Status === 'Accepted') {
+                <div class="feedback-panel" aria-label="Post-Acceptance Outcome & Feedback">
+                  <h4>Post-Acceptance Outcome &amp; Feedback</h4>
+                  <div class="feedback-grid">
+                    <label class="cap-label">
+                      <span>Rating (1–5 ★)</span>
+                      <div class="star-row">
+                        @for (star of [1, 2, 3, 4, 5]; track star) {
+                          <button
+                            type="button"
+                            class="star-btn"
+                            [class.star-active]="star <= FeedbackRating"
+                            (click)="FeedbackRating = star"
+                          >
+                            ★
+                          </button>
+                        }
+                      </div>
+                    </label>
+                    <label class="cap-label">
+                      <span>Outcome Status</span>
+                      <select [(ngModel)]="FeedbackOutcome">
+                        <option value="Engaged">Engaged</option>
+                        <option value="ConsultedOnly">Consulted Only</option>
+                        <option value="NoResponse">No Response</option>
+                        <option value="NotAFit">Not A Fit</option>
+                        <option value="Resolved">Resolved</option>
+                      </select>
+                    </label>
+                    <label class="cap-label">
+                      <span>Submitted By</span>
+                      <select [(ngModel)]="FeedbackSubmittedBy">
+                        <option value="Professional">Professional</option>
+                        <option value="Seeker">Seeker</option>
+                        <option value="Coordinator">Coordinator</option>
+                      </select>
+                    </label>
+                  </div>
+                  <textarea
+                    rows="2"
+                    [(ngModel)]="FeedbackComments"
+                    placeholder="Capture engagement outcome, resolution notes, or client feedback..."
+                  ></textarea>
+                  <div class="response-actions">
+                    <button
+                      type="button"
+                      class="btn-accept"
+                      [disabled]="IsSubmittingFeedback"
+                      (click)="SubmitFeedbackOutcome()"
+                    >
+                      {{ IsSubmittingFeedback ? 'Saving Feedback...' : 'Submit Outcome & Feedback' }}
+                    </button>
+                  </div>
+                </div>
+              }
             } @else {
               <div class="empty-detail">Select an assignment from the left workbench to inspect conflict parties and respond within SLA.</div>
             }
@@ -258,6 +318,51 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
       padding: 0.4rem 0.75rem;
       cursor: pointer;
     }
+    .feedback-panel {
+      border-top: 1px solid var(--mj-border-default);
+      padding-top: 0.9rem;
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .feedback-panel h4 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--mj-text-primary);
+    }
+    .feedback-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+    }
+    .feedback-panel textarea {
+      width: 100%;
+      background: var(--mj-bg-surface);
+      color: var(--mj-text-primary);
+      border: 1px solid var(--mj-border-default);
+      border-radius: var(--mj-radius-sm, 6px);
+      padding: 0.5rem;
+    }
+    .star-row {
+      display: flex;
+      gap: 0.25rem;
+    }
+    .star-btn {
+      background: var(--mj-bg-surface);
+      color: var(--mj-text-muted);
+      border: 1px solid var(--mj-border-default);
+      border-radius: 4px;
+      padding: 0.2rem 0.45rem;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .star-btn.star-active {
+      background: var(--mj-status-warning-bg);
+      color: var(--mj-status-warning-text);
+      border-color: var(--mj-status-warning-border);
+    }
     .btn-accept {
       background: var(--mj-status-success-text);
       color: var(--mj-text-inverse);
@@ -308,6 +413,11 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
   public IsSavingCapacity = false;
   public Prefs: ProInboxPreferences = { StatusFilter: 'Offered' };
   public ResponseNotes = '';
+  public FeedbackRating = 5;
+  public FeedbackOutcome: FeedbackOutcomeStatus = 'Engaged';
+  public FeedbackSubmittedBy: FeedbackSubmittedByType = 'Professional';
+  public FeedbackComments = '';
+  public IsSubmittingFeedback = false;
   public ActionMessage = '';
   public IsActing = false;
   public NowMs = Date.now();
@@ -486,6 +596,46 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
       await this.Refresh();
     } finally {
       this.IsActing = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  public async SubmitFeedbackOutcome(): Promise<void> {
+    if (!this.SelectedAssignment) return;
+    this.IsSubmittingFeedback = true;
+    this.ActionMessage = '';
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      const fb = await md.GetEntityObject<ReferralFeedbackEntity>(
+        'MJ_BizApps_Referrals: Referral Feedbacks',
+        md.CurrentUser,
+      );
+      fb.NewRecord();
+      fb.ReferralAssignmentID = this.SelectedAssignment.ID;
+      fb.ProfessionalProfileID = this.SelectedAssignment.ProfessionalProfileID;
+      fb.SubmittedByType = this.FeedbackSubmittedBy;
+      fb.Rating = Math.max(1, Math.min(5, Number(this.FeedbackRating) || 5));
+      fb.OutcomeStatus = this.FeedbackOutcome;
+      fb.Comments = this.FeedbackComments.trim() || null;
+
+      const saved = await fb.Save();
+      if (!saved) {
+        this.ActionMessage = fb.LatestResult?.CompleteMessage ?? 'Failed to save referral feedback.';
+        return;
+      }
+
+      const recomputed = await ReferralCredentialService.Instance.RecomputeProfileRatingAndCount(
+        this.SelectedAssignment.ProfessionalProfileID,
+        md.CurrentUser,
+      );
+      this.FeedbackComments = '';
+      this.ActionMessage = `Saved ${fb.OutcomeStatus} outcome (${fb.Rating} ★). Profile rating is now ${recomputed.AverageRating ?? 'N/A'} across ${recomputed.TotalCompletedCount} completed referral(s).`;
+      await this.Refresh();
+    } catch (err) {
+      this.ActionMessage = err instanceof Error ? err.message : 'Failed to submit referral feedback.';
+    } finally {
+      this.IsSubmittingFeedback = false;
       this.cdr.markForCheck();
     }
   }

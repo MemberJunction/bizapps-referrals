@@ -8,63 +8,72 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CompositeKey, Metadata, RunView } from '@memberjunction/core';
-import { NavigationService } from '@memberjunction/ng-shared';
+import { ResourceData } from '@memberjunction/core-entities';
+import { RegisterClass } from '@memberjunction/global';
+import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJPageBodyComponent,
+  MJPageHeaderComponent,
+  MJPageLayoutComponent,
+} from '@memberjunction/ng-ui-components';
+import {
+  CredentialProviderDescriptor,
   DomainVocabulary,
-  VOCABULARY_PRESETS,
+  ReferralCredentialService,
   VocabularyService,
 } from '@mj-biz-apps/referrals-core';
 import {
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
 } from '@mj-biz-apps/referrals-entities';
+import { DirectoryPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
 
 export interface DirectoryProfileCard {
   Profile: ProfessionalProfileEntity;
   PracticeAreaNames: string[];
   JurisdictionNames: string[];
+  Credentials: ProfessionalCredentialEntity[];
 }
 
+export interface VerificationQueueItem {
+  Credential: ProfessionalCredentialEntity;
+  ProfileName: string;
+}
+
+@RegisterClass(BaseResourceComponent, 'ReferralsCredentialDirectoryResource')
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MJPageLayoutComponent,
+    MJPageHeaderComponent,
+    MJPageBodyComponent,
+  ],
   selector: 'mj-referrals-credential-directory',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .directory-container {
-      padding: 1.5rem;
+      padding: 1.25rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
-      background: var(--mj-bg-surface-page, #f8fafc);
+      gap: 1.25rem;
+      background: var(--mj-bg-page);
       min-height: 100%;
     }
-    .directory-header {
+    .header-actions {
       display: flex;
-      justify-content: space-between;
+      gap: 0.65rem;
       align-items: center;
       flex-wrap: wrap;
-      gap: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--mj-border-default, #e2e8f0);
-    }
-    .directory-title h2 {
-      margin: 0 0 0.25rem 0;
-      font-size: 1.35rem;
-      font-weight: 700;
-      color: var(--mj-text-primary, #0f172a);
-    }
-    .directory-title p {
-      margin: 0;
-      font-size: 0.85rem;
-      color: var(--mj-text-secondary, #64748b);
     }
     .filter-bar {
-      background: #ffffff;
-      border: 1px solid var(--mj-border-default, #e2e8f0);
+      background: var(--mj-bg-surface);
+      border: 1px solid var(--mj-border-default);
       border-radius: 8px;
       padding: 1rem 1.25rem;
       display: grid;
@@ -80,15 +89,16 @@ export interface DirectoryProfileCard {
     .form-group label {
       font-size: 0.78rem;
       font-weight: 600;
-      color: #475569;
+      color: var(--mj-text-secondary);
     }
     .form-control {
       padding: 0.55rem 0.75rem;
-      border: 1px solid #cbd5e1;
+      border: 1px solid var(--mj-border-default);
       border-radius: 6px;
       font-size: 0.85rem;
       outline: none;
-      background: #ffffff;
+      background: var(--mj-bg-surface);
+      color: var(--mj-text-primary);
     }
     .cards-grid {
       display: grid;
@@ -96,200 +106,416 @@ export interface DirectoryProfileCard {
       gap: 1.25rem;
     }
     .pro-card {
-      background: #ffffff;
-      border: 1px solid var(--mj-border-default, #e2e8f0);
+      background: var(--mj-bg-surface);
+      border: 1px solid var(--mj-border-default);
       border-radius: 8px;
       padding: 1.25rem;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 1rem;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
     }
     .pro-name {
       font-size: 1.05rem;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--mj-text-primary);
       margin: 0;
     }
     .pro-firm {
       font-size: 0.82rem;
-      color: #64748b;
+      color: var(--mj-text-secondary);
       margin-top: 0.15rem;
+    }
+    .pro-license {
+      font-size: 0.78rem;
+      color: var(--mj-text-muted);
+      margin-top: 0.2rem;
+    }
+    .pro-bio {
+      font-size: 0.8rem;
+      color: var(--mj-text-secondary);
+      margin: 0.65rem 0 0 0;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .pro-pills {
       display: flex;
-      gap: 0.35rem;
       flex-wrap: wrap;
-      margin-top: 0.5rem;
+      gap: 0.35rem;
+      margin-top: 0.65rem;
     }
     .pill {
-      padding: 0.18rem 0.55rem;
-      border-radius: 999px;
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
       font-size: 0.72rem;
       font-weight: 600;
+      border: 1px solid var(--mj-border-default);
+      background: var(--mj-bg-surface-sunken);
+      color: var(--mj-text-secondary);
     }
-    .pill-verified { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-    .pill-avail { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .pill-verified {
+      background: var(--mj-status-success-bg);
+      color: var(--mj-status-success-text);
+      border-color: var(--mj-status-success-border);
+    }
+    .pill-pending {
+      background: var(--mj-status-warning-bg);
+      color: var(--mj-status-warning-text);
+      border-color: var(--mj-status-warning-border);
+    }
+    .pill-avail {
+      background: var(--mj-status-info-bg);
+      color: var(--mj-status-info-text);
+      border-color: var(--mj-status-info-border);
+    }
+    .pill-accent {
+      background: var(--mj-bg-surface-hover);
+      color: var(--mj-brand-primary);
+      border-color: var(--mj-border-default);
+    }
     .pro-metrics {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.5rem;
-      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid var(--mj-border-subtle);
       padding-top: 0.75rem;
+      font-size: 0.8rem;
     }
     .metric-col {
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
+      gap: 0.15rem;
     }
-    .metric-lbl { font-size: 0.7rem; color: #64748b; }
-    .metric-val { font-size: 0.88rem; font-weight: 700; color: #0f172a; }
+    .metric-lbl { font-size: 0.7rem; color: var(--mj-text-muted); }
+    .metric-val { font-size: 0.88rem; font-weight: 700; color: var(--mj-text-primary); }
+    .card-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+    }
     .btn {
       padding: 0.45rem 0.85rem;
       border-radius: 6px;
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #334155;
+      border: 1px solid var(--mj-border-default);
+      background: var(--mj-bg-surface);
+      color: var(--mj-text-primary);
     }
     .btn-primary {
-      background: var(--mj-brand-primary, #1e40af);
-      color: #ffffff;
-      border-color: var(--mj-brand-primary, #1e40af);
+      background: var(--mj-brand-primary);
+      color: var(--mj-text-inverse);
+      border-color: var(--mj-brand-primary);
+    }
+    .btn-danger {
+      background: var(--mj-status-error-bg);
+      color: var(--mj-status-error-text);
+      border-color: var(--mj-status-error-border);
+    }
+    .queue-panel {
+      background: var(--mj-bg-surface);
+      border: 1px solid var(--mj-border-default);
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .queue-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--mj-text-primary);
+    }
+    .queue-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border: 1px solid var(--mj-border-subtle);
+      border-radius: 6px;
+      background: var(--mj-bg-surface-sunken);
+    }
+    .queue-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .queue-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .status-banner {
+      padding: 0.65rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.84rem;
+      background: var(--mj-status-info-bg);
+      color: var(--mj-status-info-text);
+      border: 1px solid var(--mj-status-info-border);
+    }
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--mj-text-muted);
     }
   `],
   template: `
-    <div class="directory-container">
-      <header class="directory-header">
-        <div class="directory-title">
-          <h2>Verified Member Directory & Credential Explorer</h2>
-          <p>Browse roster of certified, active {{ Vocab.ProfessionalPluralLabel }} with live credentials and capacity</p>
+    <mj-page-layout>
+      <mj-page-header [Title]="'Directory & ' + Vocab.ProfessionalPluralLabel" Icon="fa-solid fa-address-book">
+        <div class="header-actions" actions>
+          <button
+            type="button"
+            class="btn"
+            [class.btn-primary]="Prefs.ShowVerificationQueue"
+            (click)="ToggleVerificationQueue()"
+          >
+            Verification Queue ({{ PendingQueue.length }})
+          </button>
+          <button type="button" class="btn" (click)="ResetFilters()">Reset Filters</button>
+          <button type="button" class="btn btn-primary" (click)="LoadProfiles()">Refresh</button>
         </div>
-      </header>
+      </mj-page-header>
+      <mj-page-body>
+        <div class="directory-container">
+          @if (StatusMessage) {
+            <div class="status-banner">{{ StatusMessage }}</div>
+          }
 
-      <section class="filter-bar">
-        <div class="form-group">
-          <label>Search Name / Firm</label>
-          <input type="text" class="form-control" [(ngModel)]="SearchTerm" (input)="ApplyFilters()" placeholder="Filter by name..." />
-        </div>
+          @if (Prefs.ShowVerificationQueue) {
+            <section class="queue-panel" aria-label="Coordinator Verification Queue">
+              <div class="queue-header">
+                <h3>Coordinator Verification Queue</h3>
+                <div class="queue-actions">
+                  <label class="form-group">
+                    <span>Verification Provider</span>
+                    <select class="form-control" [(ngModel)]="SelectedProviderKey">
+                      @for (p of Providers; track p.ProviderKey) {
+                        <option [value]="p.ProviderKey" [disabled]="!p.Available">
+                          {{ p.DisplayName }} ({{ p.Available ? 'Ready' : 'Not Installed' }})
+                        </option>
+                      }
+                    </select>
+                  </label>
+                </div>
+              </div>
+              @for (item of PendingQueue; track item.Credential.ID) {
+                <div class="queue-row">
+                  <div class="queue-info">
+                    <strong>{{ item.ProfileName }} — {{ item.Credential.CredentialName }}</strong>
+                    <span class="pro-license">
+                      Code: {{ item.Credential.CredentialCode }} • Provider: {{ item.Credential.ProviderKey }} • Status: {{ item.Credential.VerificationStatus }}
+                    </span>
+                  </div>
+                  <div class="queue-actions">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      [disabled]="IsVerifying"
+                      (click)="VerifyCredential(item.Credential, 'Verified')"
+                    >
+                      Verify
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="IsVerifying"
+                      (click)="VerifyCredential(item.Credential, 'Rejected')"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="pro-license">All credentials in the directory are verified.</div>
+              }
+            </section>
+          }
 
-        <div class="form-group">
-          <label>Availability</label>
-          <select class="form-control" [(ngModel)]="AvailabilityFilter" (change)="ApplyFilters()">
-            <option value="All">All Statuses</option>
-            <option value="Available">Available</option>
-            <option value="Limited">Limited Capacity</option>
-            <option value="OnLeave">On Leave</option>
-          </select>
-        </div>
+          <section class="filter-bar">
+            <div class="form-group">
+              <label>Search Name, Firm, License, or {{ Vocab.PracticeAreaLabel }}</label>
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="SearchTerm"
+                (ngModelChange)="OnFilterInputChange()"
+                placeholder="e.g., Litigation, California, LIC-1042..."
+              />
+            </div>
 
-        <div class="form-group">
-          <label>Verification Status</label>
-          <select class="form-control" [(ngModel)]="VerificationFilter" (change)="ApplyFilters()">
-            <option value="All">All</option>
-            <option value="Verified">Verified Only</option>
-            <option value="Pending">Pending</option>
-          </select>
-        </div>
+            <div class="form-group">
+              <label>Availability Status</label>
+              <select class="form-control" [(ngModel)]="AvailabilityFilter" (ngModelChange)="ApplyFilters()">
+                <option value="All">All Availabilities</option>
+                <option value="Available">Available</option>
+                <option value="Limited">Limited</option>
+                <option value="OnLeave">On Leave</option>
+                <option value="Unavailable">Unavailable</option>
+              </select>
+            </div>
 
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" class="btn" (click)="ResetFilters()">Reset</button>
-        </div>
-      </section>
+            <div class="form-group">
+              <label>Verification Status</label>
+              <select class="form-control" [(ngModel)]="VerificationFilter" (ngModelChange)="ApplyFilters()">
+                <option value="All">All Statuses</option>
+                <option value="Verified">Verified Only</option>
+                <option value="Pending">Pending Verification</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          </section>
 
-      <section class="cards-grid">
-        @for (card of FilteredCards; track card.Profile.ID) {
-          <div class="pro-card">
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <section class="cards-grid">
+            @if (FilteredCards.length === 0) {
+              <div class="empty-state">
+                No {{ Vocab.ProfessionalPluralLabel.toLowerCase() }} matched the current directory filters.
+              </div>
+            }
+
+            @for (card of FilteredCards; track card.Profile.ID) {
+              <div class="pro-card">
                 <div>
-                  <h3 class="pro-name">{{ card.Profile.DisplayName }}</h3>
-                  <div class="pro-firm">{{ card.Profile.FirmName || 'Independent Practice' }}</div>
-                </div>
-              </div>
+                  <div class="queue-header">
+                    <div>
+                      <h3 class="pro-name">{{ card.Profile.DisplayName }}</h3>
+                      <div class="pro-firm">{{ card.Profile.FirmName || 'Independent Practice' }}</div>
+                      @if (card.Profile.LicenseNumber) {
+                        <div class="pro-license">License: {{ card.Profile.LicenseNumber }}</div>
+                      }
+                    </div>
+                  </div>
 
-              <div class="pro-pills">
-                <span class="pill pill-verified">{{ card.Profile.VerificationStatus }}</span>
-                <span class="pill pill-avail">{{ card.Profile.AvailabilityStatus }}</span>
-                @if (card.Profile.AcceptsProBono) {
-                  <span class="pill" style="background: #fdf4ff; color: #86198f; border: 1px solid #f0abfc;">Pro Bono</span>
-                }
-              </div>
+                  <div class="pro-pills">
+                    <span
+                      class="pill"
+                      [class.pill-verified]="card.Profile.VerificationStatus === 'Verified'"
+                      [class.pill-pending]="card.Profile.VerificationStatus !== 'Verified'"
+                    >
+                      {{ card.Profile.VerificationStatus }}
+                    </span>
+                    <span class="pill pill-avail">{{ card.Profile.AvailabilityStatus }}</span>
+                    @if (card.Profile.AcceptsProBono) {
+                      <span class="pill pill-accent">Pro Bono</span>
+                    }
+                  </div>
 
-              @if (card.PracticeAreaNames.length > 0) {
-                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem;">
-                  @for (pa of card.PracticeAreaNames; track pa) {
-                    <span class="pill" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.72rem;">{{ pa }}</span>
+                  @if (card.Credentials.length > 0) {
+                    <div class="pro-pills">
+                      @for (cred of card.Credentials; track cred.ID) {
+                        <span
+                          class="pill"
+                          [class.pill-verified]="cred.VerificationStatus === 'Verified'"
+                          [class.pill-pending]="cred.VerificationStatus !== 'Verified'"
+                        >
+                          {{ cred.CredentialCode }} ({{ cred.VerificationStatus }})
+                        </span>
+                      }
+                    </div>
+                  }
+
+                  <div class="pro-pills">
+                    @for (pa of card.PracticeAreaNames; track pa) {
+                      <span class="pill pill-accent">{{ pa }}</span>
+                    }
+                  </div>
+
+                  <div class="pro-pills">
+                    @for (jur of card.JurisdictionNames; track jur) {
+                      <span class="pill">{{ jur }}</span>
+                    }
+                  </div>
+
+                  @if (card.Profile.Bio) {
+                    <p class="pro-bio">{{ card.Profile.Bio }}</p>
                   }
                 </div>
-              }
 
-              @if (card.JurisdictionNames.length > 0) {
-                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem;">
-                  @for (jur of card.JurisdictionNames; track jur) {
-                    <span class="pill" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-size: 0.72rem;">{{ jur }}</span>
-                  }
-                </div>
-              }
+                <div>
+                  <div class="pro-metrics">
+                    <div class="metric-col">
+                      <span class="metric-lbl">Capacity</span>
+                      <span class="metric-val">{{ card.Profile.ActiveReferralCount }} / {{ card.Profile.MaxConcurrentReferrals }}</span>
+                    </div>
+                    <div class="metric-col">
+                      <span class="metric-lbl">Avg Response</span>
+                      <span class="metric-val">{{ card.Profile.AverageResponseHours != null ? (card.Profile.AverageResponseHours + 'h') : 'N/A' }}</span>
+                    </div>
+                    <div class="metric-col">
+                      <span class="metric-lbl">Rating</span>
+                      <span class="metric-val">{{ card.Profile.AverageRating != null ? (card.Profile.AverageRating + ' ★') : 'Unrated' }}</span>
+                    </div>
+                  </div>
 
-              @if (card.Profile.Bio) {
-                <p style="font-size: 0.8rem; color: #475569; margin: 0.65rem 0 0 0; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                  {{ card.Profile.Bio }}
-                </p>
-              }
-            </div>
-
-            <div>
-              <div class="pro-metrics">
-                <div class="metric-col">
-                  <span class="metric-lbl">Active Load</span>
-                  <span class="metric-val">{{ card.Profile.ActiveReferralCount }} / {{ card.Profile.MaxConcurrentReferrals }}</span>
-                </div>
-                <div class="metric-col">
-                  <span class="metric-lbl">Avg Response</span>
-                  <span class="metric-val">{{ card.Profile.AverageResponseHours != null ? (card.Profile.AverageResponseHours + 'h') : 'N/A' }}</span>
-                </div>
-                <div class="metric-col">
-                  <span class="metric-lbl">Rating</span>
-                  <span class="metric-val">{{ card.Profile.AverageRating != null ? (card.Profile.AverageRating + ' ★') : 'Unrated' }}</span>
+                  <div class="card-footer">
+                    <button type="button" class="btn" (click)="OpenProfile(card.Profile.ID)">View Profile</button>
+                  </div>
                 </div>
               </div>
-
-              <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.85rem;">
-                <button type="button" class="btn" (click)="OpenProfile(card.Profile.ID)">View Profile</button>
-              </div>
-            </div>
-          </div>
-        }
-      </section>
-    </div>
+            }
+          </section>
+        </div>
+      </mj-page-body>
+    </mj-page-layout>
   `,
 })
-export class ReferralsCredentialDirectoryComponent implements OnInit {
+export class ReferralsCredentialDirectoryComponent extends BaseResourceComponent implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
-  private readonly navService = inject(NavigationService);
+  protected override readonly navigationService = inject(NavigationService);
   public Vocab: DomainVocabulary = VocabularyService.Instance.Current;
 
-  public SearchTerm = '';
+  public Prefs: DirectoryPreferences = ReferralsUiStateHelper.LoadDirectoryPreferences();
+  public SearchTerm = this.Prefs.SearchTerm;
   public AvailabilityFilter = 'All';
   public VerificationFilter = 'Verified';
 
   public AllCards: DirectoryProfileCard[] = [];
   public FilteredCards: DirectoryProfileCard[] = [];
+  public PendingQueue: VerificationQueueItem[] = [];
+  public Providers: CredentialProviderDescriptor[] = [];
+  public SelectedProviderKey = 'Manual';
+  public IsVerifying = false;
+  public StatusMessage = '';
+
+  override async GetResourceDisplayName(_data: ResourceData): Promise<string> {
+    return 'Directory & Pros';
+  }
+
+  override async GetResourceIconClass(_data: ResourceData): Promise<string> {
+    return 'fa-solid fa-address-book';
+  }
 
   async ngOnInit(): Promise<void> {
-    await this.LoadProfiles();
-    this.cdr.markForCheck();
+    super.ngOnInit();
+    queueMicrotask(() => this.NotifyLoadStarted());
+    try {
+      this.Providers = ReferralCredentialService.Instance.ListProviders();
+      await this.LoadProfiles();
+    } finally {
+      this.NotifyLoadComplete();
+      this.cdr.markForCheck();
+    }
   }
 
   public async LoadProfiles(): Promise<void> {
     try {
       const rv = new RunView();
       const md = new Metadata();
-      const [proRes, ppaRes, paRes, pjRes, jurRes] = await Promise.all([
+      const [proRes, ppaRes, paRes, pjRes, jurRes, credRes] = await Promise.all([
         rv.RunView<ProfessionalProfileEntity>(
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
@@ -327,6 +553,13 @@ export class ReferralsCredentialDirectoryComponent implements OnInit {
           },
           md.CurrentUser,
         ),
+        rv.RunView<ProfessionalCredentialEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
       ]);
 
       if (proRes.Success) {
@@ -342,6 +575,9 @@ export class ReferralsCredentialDirectoryComponent implements OnInit {
 
         const ppaList = ppaRes.Success ? ppaRes.Results : [];
         const pjList = pjRes.Success ? pjRes.Results : [];
+        const credList = credRes.Success ? credRes.Results : [];
+        const profileNameMap = new Map<string, string>();
+        proRes.Results.forEach((p) => profileNameMap.set(p.ID, p.DisplayName));
 
         this.AllCards = proRes.Results.map((p) => {
           const paNames = ppaList
@@ -354,17 +590,73 @@ export class ReferralsCredentialDirectoryComponent implements OnInit {
             .map((l) => jurMap.get(l.JurisdictionID) || '')
             .filter(Boolean);
 
+          const creds = credList.filter((c) => c.ProfessionalProfileID === p.ID);
+
           return {
             Profile: p,
             PracticeAreaNames: paNames,
             JurisdictionNames: jurNames,
+            Credentials: creds,
           };
         });
+
+        this.PendingQueue = credList
+          .filter((c) => c.VerificationStatus === 'Pending')
+          .map((c) => ({
+            Credential: c,
+            ProfileName: profileNameMap.get(c.ProfessionalProfileID) ?? 'Professional',
+          }));
 
         this.ApplyFilters();
       }
     } catch {
       // In standalone or test mode
+    }
+  }
+
+  public async ToggleVerificationQueue(): Promise<void> {
+    this.Prefs = { ...this.Prefs, ShowVerificationQueue: !this.Prefs.ShowVerificationQueue };
+    await ReferralsUiStateHelper.SaveDirectoryPreferences(this.Prefs);
+    this.cdr.markForCheck();
+  }
+
+  public async OnFilterInputChange(): Promise<void> {
+    this.Prefs = { ...this.Prefs, SearchTerm: this.SearchTerm };
+    await ReferralsUiStateHelper.SaveDirectoryPreferences(this.Prefs);
+    this.ApplyFilters();
+  }
+
+  public async VerifyCredential(
+    credential: ProfessionalCredentialEntity,
+    targetStatus: 'Verified' | 'Rejected',
+  ): Promise<void> {
+    this.IsVerifying = true;
+    this.StatusMessage = '';
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
+        {
+          ProfessionalProfileID: credential.ProfessionalProfileID,
+          ProfessionalCredentialID: credential.ID,
+          CredentialCode: credential.CredentialCode,
+          CredentialName: credential.CredentialName,
+          IssuerName: credential.IssuerName,
+          JurisdictionID: credential.JurisdictionID,
+          ExternalReferenceID: credential.ExternalReferenceID,
+          EvidenceURL: credential.EvidenceURL,
+          ProviderKey: this.SelectedProviderKey,
+          ForceStatus: targetStatus,
+        },
+        md.CurrentUser,
+      );
+      this.StatusMessage = result.Message;
+      await this.LoadProfiles();
+    } catch (err) {
+      this.StatusMessage = err instanceof Error ? err.message : 'Credential verification failed.';
+    } finally {
+      this.IsVerifying = false;
+      this.cdr.markForCheck();
     }
   }
 
@@ -376,6 +668,8 @@ export class ReferralsCredentialDirectoryComponent implements OnInit {
         !term ||
         p.DisplayName.toLowerCase().includes(term) ||
         (p.FirmName && p.FirmName.toLowerCase().includes(term)) ||
+        (p.LicenseNumber && p.LicenseNumber.toLowerCase().includes(term)) ||
+        card.Credentials.some((c) => c.CredentialCode.toLowerCase().includes(term)) ||
         card.PracticeAreaNames.some((n) => n.toLowerCase().includes(term)) ||
         card.JurisdictionNames.some((n) => n.toLowerCase().includes(term));
 
@@ -396,6 +690,9 @@ export class ReferralsCredentialDirectoryComponent implements OnInit {
   }
 
   public OpenProfile(id: string): void {
-    this.navService.OpenEntityRecord('MJ_BizApps_Referrals: Professional Profiles', CompositeKey.FromID(id));
+    this.navigationService.OpenEntityRecord(
+      'MJ_BizApps_Referrals: Professional Profiles',
+      CompositeKey.FromID(id),
+    );
   }
 }

@@ -18,6 +18,7 @@ import {
   OrganizationReferralsOverviewPanel,
   PersonReferralsOverviewPanel,
   PracticeAreaHeroPanel,
+  ProfessionalCredentialHeroPanel,
   ProfessionalJurisdictionHeroPanel,
   ProfessionalPracticeAreaHeroPanel,
   ProfessionalProfileHeroPanel,
@@ -32,6 +33,7 @@ import {
   ConflictCheckPartyFormComponent,
   JurisdictionFormComponent,
   PracticeAreaFormComponent,
+  ProfessionalCredentialFormComponent,
   ProfessionalJurisdictionFormComponent,
   ProfessionalPracticeAreaFormComponent,
   ProfessionalProfileFormComponent,
@@ -56,6 +58,7 @@ import {
     ReferralsFinderWidgetComponent,
     ReferralRequestHeroPanel,
     ProfessionalProfileHeroPanel,
+    ProfessionalCredentialHeroPanel,
     ReferralAssignmentHeroPanel,
     ConflictCheckPartyHeroPanel,
     PracticeAreaHeroPanel,
@@ -80,6 +83,7 @@ import {
     ReferralsFinderWidgetComponent,
     ReferralRequestHeroPanel,
     ProfessionalProfileHeroPanel,
+    ProfessionalCredentialHeroPanel,
     ReferralAssignmentHeroPanel,
     ConflictCheckPartyHeroPanel,
     PracticeAreaHeroPanel,
@@ -109,6 +113,7 @@ export function LoadBizAppsReferralsClient(): void {
   void ReferralsFinderWidgetComponent;
   void ReferralRequestHeroPanel;
   void ProfessionalProfileHeroPanel;
+  void ProfessionalCredentialHeroPanel;
   void ReferralAssignmentHeroPanel;
   void ConflictCheckPartyHeroPanel;
   void PracticeAreaHeroPanel;
@@ -123,6 +128,7 @@ export function LoadBizAppsReferralsClient(): void {
   void REFERRALS_ENTITY_FORM_COMPONENTS;
   void ReferralRequestFormComponent;
   void ProfessionalProfileFormComponent;
+  void ProfessionalCredentialFormComponent;
   void ReferralAssignmentFormComponent;
   void ConflictCheckPartyFormComponent;
   void PracticeAreaFormComponent;

@@ -3380,6 +3380,12 @@ export type mjBizAppsReferralsProfessionalCredentialEntityType = z.infer<typeof 
  */
 @RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Credentials')
 export class mjBizAppsReferralsProfessionalCredentialEntity extends BaseEntity<mjBizAppsReferralsProfessionalCredentialEntityType> {
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]): Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
     /**
     * * Field Name: ID
     * * Display Name: ID

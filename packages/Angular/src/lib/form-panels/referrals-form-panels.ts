@@ -10,6 +10,7 @@ import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
@@ -902,3 +903,67 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
   }
 }
 
+
+@RegisterClassEx(BaseFormPanel, {
+  key: 'referrals:professional-credential-hero-panel',
+  skipNullKeyWarning: true,
+  metadata: {
+    entity: 'MJ_BizApps_Referrals: Professional Credentials',
+    slot: 'before-fields',
+    sortKey: 5,
+    contributionKey: 'referrals-professional-credential-hero',
+  },
+})
+@Component({
+  standalone: true,
+  imports: [CommonModule],
+  selector: 'mj-professional-credential-hero-panel',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [HERO_PANEL_STYLES],
+  template: `
+    @if (TypedRecord; as cred) {
+      <section class="mj-referrals-hero">
+        <div class="hero-top">
+          <div>
+            <h3 class="hero-title">{{ cred.CredentialName || cred.CredentialCode || 'Credential' }}</h3>
+            <p class="hero-sub">Code: {{ cred.CredentialCode }} • Provider: {{ cred.ProviderKey }}</p>
+          </div>
+          <div class="hero-actions">
+            <span class="badge" [attr.data-status]="cred.VerificationStatus">{{ cred.VerificationStatus }}</span>
+            <button type="button" class="btn-outline" (click)="OpenProfile(cred.ProfessionalProfileID)">
+              View Profile
+            </button>
+          </div>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric-tile">
+            <span class="metric-label">Issuer</span>
+            <span class="metric-val">{{ cred.IssuerName || 'N/A' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Primary</span>
+            <span class="metric-val">{{ cred.IsPrimary ? 'Yes' : 'No' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Expires</span>
+            <span class="metric-val">{{ cred.ExpiresAt ? (cred.ExpiresAt | date:'mediumDate') : 'No Expiry' }}</span>
+          </div>
+        </div>
+      </section>
+    }
+  `,
+})
+export class ProfessionalCredentialHeroPanel extends BaseFormPanel {
+  protected readonly navService = inject(NavigationService);
+
+  public get TypedRecord(): ProfessionalCredentialEntity | null {
+    return this.Record instanceof ProfessionalCredentialEntity ? this.Record : null;
+  }
+
+  public OpenProfile(profileId: string): void {
+    this.navService.OpenEntityRecord(
+      'MJ_BizApps_Referrals: Professional Profiles',
+      CompositeKey.FromID(profileId),
+    );
+  }
+}

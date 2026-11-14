@@ -30,6 +30,12 @@
           "Icon": "fa-solid fa-chart-pie",
           "ResourceType": "Custom",
           "DriverClass": "ReferralsReportGalleryResource"
+        },
+        {
+          "Label": "Directory & Pros",
+          "Icon": "fa-solid fa-address-book",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsCredentialDirectoryResource"
         }
       ]
     },
@@ -138,6 +144,17 @@
           "sync": {
             "lastModified": "2026-11-13T23:24:58.591Z",
             "checksum": "05ea38e22b7f1de5690c827fa801e79722e9ea3e47dde7d81397706977a13883"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Professional Credentials",
+            "Sequence": 8,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000008"
           }
         }
       ]

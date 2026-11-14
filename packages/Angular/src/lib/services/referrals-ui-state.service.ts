@@ -15,9 +15,17 @@ export interface OpsTelemetryPreferences {
   ShowExhaustedOnly: boolean;
 }
 
+export interface DirectoryPreferences {
+  SearchTerm: string;
+  PracticeAreaID: string;
+  JurisdictionID: string;
+  ShowVerificationQueue: boolean;
+}
+
 const SEEKER_PREFS_KEY = 'Referrals.SeekerIntake.Preferences';
 const PRO_INBOX_PREFS_KEY = 'Referrals.ProInbox.Preferences';
 const OPS_PREFS_KEY = 'Referrals.OpsTelemetry.Preferences';
+const DIRECTORY_PREFS_KEY = 'Referrals.Directory.Preferences';
 
 export class ReferralsUiStateHelper {
   public static LoadSeekerPreferences(): SeekerFilterPreferences {
@@ -76,5 +84,27 @@ export class ReferralsUiStateHelper {
 
   public static async SaveOpsPreferences(prefs: OpsTelemetryPreferences): Promise<void> {
     await UserInfoEngine.Instance.SetSetting(OPS_PREFS_KEY, JSON.stringify(prefs));
+  }
+
+  public static LoadDirectoryPreferences(): DirectoryPreferences {
+    const raw = UserInfoEngine.Instance.GetSetting(DIRECTORY_PREFS_KEY);
+    if (!raw) {
+      return { SearchTerm: '', PracticeAreaID: '', JurisdictionID: '', ShowVerificationQueue: false };
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<DirectoryPreferences>;
+      return {
+        SearchTerm: typeof parsed.SearchTerm === 'string' ? parsed.SearchTerm : '',
+        PracticeAreaID: typeof parsed.PracticeAreaID === 'string' ? parsed.PracticeAreaID : '',
+        JurisdictionID: typeof parsed.JurisdictionID === 'string' ? parsed.JurisdictionID : '',
+        ShowVerificationQueue: Boolean(parsed.ShowVerificationQueue),
+      };
+    } catch {
+      return { SearchTerm: '', PracticeAreaID: '', JurisdictionID: '', ShowVerificationQueue: false };
+    }
+  }
+
+  public static async SaveDirectoryPreferences(prefs: DirectoryPreferences): Promise<void> {
+    await UserInfoEngine.Instance.SetSetting(DIRECTORY_PREFS_KEY, JSON.stringify(prefs));
   }
 }
