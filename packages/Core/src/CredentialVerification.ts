@@ -11,6 +11,7 @@ import type {
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralFeedbackEntity,
+  ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { IsAssociationAdmin } from './CascadeRoutingService.js';
 import type { FeedbackOutcomeStatus, FeedbackSubmittedByType } from './types.js';
@@ -55,8 +56,8 @@ export interface ExternalVerificationAdapterInput {
 export interface ExternalVerificationAdapterResult {
   Success: boolean;
   VerificationStatus: CredentialVerificationStatus;
-  SubjectProfileID?: string;
-  CredentialCode?: string;
+  SubjectProfileID: string;
+  CredentialCode: string;
   ExternalReferenceID?: string | null;
   IssuerName?: string | null;
   VerifiedAt?: string | null;
@@ -143,7 +144,7 @@ export interface SubmitReferralFeedbackRequest {
   ProfessionalProfileID?: string;
   Rating: number;
   OutcomeStatus: FeedbackOutcomeStatus;
-  SubmittedByType: FeedbackSubmittedByType;
+  SubmittedByType?: FeedbackSubmittedByType;
   Comments?: string | null;
 }
 
@@ -153,6 +154,7 @@ export interface SubmitReferralFeedbackResult {
   ReferralAssignmentID: string;
   ReferralRequestID: string;
   ProfessionalProfileID: string;
+  SubmittedByType: FeedbackSubmittedByType;
   AverageRating: number | null;
   TotalCompletedCount: number;
   Message: string;
@@ -168,7 +170,7 @@ const COORDINATOR_ROLES = new Set([
   'owner',
 ]);
 
-function isCoordinatorOrAdmin(contextUser: UserInfo | undefined): boolean {
+export function IsCoordinatorOrAdmin(contextUser: UserInfo | undefined): boolean {
   if (!contextUser) {
     return false;
   }
@@ -183,14 +185,14 @@ function assertCoordinatorAuthority(contextUser: UserInfo | undefined, actionLab
   if (!contextUser) {
     throw new AuthorizationError(`Authenticated UserInfo context is required to ${actionLabel}.`);
   }
-  if (!isCoordinatorOrAdmin(contextUser)) {
+  if (!IsCoordinatorOrAdmin(contextUser)) {
     throw new AuthorizationError(
       `User '${contextUser.Email ?? contextUser.Name ?? contextUser.ID}' lacks Coordinator or Administrator authority to ${actionLabel}.`,
     );
   }
 }
 
-async function resolvePersonIdForUser(
+export async function ResolvePersonIdForUser(
   contextUser: UserInfo,
   dp: IMetadataProvider & IRunViewProvider,
 ): Promise<string | null> {
@@ -202,7 +204,7 @@ async function resolvePersonIdForUser(
     const rv = new RunView(dp);
     const personRes = await rv.RunView<{ ID: string }>(
       {
-        EntityName: 'MJ_BizAppsCommon: People',
+        EntityName: 'MJ_BizApps_Common: People',
         ExtraFilter: `UserID = '${validUserId}'`,
         Fields: ['ID'],
         ResultType: 'simple',
@@ -213,7 +215,7 @@ async function resolvePersonIdForUser(
       return personRes.Results[0].ID;
     }
   } catch {
-    // Person entity may not be registered in lightweight unit-test providers; fail safe to null.
+    return null;
   }
   return null;
 }
@@ -239,6 +241,39 @@ function isCredentialActive(
     return true;
   }
   return new Date(cred.ExpiresAt).getTime() > nowMs;
+}
+
+function hexToBytes(hex: string): Uint8Array | null {
+  const normalized = hex.trim().toLowerCase();
+  if (!/^[0-9a-f]+$/.test(normalized) || normalized.length % 2 !== 0) {
+    return null;
+  }
+  const bytes = new Uint8Array(normalized.length / 2);
+  for (let i = 0; i < normalized.length; i += 2) {
+    bytes[i / 2] = parseInt(normalized.slice(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+async function verifyHmacSha256Hex(
+  secret: string,
+  payload: string,
+  signatureHex: string,
+): Promise<boolean> {
+  const sigBytes = hexToBytes(signatureHex);
+  if (!sigBytes || !globalThis.crypto?.subtle) {
+    return false;
+  }
+  const encoder = new TextEncoder();
+  const key = await globalThis.crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  const sigBuffer = sigBytes.buffer.slice(sigBytes.byteOffset, sigBytes.byteOffset + sigBytes.byteLength) as ArrayBuffer;
+  return globalThis.crypto.subtle.verify('HMAC', key, sigBuffer, encoder.encode(payload));
 }
 
 /**
@@ -284,6 +319,7 @@ export class ManualReferralCredentialProvider extends BaseReferralCredentialProv
   public override async VerifyCredential(
     request: CredentialVerificationRequest,
     contextUser: UserInfo,
+    provider?: IMetadataProvider & IRunViewProvider,
   ): Promise<CredentialVerificationResult> {
     assertCoordinatorAuthority(contextUser, 'perform manual credential verification');
     const code = request.CredentialCode.trim();
@@ -291,6 +327,18 @@ export class ManualReferralCredentialProvider extends BaseReferralCredentialProv
       throw new PersistenceError('CredentialCode is required for manual verification.');
     }
     const status: CredentialVerificationStatus = request.ForceStatus ?? 'Verified';
+    if (status === 'Verified' || status === 'Rejected' || status === 'Revoked') {
+      const dp = resolveDataProvider(provider);
+      if (dp) {
+        const reviewerPersonId = await ResolvePersonIdForUser(contextUser, dp);
+        if (!reviewerPersonId) {
+          throw new AuthorizationError(
+            'Authenticated coordinator must resolve to a valid Person record before recording a manual verification decision.',
+          );
+        }
+      }
+    }
+
     const verifiedAt = status === 'Verified' ? new Date().toISOString() : null;
     const assertion: NormalizedCredentialAssertion = {
       CredentialCode: code,
@@ -393,65 +441,76 @@ export class ManualReferralCredentialProvider extends BaseReferralCredentialProv
 
 /**
  * External registry / webhook-backed verification provider.
- * Fails closed unless an explicit ExternalVerificationAdapter or validated signed assertion payload is provided.
+ * Fails closed unless a configured ExternalVerificationAdapter or server-secret HMAC-SHA256 assertion is verified.
  */
 @RegisterClass(BaseReferralCredentialProvider, 'ExternalAction')
 export class ExternalActionCredentialProvider extends BaseReferralCredentialProvider {
   public readonly ProviderKey = 'ExternalAction';
   public readonly DisplayName = 'External Registry Action';
   public readonly Description =
-    'Verifies credentials against external state bar, licensing board, or registry actions using a configured adapter or validated assertion.';
+    'Verifies credentials against external state bar, licensing board, or registry actions using a configured adapter or HMAC-SHA256 verified assertion.';
 
   private static configuredAdapter: ExternalVerificationAdapter | null = null;
+  private static configuredHmacSecret: string | null = null;
 
   public static ConfigureAdapter(adapter: ExternalVerificationAdapter | null): void {
     ExternalActionCredentialProvider.configuredAdapter = adapter;
   }
 
-  public override IsAvailable(): boolean {
-    return ExternalActionCredentialProvider.configuredAdapter !== null;
+  public static ConfigureHmacSecret(secret: string | null): void {
+    ExternalActionCredentialProvider.configuredHmacSecret = secret && secret.trim().length > 0 ? secret.trim() : null;
   }
 
-  private validateSignedMetadataPayload(
-    request: CredentialVerificationRequest,
-  ): ExternalVerificationAdapterResult | null {
-    const meta = request.Metadata;
-    if (!meta) {
-      return null;
-    }
-    const verifiedFlag = meta['verifiedByExternalAction'] === true;
-    const signature = typeof meta['assertionSignature'] === 'string' ? meta['assertionSignature'].trim() : '';
-    const attestedSubject = typeof meta['subjectProfileId'] === 'string' ? meta['subjectProfileId'].trim() : '';
-    const attestedCode = typeof meta['credentialCode'] === 'string' ? meta['credentialCode'].trim() : '';
+  public override IsAvailable(): boolean {
+    return (
+      ExternalActionCredentialProvider.configuredAdapter !== null ||
+      ExternalActionCredentialProvider.configuredHmacSecret !== null
+    );
+  }
 
-    if (!verifiedFlag || signature.length < 16 || !attestedSubject || !attestedCode) {
+  private async verifyHmacTokenPayload(
+    request: CredentialVerificationRequest,
+  ): Promise<ExternalVerificationAdapterResult | null> {
+    const secret = ExternalActionCredentialProvider.configuredHmacSecret;
+    const meta = request.Metadata;
+    if (!secret || !meta) {
       return null;
     }
-    if (!UUIDsEqual(attestedSubject, request.ProfessionalProfileID)) {
+
+    const tokenHex = typeof meta['hmacSignature'] === 'string' ? meta['hmacSignature'].trim() : '';
+    const subjectProfileId = typeof meta['subjectProfileId'] === 'string' ? meta['subjectProfileId'].trim() : '';
+    const credentialCode = typeof meta['credentialCode'] === 'string' ? meta['credentialCode'].trim() : '';
+    const issuedAt = typeof meta['issuedAt'] === 'string' ? meta['issuedAt'].trim() : '';
+    const expiresAt = typeof meta['expiresAt'] === 'string' ? meta['expiresAt'].trim() : '';
+
+    if (!tokenHex || !subjectProfileId || !credentialCode || !issuedAt) {
+      return null;
+    }
+
+    const payload = `${subjectProfileId}|${credentialCode}|${issuedAt}|${expiresAt}`;
+    const validSig = await verifyHmacSha256Hex(secret, payload, tokenHex);
+    if (!validSig) {
       return {
         Success: false,
         VerificationStatus: 'Rejected',
-        Message: 'External assertion payload subjectProfileId does not match target ProfessionalProfileID.',
+        SubjectProfileID: subjectProfileId,
+        CredentialCode: credentialCode,
+        Message: 'External HMAC-SHA256 assertion signature verification failed.',
       };
     }
-    if (attestedCode.toLowerCase() !== request.CredentialCode.trim().toLowerCase()) {
-      return {
-        Success: false,
-        VerificationStatus: 'Rejected',
-        Message: 'External assertion payload credentialCode does not match requested CredentialCode.',
-      };
-    }
+
     return {
       Success: true,
       VerificationStatus: 'Verified',
-      SubjectProfileID: attestedSubject,
-      CredentialCode: attestedCode,
-      ExternalReferenceID: request.ExternalReferenceID?.trim() || signature,
+      SubjectProfileID: subjectProfileId,
+      CredentialCode: credentialCode,
+      ExternalReferenceID: request.ExternalReferenceID?.trim() || tokenHex.slice(0, 32),
       IssuerName: request.IssuerName ?? 'External Licensing Registry',
-      VerifiedAt: new Date().toISOString(),
+      VerifiedAt: issuedAt,
+      ExpiresAt: expiresAt || null,
       EvidenceURL: request.EvidenceURL ?? null,
       MetadataJSON: JSON.stringify(meta),
-      Message: `Validated signed external assertion for '${attestedCode}'.`,
+      Message: `Verified HMAC-SHA256 external assertion for '${credentialCode}'.`,
     };
   }
 
@@ -482,8 +541,8 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
         },
         contextUser,
       );
-    } else {
-      adapterOutcome = this.validateSignedMetadataPayload(request);
+    } else if (ExternalActionCredentialProvider.configuredHmacSecret) {
+      adapterOutcome = await this.verifyHmacTokenPayload(request);
     }
 
     if (!adapterOutcome) {
@@ -512,7 +571,7 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
     }
 
     if (
-      adapterOutcome.SubjectProfileID &&
+      !adapterOutcome.SubjectProfileID ||
       !UUIDsEqual(adapterOutcome.SubjectProfileID, request.ProfessionalProfileID)
     ) {
       return {
@@ -523,7 +582,7 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
         ExternalReferenceID: adapterOutcome.ExternalReferenceID ?? request.ExternalReferenceID ?? null,
         VerifiedAt: null,
         ExpiresAt: adapterOutcome.ExpiresAt ?? null,
-        Message: 'External verification adapter returned a mismatched subject profile ID; failing closed as Rejected.',
+        Message: 'External verification adapter returned missing or mismatched SubjectProfileID; failing closed as Rejected.',
         Assertion: {
           CredentialCode: code,
           CredentialName: request.CredentialName?.trim() || code,
@@ -540,7 +599,7 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
     }
 
     if (
-      adapterOutcome.CredentialCode &&
+      !adapterOutcome.CredentialCode ||
       adapterOutcome.CredentialCode.trim().toLowerCase() !== code.toLowerCase()
     ) {
       return {
@@ -551,7 +610,7 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
         ExternalReferenceID: adapterOutcome.ExternalReferenceID ?? request.ExternalReferenceID ?? null,
         VerifiedAt: null,
         ExpiresAt: adapterOutcome.ExpiresAt ?? null,
-        Message: 'External verification adapter returned a mismatched credential code; failing closed as Rejected.',
+        Message: 'External verification adapter returned missing or mismatched CredentialCode; failing closed as Rejected.',
         Assertion: {
           CredentialCode: code,
           CredentialName: request.CredentialName?.trim() || code,
@@ -567,8 +626,40 @@ export class ExternalActionCredentialProvider extends BaseReferralCredentialProv
       };
     }
 
-    const isExpired =
-      Boolean(adapterOutcome.ExpiresAt) && new Date(adapterOutcome.ExpiresAt!).getTime() <= Date.now();
+    const validStatuses: ReadonlyArray<CredentialVerificationStatus> = [
+      'Pending',
+      'Verified',
+      'Rejected',
+      'Expired',
+      'Revoked',
+    ];
+    if (!validStatuses.includes(adapterOutcome.VerificationStatus)) {
+      return {
+        Success: false,
+        ProviderKey: this.ProviderKey,
+        ProfessionalCredentialID: request.ProfessionalCredentialID,
+        VerificationStatus: 'Pending',
+        ExternalReferenceID: adapterOutcome.ExternalReferenceID ?? request.ExternalReferenceID ?? null,
+        VerifiedAt: null,
+        ExpiresAt: null,
+        Message: 'External verification adapter returned an invalid VerificationStatus; failing closed.',
+        Assertion: {
+          CredentialCode: code,
+          CredentialName: request.CredentialName?.trim() || code,
+          IssuerName: adapterOutcome.IssuerName ?? request.IssuerName ?? 'External Licensing Registry',
+          ProviderKey: this.ProviderKey,
+          ExternalReferenceID: adapterOutcome.ExternalReferenceID ?? request.ExternalReferenceID ?? null,
+          JurisdictionID: request.JurisdictionID ?? null,
+          VerificationStatus: 'Pending',
+          VerifiedAt: null,
+          EvidenceURL: adapterOutcome.EvidenceURL ?? request.EvidenceURL ?? null,
+          MetadataJSON: adapterOutcome.MetadataJSON ?? (request.Metadata ? JSON.stringify(request.Metadata) : null),
+        },
+      };
+    }
+
+    const expiresAtMs = adapterOutcome.ExpiresAt ? new Date(adapterOutcome.ExpiresAt).getTime() : null;
+    const isExpired = expiresAtMs !== null && (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now());
     const finalStatus: CredentialVerificationStatus = isExpired
       ? 'Expired'
       : adapterOutcome.Success
@@ -717,6 +808,7 @@ interface CredentialingBridgeRow {
   PersonID?: string | null;
   ProfessionalProfileID?: string | null;
   OrganizationID?: string | null;
+  JurisdictionID?: string | null;
   CredentialCode?: string;
   Code?: string;
   CredentialName?: string;
@@ -742,7 +834,9 @@ function mapBridgeStatus(raw?: string): CredentialVerificationStatus {
 interface BridgeEntityMetadata {
   Name: string;
   CodeField: 'CredentialCode' | 'Code' | null;
-  SubjectField: 'PersonID' | 'ProfessionalProfileID' | 'OrganizationID' | null;
+  PersonSubjectField: 'PersonID' | 'ProfessionalProfileID' | null;
+  HasOrganizationField: boolean;
+  HasJurisdictionField: boolean;
 }
 
 /**
@@ -773,23 +867,25 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       : fieldNames.has('Code')
         ? 'Code'
         : null;
-    const subjectField: BridgeEntityMetadata['SubjectField'] = fieldNames.has('PersonID')
+    // Require person-level subject field (PersonID or ProfessionalProfileID); never OrganizationID-only.
+    const personSubjectField: BridgeEntityMetadata['PersonSubjectField'] = fieldNames.has('PersonID')
       ? 'PersonID'
       : fieldNames.has('ProfessionalProfileID')
         ? 'ProfessionalProfileID'
-        : fieldNames.has('OrganizationID')
-          ? 'OrganizationID'
-          : null;
+        : null;
 
     return {
       Name: match.Name,
       CodeField: codeField,
-      SubjectField: subjectField,
+      PersonSubjectField: personSubjectField,
+      HasOrganizationField: fieldNames.has('OrganizationID'),
+      HasJurisdictionField: fieldNames.has('JurisdictionID'),
     };
   }
 
   public override IsAvailable(provider?: IMetadataProvider): boolean {
-    return this.inspectCredentialingEntity(provider) !== null;
+    const meta = this.inspectCredentialingEntity(provider);
+    return meta !== null && meta.CodeField !== null && meta.PersonSubjectField !== null;
   }
 
   public override async VerifyCredential(
@@ -819,7 +915,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       };
     }
 
-    if (!bridgeMeta.CodeField || !bridgeMeta.SubjectField) {
+    if (!bridgeMeta.CodeField || !bridgeMeta.PersonSubjectField) {
       return {
         Success: false,
         ProviderKey: this.ProviderKey,
@@ -828,7 +924,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         ExternalReferenceID: request.ExternalReferenceID ?? null,
         VerifiedAt: null,
         ExpiresAt: null,
-        Message: `Entity '${bridgeMeta.Name}' lacks required code or subject metadata fields for safe bridging.`,
+        Message: `Entity '${bridgeMeta.Name}' lacks required code or person-level subject metadata fields for safe bridging.`,
         Assertion: {
           CredentialCode: request.CredentialCode,
           CredentialName: request.CredentialName ?? request.CredentialCode,
@@ -847,11 +943,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
     }
 
     const expectedSubjectId =
-      bridgeMeta.SubjectField === 'PersonID'
-        ? profileEntity.PersonID
-        : bridgeMeta.SubjectField === 'OrganizationID'
-          ? profileEntity.OrganizationID
-          : profileEntity.ID;
+      bridgeMeta.PersonSubjectField === 'PersonID' ? profileEntity.PersonID : profileEntity.ID;
 
     if (!expectedSubjectId) {
       return {
@@ -862,7 +954,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         ExternalReferenceID: request.ExternalReferenceID ?? null,
         VerifiedAt: null,
         ExpiresAt: null,
-        Message: `ProfessionalProfile '${validProfileId}' has no '${bridgeMeta.SubjectField}' for Credentialing lookup.`,
+        Message: `ProfessionalProfile '${validProfileId}' has no '${bridgeMeta.PersonSubjectField}' for Credentialing lookup.`,
         Assertion: {
           CredentialCode: request.CredentialCode,
           CredentialName: request.CredentialName ?? request.CredentialCode,
@@ -872,13 +964,26 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       };
     }
 
-    const validSubjectId = AssertValidUUID(expectedSubjectId, bridgeMeta.SubjectField);
+    const validSubjectId = AssertValidUUID(expectedSubjectId, bridgeMeta.PersonSubjectField);
     const rv = new RunView(dp);
     const escapedCode = EscapeSqlLiteral(request.CredentialCode.trim());
+    const filterClauses = [
+      `${bridgeMeta.PersonSubjectField} = '${validSubjectId}'`,
+      `${bridgeMeta.CodeField} = '${escapedCode}'`,
+    ];
+    if (bridgeMeta.HasOrganizationField && profileEntity.OrganizationID) {
+      const validOrgId = AssertValidUUID(profileEntity.OrganizationID, 'OrganizationID');
+      filterClauses.push(`OrganizationID = '${validOrgId}'`);
+    }
+    if (bridgeMeta.HasJurisdictionField && request.JurisdictionID) {
+      const validJurId = AssertValidUUID(request.JurisdictionID, 'JurisdictionID');
+      filterClauses.push(`JurisdictionID = '${validJurId}'`);
+    }
+
     const res = await rv.RunView<CredentialingBridgeRow>(
       {
         EntityName: bridgeMeta.Name,
-        ExtraFilter: `${bridgeMeta.SubjectField} = '${validSubjectId}' AND ${bridgeMeta.CodeField} = '${escapedCode}'`,
+        ExtraFilter: filterClauses.join(' AND '),
         ResultType: 'simple',
       },
       contextUser,
@@ -903,8 +1008,8 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       };
     }
 
-    const row = res.Results?.[0];
-    if (!row) {
+    const rows = res.Results ?? [];
+    if (rows.length === 0) {
       return {
         Success: false,
         ProviderKey: this.ProviderKey,
@@ -923,12 +1028,28 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       };
     }
 
+    if (rows.length > 1) {
+      return {
+        Success: false,
+        ProviderKey: this.ProviderKey,
+        ProfessionalCredentialID: request.ProfessionalCredentialID,
+        VerificationStatus: 'Pending',
+        ExternalReferenceID: request.ExternalReferenceID ?? null,
+        VerifiedAt: null,
+        ExpiresAt: null,
+        Message: `Multiple ambiguous credentialing records (${rows.length}) found in '${bridgeMeta.Name}' for '${request.CredentialCode}'; failing closed.`,
+        Assertion: {
+          CredentialCode: request.CredentialCode,
+          CredentialName: request.CredentialName ?? request.CredentialCode,
+          ProviderKey: this.ProviderKey,
+          VerificationStatus: 'Pending',
+        },
+      };
+    }
+
+    const row = rows[0];
     const rowSubjectId =
-      bridgeMeta.SubjectField === 'PersonID'
-        ? row.PersonID
-        : bridgeMeta.SubjectField === 'OrganizationID'
-          ? row.OrganizationID
-          : row.ProfessionalProfileID;
+      bridgeMeta.PersonSubjectField === 'PersonID' ? row.PersonID : row.ProfessionalProfileID;
 
     if (rowSubjectId && !UUIDsEqual(rowSubjectId, validSubjectId)) {
       return {
@@ -959,7 +1080,8 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
     if (expiresAtIso && new Date(expiresAtIso).getTime() <= Date.now()) {
       status = 'Expired';
     }
-    const verifiedAt = status === 'Verified' ? new Date().toISOString() : null;
+    const sourceVerifiedAtIso =
+      status === 'Verified' && row.VerifiedAt ? new Date(row.VerifiedAt).toISOString() : null;
 
     return {
       Success: status === 'Verified',
@@ -967,7 +1089,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       ProfessionalCredentialID: request.ProfessionalCredentialID,
       VerificationStatus: status,
       ExternalReferenceID: row.ID ?? request.ExternalReferenceID ?? null,
-      VerifiedAt: verifiedAt,
+      VerifiedAt: sourceVerifiedAtIso,
       ExpiresAt: expiresAtIso,
       Message: `Bridged credential '${request.CredentialCode}' from '${bridgeMeta.Name}' with status '${status}'.`,
       Assertion: {
@@ -977,7 +1099,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         ProviderKey: this.ProviderKey,
         ExternalReferenceID: row.ID ?? request.ExternalReferenceID ?? null,
         VerificationStatus: status,
-        VerifiedAt: verifiedAt,
+        VerifiedAt: sourceVerifiedAtIso,
         ExpiresAt: expiresAtIso,
         EvidenceURL: row.EvidenceURL ?? request.EvidenceURL ?? null,
       },
@@ -1005,7 +1127,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
       };
     }
 
-    if (!bridgeMeta.SubjectField) {
+    if (!bridgeMeta.PersonSubjectField) {
       return {
         Success: false,
         ProviderKey: this.ProviderKey,
@@ -1014,7 +1136,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         CreatedCount: 0,
         UpdatedCount: 0,
         Assertions: [],
-        Message: `Entity '${bridgeMeta.Name}' lacks subject field metadata for safe bridging.`,
+        Message: `Entity '${bridgeMeta.Name}' lacks person-level subject field metadata for safe bridging.`,
       };
     }
 
@@ -1055,11 +1177,7 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
     }
 
     const expectedSubjectId =
-      bridgeMeta.SubjectField === 'PersonID'
-        ? profile.PersonID
-        : bridgeMeta.SubjectField === 'OrganizationID'
-          ? profile.OrganizationID
-          : profile.ID;
+      bridgeMeta.PersonSubjectField === 'PersonID' ? profile.PersonID : profile.ID;
 
     if (!expectedSubjectId) {
       return {
@@ -1070,15 +1188,21 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         CreatedCount: 0,
         UpdatedCount: 0,
         Assertions: [],
-        Message: `Profile has no linked '${bridgeMeta.SubjectField}' to bridge from BizApps Credentialing.`,
+        Message: `Profile has no linked '${bridgeMeta.PersonSubjectField}' to bridge from BizApps Credentialing.`,
       };
     }
 
-    const validSubjectId = AssertValidUUID(expectedSubjectId, bridgeMeta.SubjectField);
+    const validSubjectId = AssertValidUUID(expectedSubjectId, bridgeMeta.PersonSubjectField);
+    const filterClauses = [`${bridgeMeta.PersonSubjectField} = '${validSubjectId}'`];
+    if (bridgeMeta.HasOrganizationField && profile.OrganizationID) {
+      const validOrgId = AssertValidUUID(profile.OrganizationID, 'OrganizationID');
+      filterClauses.push(`OrganizationID = '${validOrgId}'`);
+    }
+
     const credRes = await rv.RunView<CredentialingBridgeRow>(
       {
         EntityName: bridgeMeta.Name,
-        ExtraFilter: `${bridgeMeta.SubjectField} = '${validSubjectId}'`,
+        ExtraFilter: filterClauses.join(' AND '),
         ResultType: 'simple',
       },
       contextUser,
@@ -1097,13 +1221,44 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
     }
 
     const nowMs = Date.now();
-    const assertions: NormalizedCredentialAssertion[] = (credRes.Results ?? []).map((row) => {
+    const byCode = new Map<string, CredentialingBridgeRow[]>();
+    for (const row of credRes.Results ?? []) {
+      const codeKey = (row.CredentialCode ?? row.Code ?? 'CRED').trim().toLowerCase();
+      const group = byCode.get(codeKey) ?? [];
+      group.push(row);
+      byCode.set(codeKey, group);
+    }
+
+    const assertions: NormalizedCredentialAssertion[] = [];
+    for (const [, group] of byCode.entries()) {
+      if (group.length > 1) {
+        const statuses = new Set(group.map((g) => mapBridgeStatus(g.VerificationStatus ?? g.Status)));
+        if (statuses.size > 1) {
+          // Conflicting statuses for same credential code -> fail closed as Pending
+          const first = group[0];
+          assertions.push({
+            CredentialCode: first.CredentialCode ?? first.Code ?? 'CRED',
+            CredentialName: first.CredentialName ?? first.Name ?? 'Bridged Credential',
+            IssuerName: first.IssuerName ?? null,
+            ProviderKey: this.ProviderKey,
+            ExternalReferenceID: first.ID ?? null,
+            VerificationStatus: 'Pending',
+            IssuedAt: first.IssuedAt ? new Date(first.IssuedAt).toISOString() : null,
+            ExpiresAt: first.ExpiresAt ? new Date(first.ExpiresAt).toISOString() : null,
+            VerifiedAt: null,
+            EvidenceURL: first.EvidenceURL ?? null,
+          });
+          continue;
+        }
+      }
+
+      const row = group[0];
       let status = mapBridgeStatus(row.VerificationStatus ?? row.Status);
       const expiresAtIso = row.ExpiresAt ? new Date(row.ExpiresAt).toISOString() : null;
       if (expiresAtIso && new Date(expiresAtIso).getTime() <= nowMs) {
         status = 'Expired';
       }
-      return {
+      assertions.push({
         CredentialCode: row.CredentialCode ?? row.Code ?? 'CRED',
         CredentialName: row.CredentialName ?? row.Name ?? 'Bridged Credential',
         IssuerName: row.IssuerName ?? null,
@@ -1114,8 +1269,8 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
         ExpiresAt: expiresAtIso,
         VerifiedAt: status === 'Verified' && row.VerifiedAt ? new Date(row.VerifiedAt).toISOString() : null,
         EvidenceURL: row.EvidenceURL ?? null,
-      };
-    });
+      });
+    }
 
     return {
       Success: true,
@@ -1132,6 +1287,35 @@ export class OptionalCredentialingBridgeProvider extends BaseReferralCredentialP
 
 export function LoadCredentialProviders(): void {
   // Ensures provider class registrations are preserved by bundlers.
+}
+
+interface CredentialSnapshot {
+  Entity: ProfessionalCredentialEntity;
+  IsNew: boolean;
+  PriorVerificationStatus: CredentialVerificationStatus;
+  PriorVerifiedAt: Date | null;
+  PriorVerifiedByPersonID: string | null;
+  PriorProviderKey: string;
+  PriorExternalReferenceID: string | null;
+  PriorEvidenceURL: string | null;
+  PriorMetadataJSON: string | null;
+}
+
+async function rollbackCredentialSnapshot(snap: CredentialSnapshot): Promise<void> {
+  if (snap.IsNew) {
+    if (typeof snap.Entity.Delete === 'function') {
+      await snap.Entity.Delete();
+    }
+    return;
+  }
+  snap.Entity.VerificationStatus = snap.PriorVerificationStatus;
+  snap.Entity.VerifiedAt = snap.PriorVerifiedAt;
+  snap.Entity.VerifiedByPersonID = snap.PriorVerifiedByPersonID;
+  snap.Entity.ProviderKey = snap.PriorProviderKey;
+  snap.Entity.ExternalReferenceID = snap.PriorExternalReferenceID;
+  snap.Entity.EvidenceURL = snap.PriorEvidenceURL;
+  snap.Entity.MetadataJSON = snap.PriorMetadataJSON;
+  await snap.Entity.Save();
 }
 
 /**
@@ -1193,7 +1377,7 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     return match;
   }
 
-  private async synchronizeProfileVerificationStatus(
+  public async SyncProfilePositionStatus(
     profile: ProfessionalProfileEntity,
     contextUser: UserInfo,
     dp: IMetadataProvider & IRunViewProvider,
@@ -1219,26 +1403,24 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     const creds = credRes.Results ?? [];
-    if (creds.length === 0) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const activeVerified = creds.filter((c) => isCredentialActive(c, nowMs));
     let targetStatus = profile.VerificationStatus;
 
-    if (activeVerified.length > 0) {
-      targetStatus = 'Verified';
-      const primaryActive = activeVerified.find((c) => c.IsPrimary) ?? activeVerified[0];
-      if (primaryActive && !profile.LicenseNumber) {
-        profile.LicenseNumber = primaryActive.CredentialCode;
+    if (creds.length === 0) {
+      if (profile.VerificationStatus === 'Verified') {
+        targetStatus = 'Pending';
       }
     } else {
-      const hasPending = creds.some((c) => c.VerificationStatus === 'Pending');
-      if (hasPending) {
-        targetStatus = 'Pending';
+      const nowMs = Date.now();
+      const activeVerified = creds.filter((c) => isCredentialActive(c, nowMs));
+      if (activeVerified.length > 0) {
+        targetStatus = 'Verified';
+        const primaryActive = activeVerified.find((c) => c.IsPrimary) ?? activeVerified[0];
+        if (primaryActive && !profile.LicenseNumber) {
+          profile.LicenseNumber = primaryActive.CredentialCode;
+        }
       } else {
-        targetStatus = 'Expired';
+        const hasPending = creds.some((c) => c.VerificationStatus === 'Pending');
+        targetStatus = hasPending ? 'Pending' : 'Expired';
       }
     }
 
@@ -1270,6 +1452,7 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     let credEntity: ProfessionalCredentialEntity | null = null;
+    let isNew = false;
     if (request.ProfessionalCredentialID) {
       const validCredId = AssertValidUUID(request.ProfessionalCredentialID, 'ProfessionalCredentialID');
       credEntity = await dp.GetEntityObject<ProfessionalCredentialEntity>(
@@ -1287,8 +1470,15 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     const impl = this.ResolveProvider(request.ProviderKey ?? 'Manual');
+    let verifiedByPersonId: string | null = null;
     if (impl.ProviderKey === 'Manual') {
       assertCoordinatorAuthority(contextUser, 'verify credentials manually');
+      verifiedByPersonId = await ResolvePersonIdForUser(contextUser, dp);
+      if (!verifiedByPersonId) {
+        throw new AuthorizationError(
+          'Authenticated coordinator must resolve to a valid Person record before manual credential verification.',
+        );
+      }
     }
 
     const result = await impl.VerifyCredential(request, contextUser, dp);
@@ -1318,13 +1508,21 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
         );
         credEntity.NewRecord();
         credEntity.ProfessionalProfileID = validProfileId;
+        isNew = true;
       }
     }
 
-    const verifiedByPersonId =
-      impl.ProviderKey === 'Manual' && contextUser
-        ? await resolvePersonIdForUser(contextUser, dp)
-        : null;
+    const snapshot: CredentialSnapshot = {
+      Entity: credEntity,
+      IsNew: isNew,
+      PriorVerificationStatus: credEntity.VerificationStatus,
+      PriorVerifiedAt: credEntity.VerifiedAt,
+      PriorVerifiedByPersonID: credEntity.VerifiedByPersonID,
+      PriorProviderKey: credEntity.ProviderKey,
+      PriorExternalReferenceID: credEntity.ExternalReferenceID,
+      PriorEvidenceURL: credEntity.EvidenceURL,
+      PriorMetadataJSON: credEntity.MetadataJSON,
+    };
 
     credEntity.CredentialCode = result.Assertion.CredentialCode;
     credEntity.CredentialName = result.Assertion.CredentialName;
@@ -1350,7 +1548,12 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     result.ProfessionalCredentialID = credEntity.ID;
-    await this.synchronizeProfileVerificationStatus(profile, contextUser, dp);
+    try {
+      await this.SyncProfilePositionStatus(profile, contextUser, dp);
+    } catch (syncError) {
+      await rollbackCredentialSnapshot(snapshot);
+      throw syncError;
+    }
 
     return result;
   }
@@ -1427,7 +1630,7 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     if (syncResult.Assertions.length === 0) {
-      await this.synchronizeProfileVerificationStatus(profile, contextUser, dp);
+      await this.SyncProfilePositionStatus(profile, contextUser, dp);
       return syncResult;
     }
 
@@ -1453,58 +1656,85 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
 
     let created = 0;
     let updated = 0;
-    for (const assertion of syncResult.Assertions) {
-      const existing = existingByCode.get(assertion.CredentialCode.toLowerCase());
-      const target =
-        existing ??
-        (await dp.GetEntityObject<ProfessionalCredentialEntity>(
-          'MJ_BizApps_Referrals: Professional Credentials',
-          contextUser,
-        ));
-      if (!existing) {
-        target.NewRecord();
-        target.ProfessionalProfileID = validProfileId;
-      }
-      target.CredentialCode = assertion.CredentialCode;
-      target.CredentialName = assertion.CredentialName;
-      target.IssuerName = assertion.IssuerName ?? null;
-      target.ProviderKey = assertion.ProviderKey;
-      target.ExternalReferenceID = assertion.ExternalReferenceID ?? null;
-      target.JurisdictionID = assertion.JurisdictionID ?? target.JurisdictionID ?? null;
-      target.VerificationStatus = assertion.VerificationStatus;
-      target.IssuedAt = assertion.IssuedAt ? new Date(assertion.IssuedAt) : null;
-      target.ExpiresAt = assertion.ExpiresAt ? new Date(assertion.ExpiresAt) : null;
-      target.VerifiedAt = assertion.VerifiedAt ? new Date(assertion.VerifiedAt) : null;
-      target.EvidenceURL = assertion.EvidenceURL ?? null;
-      target.MetadataJSON = assertion.MetadataJSON ?? null;
+    const snapshots: CredentialSnapshot[] = [];
 
-      if (!(await target.Save())) {
-        throw new PersistenceError(
-          `Failed to save synced ProfessionalCredential '${assertion.CredentialCode}'.`,
-        );
+    try {
+      for (const assertion of syncResult.Assertions) {
+        const existing = existingByCode.get(assertion.CredentialCode.toLowerCase());
+        const target =
+          existing ??
+          (await dp.GetEntityObject<ProfessionalCredentialEntity>(
+            'MJ_BizApps_Referrals: Professional Credentials',
+            contextUser,
+          ));
+        const snap: CredentialSnapshot = {
+          Entity: target,
+          IsNew: !existing,
+          PriorVerificationStatus: target.VerificationStatus,
+          PriorVerifiedAt: target.VerifiedAt,
+          PriorVerifiedByPersonID: target.VerifiedByPersonID,
+          PriorProviderKey: target.ProviderKey,
+          PriorExternalReferenceID: target.ExternalReferenceID,
+          PriorEvidenceURL: target.EvidenceURL,
+          PriorMetadataJSON: target.MetadataJSON,
+        };
+
+        if (!existing) {
+          target.NewRecord();
+          target.ProfessionalProfileID = validProfileId;
+        }
+        target.CredentialCode = assertion.CredentialCode;
+        target.CredentialName = assertion.CredentialName;
+        target.IssuerName = assertion.IssuerName ?? null;
+        target.ProviderKey = assertion.ProviderKey;
+        target.ExternalReferenceID = assertion.ExternalReferenceID ?? null;
+        target.JurisdictionID = assertion.JurisdictionID ?? target.JurisdictionID ?? null;
+        target.VerificationStatus = assertion.VerificationStatus;
+        target.IssuedAt = assertion.IssuedAt ? new Date(assertion.IssuedAt) : null;
+        target.ExpiresAt = assertion.ExpiresAt ? new Date(assertion.ExpiresAt) : null;
+        target.VerifiedAt = assertion.VerifiedAt ? new Date(assertion.VerifiedAt) : null;
+        target.EvidenceURL = assertion.EvidenceURL ?? null;
+        target.MetadataJSON = assertion.MetadataJSON ?? null;
+
+        if (!(await target.Save())) {
+          throw new PersistenceError(
+            `Failed to save synced ProfessionalCredential '${assertion.CredentialCode}'.`,
+          );
+        }
+        snapshots.push(snap);
+        if (!existing) {
+          created++;
+        } else {
+          updated++;
+        }
       }
-      if (!existing) {
-        created++;
-      } else {
-        updated++;
+
+      await this.SyncProfilePositionStatus(profile, contextUser, dp);
+    } catch (err) {
+      for (let i = snapshots.length - 1; i >= 0; i--) {
+        await rollbackCredentialSnapshot(snapshots[i]);
       }
+      throw err;
     }
 
-    await this.synchronizeProfileVerificationStatus(profile, contextUser, dp);
     syncResult.CreatedCount = created;
     syncResult.UpdatedCount = updated;
     return syncResult;
   }
 
   /**
-   * Validates assignment/request/profile consistency, upserts ReferralFeedback by (ReferralAssignmentID, SubmittedByType),
-   * and recomputes ProfessionalProfile.AverageRating and TotalCompletedCount.
+   * Verifies caller participant authority, derives SubmittedByType from authenticated role,
+   * upserts ReferralFeedback by (ReferralAssignmentID, SubmittedByType), and atomically
+   * recomputes ProfessionalProfile.AverageRating and TotalCompletedCount.
    */
   public async SubmitReferralFeedback(
     request: SubmitReferralFeedbackRequest,
     contextUser: UserInfo,
     provider?: IMetadataProvider & IRunViewProvider,
   ): Promise<SubmitReferralFeedbackResult> {
+    if (!contextUser) {
+      throw new AuthorizationError('Authenticated UserInfo context is required to submit referral feedback.');
+    }
     const validAssignmentId = AssertValidUUID(request.ReferralAssignmentID, 'ReferralAssignmentID');
     const dp = resolveDataProvider(provider);
     if (!dp) {
@@ -1526,15 +1756,6 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       throw new PersistenceError(`Invalid OutcomeStatus '${String(request.OutcomeStatus)}'.`);
     }
 
-    const validSubmitters: ReadonlyArray<FeedbackSubmittedByType> = [
-      'Seeker',
-      'Professional',
-      'Operator',
-    ];
-    if (!validSubmitters.includes(request.SubmittedByType)) {
-      throw new PersistenceError(`Invalid SubmittedByType '${String(request.SubmittedByType)}'.`);
-    }
-
     const assignment = await dp.GetEntityObject<ReferralAssignmentEntity>(
       'MJ_BizApps_Referrals: Referral Assignments',
       contextUser,
@@ -1543,9 +1764,14 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       throw new PersistenceError(`ReferralAssignment '${validAssignmentId}' not found.`);
     }
 
-    if (assignment.Status !== 'Accepted') {
+    const assignmentStatus: string = assignment.Status;
+    if (
+      assignmentStatus !== 'Accepted' &&
+      assignmentStatus !== 'InProgress' &&
+      assignmentStatus !== 'Completed'
+    ) {
       throw new PersistenceError(
-        `Feedback can only be submitted for Accepted assignments (current status: '${assignment.Status}').`,
+        `Feedback can only be submitted for Accepted, InProgress, or Completed assignments (current status: '${assignment.Status}').`,
       );
     }
 
@@ -1561,11 +1787,61 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       );
     }
 
+    const [referralRequest, proProfile, callerPersonId] = await Promise.all([
+      dp.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', contextUser),
+      dp.GetEntityObject<ProfessionalProfileEntity>('MJ_BizApps_Referrals: Professional Profiles', contextUser),
+      ResolvePersonIdForUser(contextUser, dp),
+    ]);
+
+    if (!(await referralRequest.Load(assignment.ReferralRequestID))) {
+      throw new PersistenceError(`ReferralRequest '${assignment.ReferralRequestID}' not found.`);
+    }
+    if (!(await proProfile.Load(assignment.ProfessionalProfileID))) {
+      throw new PersistenceError(`ProfessionalProfile '${assignment.ProfessionalProfileID}' not found.`);
+    }
+
+    const callerEmail = contextUser.Email?.trim().toLowerCase() ?? '';
+    const isProfessionalCaller =
+      (proProfile.UserID && contextUser.ID && UUIDsEqual(proProfile.UserID, contextUser.ID)) ||
+      (callerPersonId && proProfile.PersonID && UUIDsEqual(proProfile.PersonID, callerPersonId)) ||
+      (callerEmail.length > 0 && proProfile.Email.trim().toLowerCase() === callerEmail);
+
+    const isSeekerCaller =
+      (callerPersonId && referralRequest.SeekerPersonID && UUIDsEqual(referralRequest.SeekerPersonID, callerPersonId)) ||
+      (callerEmail.length > 0 && referralRequest.SeekerEmail.trim().toLowerCase() === callerEmail);
+
+    const isOperatorCaller = IsCoordinatorOrAdmin(contextUser);
+
+    let derivedSubmittedByType: FeedbackSubmittedByType;
+    if (request.SubmittedByType) {
+      if (request.SubmittedByType === 'Seeker' && isSeekerCaller) {
+        derivedSubmittedByType = 'Seeker';
+      } else if (request.SubmittedByType === 'Professional' && isProfessionalCaller) {
+        derivedSubmittedByType = 'Professional';
+      } else if (request.SubmittedByType === 'Operator' && isOperatorCaller) {
+        derivedSubmittedByType = 'Operator';
+      } else {
+        throw new AuthorizationError(
+          `Caller is not authorized to submit feedback as '${request.SubmittedByType}' for assignment '${validAssignmentId}'.`,
+        );
+      }
+    } else if (isProfessionalCaller) {
+      derivedSubmittedByType = 'Professional';
+    } else if (isSeekerCaller) {
+      derivedSubmittedByType = 'Seeker';
+    } else if (isOperatorCaller) {
+      derivedSubmittedByType = 'Operator';
+    } else {
+      throw new AuthorizationError(
+        `Caller is not an authorized participant (Seeker, Professional, or Operator) for assignment '${validAssignmentId}'.`,
+      );
+    }
+
     const rv = new RunView(dp);
     const existingRes = await rv.RunView<ReferralFeedbackEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks',
-        ExtraFilter: `ReferralAssignmentID = '${validAssignmentId}' AND SubmittedByType = '${EscapeSqlLiteral(request.SubmittedByType)}'`,
+        ExtraFilter: `ReferralAssignmentID = '${validAssignmentId}' AND SubmittedByType = '${EscapeSqlLiteral(derivedSubmittedByType)}'`,
         ResultType: 'entity_object',
       },
       contextUser,
@@ -1583,12 +1859,17 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
         'MJ_BizApps_Referrals: Referral Feedbacks',
         contextUser,
       ));
+
+    const priorRating = fb.Rating;
+    const priorOutcome = fb.OutcomeStatus;
+    const priorComments = fb.Comments;
+
     if (!existingFb) {
       fb.NewRecord();
       fb.ReferralAssignmentID = assignment.ID;
       fb.ReferralRequestID = assignment.ReferralRequestID;
       fb.ProfessionalProfileID = assignment.ProfessionalProfileID;
-      fb.SubmittedByType = request.SubmittedByType;
+      fb.SubmittedByType = derivedSubmittedByType;
     }
 
     fb.Rating = request.Rating;
@@ -1599,27 +1880,40 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       throw new PersistenceError('Failed to save ReferralFeedback record.');
     }
 
-    const stats = await this.RecomputeProfileRatingAndCount(
-      assignment.ProfessionalProfileID,
-      contextUser,
-      dp,
-    );
+    try {
+      const stats = await this.RecomputeProfileRatingAndCount(
+        assignment.ProfessionalProfileID,
+        contextUser,
+        dp,
+      );
 
-    return {
-      Success: true,
-      ReferralFeedbackID: fb.ID,
-      ReferralAssignmentID: assignment.ID,
-      ReferralRequestID: assignment.ReferralRequestID,
-      ProfessionalProfileID: assignment.ProfessionalProfileID,
-      AverageRating: stats.AverageRating,
-      TotalCompletedCount: stats.TotalCompletedCount,
-      Message: existingFb ? 'Feedback updated successfully.' : 'Feedback submitted successfully.',
-    };
+      return {
+        Success: true,
+        ReferralFeedbackID: fb.ID,
+        ReferralAssignmentID: assignment.ID,
+        ReferralRequestID: assignment.ReferralRequestID,
+        ProfessionalProfileID: assignment.ProfessionalProfileID,
+        SubmittedByType: derivedSubmittedByType,
+        AverageRating: stats.AverageRating,
+        TotalCompletedCount: stats.TotalCompletedCount,
+        Message: existingFb ? 'Feedback updated successfully.' : 'Feedback submitted successfully.',
+      };
+    } catch (err) {
+      if (!existingFb && typeof fb.Delete === 'function') {
+        await fb.Delete();
+      } else if (existingFb) {
+        fb.Rating = priorRating;
+        fb.OutcomeStatus = priorOutcome;
+        fb.Comments = priorComments;
+        await fb.Save();
+      }
+      throw err;
+    }
   }
 
   /**
    * Recomputes ProfessionalProfile.AverageRating across valid ratings and TotalCompletedCount
-   * across distinct completed/resolved/engaged assignments.
+   * across distinct completed/resolved assignments.
    */
   public async RecomputeProfileRatingAndCount(
     professionalProfileId: string,
@@ -1633,14 +1927,24 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     const rv = new RunView(dp);
-    const fbRes = await rv.RunView<ReferralFeedbackEntity>(
-      {
-        EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks',
-        ExtraFilter: `ProfessionalProfileID = '${validProfileId}'`,
-        ResultType: 'entity_object',
-      },
-      contextUser,
-    );
+    const [fbRes, assignRes] = await Promise.all([
+      rv.RunView<ReferralFeedbackEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks',
+          ExtraFilter: `ProfessionalProfileID = '${validProfileId}'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      ),
+      rv.RunView<ReferralAssignmentEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+          ExtraFilter: `ProfessionalProfileID = '${validProfileId}'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      ),
+    ]);
 
     if (!fbRes.Success) {
       throw new PersistenceError(
@@ -1658,8 +1962,15 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
 
     const completedAssignmentIds = new Set<string>();
     for (const fb of rows) {
-      if (fb.ReferralAssignmentID && (fb.OutcomeStatus === 'Resolved' || fb.OutcomeStatus === 'Engaged')) {
+      if (fb.ReferralAssignmentID && fb.OutcomeStatus === 'Resolved') {
         completedAssignmentIds.add(fb.ReferralAssignmentID.toLowerCase());
+      }
+    }
+    if (assignRes.Success && assignRes.Results) {
+      for (const a of assignRes.Results) {
+        if (String(a.Status) === 'Completed') {
+          completedAssignmentIds.add(a.ID.toLowerCase());
+        }
       }
     }
 
@@ -1669,12 +1980,13 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       'MJ_BizApps_Referrals: Professional Profiles',
       contextUser,
     );
-    if (await profile.Load(validProfileId)) {
-      profile.AverageRating = avgRating;
-      profile.TotalCompletedCount = totalCompleted;
-      if (!(await profile.Save())) {
-        throw new PersistenceError('Failed to save recomputed ProfessionalProfile metrics.');
-      }
+    if (!(await profile.Load(validProfileId))) {
+      throw new PersistenceError(`ProfessionalProfile '${validProfileId}' not found during metric recomputation.`);
+    }
+    profile.AverageRating = avgRating;
+    profile.TotalCompletedCount = totalCompleted;
+    if (!(await profile.Save())) {
+      throw new PersistenceError('Failed to save recomputed ProfessionalProfile metrics.');
     }
 
     return {

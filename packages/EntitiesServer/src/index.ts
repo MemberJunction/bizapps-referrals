@@ -1,6 +1,11 @@
-import { BaseEntity, EntitySaveOptions, ValidationResult } from '@memberjunction/core';
+import { BaseEntity, EntitySaveOptions, IMetadataProvider, IRunViewProvider, ValidationResult } from '@memberjunction/core';
 import { RegisterClass, ValidationErrorInfo, ValidationErrorType } from '@memberjunction/global';
-import { NormalizePartyName } from '@mj-biz-apps/referrals-core';
+import {
+  AuthorizationError,
+  IsCoordinatorOrAdmin,
+  NormalizePartyName,
+  ResolvePersonIdForUser,
+} from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
   ProfessionalCredentialEntity,
@@ -82,6 +87,49 @@ export class ProfessionalCredentialServerEntity extends ProfessionalCredentialEn
   }
 
   public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+    const statusField = this.Fields.find((f) => f.Name === 'VerificationStatus');
+    const verifiedByField = this.Fields.find((f) => f.Name === 'VerifiedByPersonID');
+    const isProtectedTransition =
+      (statusField?.Dirty &&
+        (this.VerificationStatus === 'Verified' ||
+          this.VerificationStatus === 'Rejected' ||
+          this.VerificationStatus === 'Revoked')) ||
+      Boolean(verifiedByField?.Dirty);
+
+    if (isProtectedTransition) {
+      if (!this.ContextCurrentUser || !IsCoordinatorOrAdmin(this.ContextCurrentUser)) {
+        throw new AuthorizationError(
+          'Coordinator or Administrator authority is required to transition credential VerificationStatus or modify VerifiedByPersonID.',
+        );
+      }
+      const rawProvider: object | undefined = this.ProviderToUse;
+      const isMetadataAndRunView = (
+        p: object | undefined,
+      ): p is IMetadataProvider & IRunViewProvider =>
+        Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
+      if (isMetadataAndRunView(rawProvider)) {
+        const dp = rawProvider;
+        if (this.ProfessionalProfileID) {
+          const profile = await dp.GetEntityObject<ProfessionalProfileEntity>(
+            'MJ_BizApps_Referrals: Professional Profiles',
+            this.ContextCurrentUser,
+          );
+          if (!(await profile.Load(this.ProfessionalProfileID))) {
+            throw new AuthorizationError(
+              `Parent ProfessionalProfile '${this.ProfessionalProfileID}' not found for credential verification.`,
+            );
+          }
+        }
+        const resolvedPersonId = await ResolvePersonIdForUser(this.ContextCurrentUser, dp);
+        if (!resolvedPersonId) {
+          throw new AuthorizationError(
+            'Authenticated coordinator must resolve to a valid Person record before saving credential verification decision.',
+          );
+        }
+        this.VerifiedByPersonID = resolvedPersonId;
+      }
+    }
+
     if (this.VerificationStatus === 'Verified' && !this.VerifiedAt) {
       this.VerifiedAt = new Date();
     }

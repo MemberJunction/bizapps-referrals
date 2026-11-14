@@ -612,7 +612,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
 
         this.Matches = matchItems.sort((a, b) => b.Score - a.Score);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.warn('Matching execution fallback:', err);
     } finally {
       this.IsSearching = false;
@@ -734,7 +734,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
       } else {
         this.IntakeErrorMessage = 'Failed to submit referral request. Please try again.';
       }
-    } catch (err: unknown) {
+    } catch (err) {
       this.IntakeErrorMessage = err instanceof Error ? err.message : 'An error occurred while submitting.';
     } finally {
       this.IsSubmittingIntake = false;

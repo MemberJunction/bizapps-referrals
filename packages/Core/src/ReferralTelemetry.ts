@@ -35,7 +35,7 @@ export class ReferralTelemetry {
 
   public static RecordOperation(payload: ReferralTelemetryPayload): void {
     const scrubbed = payload.Route ? ReferralTelemetry.ScrubRoute(payload.Route) : null;
-    const params: Record<string, unknown> = {
+    const params: Record<string, string | number | boolean | null> = {
       domain: 'bizapps-referrals',
       ...(scrubbed
         ? {

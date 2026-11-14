@@ -612,7 +612,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       const hasTx =
         provider != null &&
         'BeginEntityTransaction' in provider &&
-        typeof (provider as { BeginEntityTransaction?: unknown }).BeginEntityTransaction === 'function';
+        typeof (provider as { BeginEntityTransaction?: () => Promise<object> }).BeginEntityTransaction === 'function';
 
       if (hasTx) {
         const result = await CascadeRoutingService.SubmitIntakeWithConflicts(

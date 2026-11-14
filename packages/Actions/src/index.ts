@@ -1,4 +1,4 @@
-import { ActionResultSimple, RunActionParams } from '@memberjunction/actions-base';
+import { ActionParam, ActionResultSimple, RunActionParams } from '@memberjunction/actions-base';
 import { BaseAction } from '@memberjunction/actions';
 import {
   BaseRemotableOperation,
@@ -469,7 +469,18 @@ export class VerifyCredentialAction extends BaseAction {
       'Expired',
       'Revoked',
     ];
-    const forceStatus = allowedStatuses.find((s) => s === forceStatusRaw);
+    let forceStatus: CredentialVerificationStatus | undefined;
+    if (forceStatusRaw !== undefined) {
+      const matched = allowedStatuses.find((s) => s === forceStatusRaw);
+      if (!matched) {
+        return {
+          Success: false,
+          ResultCode: 'INVALID_PARAMETERS',
+          Message: `Invalid ForceStatus '${forceStatusRaw}'. Allowed values: ${allowedStatuses.join(', ')}.`,
+        };
+      }
+      forceStatus = matched;
+    }
 
     try {
       const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
@@ -543,8 +554,18 @@ export class SyncProfileCredentialsAction extends BaseAction {
 
 @RegisterClass(BaseAction, 'Referrals.ListCredentialProviders')
 export class ListCredentialProvidersAction extends BaseAction {
-  protected override async InternalRunAction(): Promise<ActionResultSimple> {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const providers = ReferralCredentialService.Instance.ListProviders(resolveActionProvider());
+    const existingOutput = params.Params?.find((p) => p.Name === 'Providers');
+    if (existingOutput) {
+      existingOutput.Value = providers;
+    } else if (params.Params) {
+      const outputParam = new ActionParam();
+      outputParam.Name = 'Providers';
+      outputParam.Type = 'Output';
+      outputParam.Value = providers;
+      params.Params.push(outputParam);
+    }
     return {
       Success: true,
       ResultCode: 'SUCCESS',

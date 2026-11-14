@@ -77,7 +77,7 @@ export class MatchingEngine {
       disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict screening unavailable.';
     } else if (conflictResult.HasConflict) {
       disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict of interest detected.';
-    } else if (credentials && credentials.length > 0) {
+    } else if (credentials !== undefined) {
       const nowMs = Date.now();
       const isCredentialActive = (
         c: Pick<ProfessionalCredentialEntity, 'VerificationStatus' | 'ExpiresAt'>,
@@ -92,23 +92,25 @@ export class MatchingEngine {
         c.VerificationStatus === 'Rejected' ||
         (c.VerificationStatus === 'Verified' && Boolean(c.ExpiresAt) && new Date(c.ExpiresAt!).getTime() <= nowMs);
 
-      const hasAnyActive = credentials.some(isCredentialActive);
+      const activeCreds = credentials.filter(isCredentialActive);
+      const hasAnyActive = activeCreds.length > 0;
       const jurisdictionCreds = credentials.filter(
         (c) => c.JurisdictionID && UUIDsEqual(c.JurisdictionID, criteria.JurisdictionID),
       );
+      const hasAnyJurisdictionScoped = credentials.some((c) => Boolean(c.JurisdictionID));
+      const hasMatchingJurisdictionActive =
+        !criteria.JurisdictionID ||
+        !hasAnyJurisdictionScoped ||
+        jurisdictionCreds.some(isCredentialActive) ||
+        activeCreds.some((c) => !c.JurisdictionID);
+
       const primaryCreds = credentials.filter((c) => c.IsPrimary);
-
-      const jurisdictionInvalid =
-        jurisdictionCreds.length > 0 &&
-        jurisdictionCreds.some(isCredentialFailed) &&
-        !jurisdictionCreds.some(isCredentialActive);
-
       const primaryInvalid =
         primaryCreds.length > 0 &&
         primaryCreds.some(isCredentialFailed) &&
         !primaryCreds.some(isCredentialActive);
 
-      if (!hasAnyActive || jurisdictionInvalid || primaryInvalid) {
+      if (!hasAnyActive || !hasMatchingJurisdictionActive || primaryInvalid) {
         disqualificationReason = 'Required professional credential is expired, revoked, or unverified.';
       }
     }
@@ -401,6 +403,7 @@ export class MatchingEngine {
     }
 
     const credsByPro = new Map<string, ProfessionalCredentialEntity[]>();
+    let credentialQueryFailed = false;
     if (profiles.length > 0) {
       const credRes = await rv.RunView<ProfessionalCredentialEntity>(
         {
@@ -409,7 +412,9 @@ export class MatchingEngine {
         },
         contextUser,
       );
-      if (credRes.Success && credRes.Results) {
+      if (!credRes.Success) {
+        credentialQueryFailed = true;
+      } else if (credRes.Results) {
         for (const cred of credRes.Results) {
           const key = cred.ProfessionalProfileID.toLowerCase();
           const list = credsByPro.get(key) ?? [];
@@ -427,7 +432,7 @@ export class MatchingEngine {
         criteria: effectiveCriteria,
         conflictParties: requestConflictParties,
         activeMatterParties,
-        credentials: credsByPro.get(profile.ID.toLowerCase()),
+        credentials: credentialQueryFailed ? [] : credsByPro.get(profile.ID.toLowerCase()) ?? [],
       }),
     );
 

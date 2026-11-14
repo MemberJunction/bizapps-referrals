@@ -51,11 +51,16 @@ type ActiveTransactionalProvider = IMetadataProvider &
     BeginEntityTransaction(): Promise<EntityTransactionHandle>;
   };
 
+type SqlParamValue = string | number | boolean | Date | null | undefined;
+interface SqlQueryRow {
+  [column: string]: SqlParamValue;
+}
+
 interface SqlCapableProvider {
-  ExecuteSQL<T = Record<string, unknown>>(
+  ExecuteSQL<T = SqlQueryRow>(
     sql: string,
-    params?: unknown[],
-    options?: unknown,
+    params?: SqlParamValue[],
+    options?: { description?: string },
     user?: UserInfo,
   ): Promise<T[]>;
   PlatformKey?: string;
@@ -75,16 +80,16 @@ const ADMIN_ROLE_NAMES = new Set([
   'sysadmin',
 ]);
 
-function hasTransactionSupport(provider: unknown): provider is ActiveTransactionalProvider {
+function hasTransactionSupport(provider: object | null | undefined): provider is ActiveTransactionalProvider {
   return (
     typeof provider === 'object' &&
     provider !== null &&
     'BeginEntityTransaction' in provider &&
-    typeof (provider as { BeginEntityTransaction?: unknown }).BeginEntityTransaction === 'function'
+    typeof (provider as { BeginEntityTransaction?: () => Promise<EntityTransactionHandle> }).BeginEntityTransaction === 'function'
   );
 }
 
-function hasSqlSupport(provider: unknown): provider is SqlCapableProvider {
+function hasSqlSupport(provider: object | null | undefined): provider is SqlCapableProvider {
   return (
     typeof provider === 'object' &&
     provider !== null &&
