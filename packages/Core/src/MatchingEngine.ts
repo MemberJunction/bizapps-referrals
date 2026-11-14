@@ -1,6 +1,7 @@
 import { IRunViewProvider, RunView, UserInfo } from '@memberjunction/core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
@@ -47,8 +48,9 @@ export class MatchingEngine {
     criteria: MatchCriteria;
     conflictParties: ReadonlyArray<Pick<ConflictCheckPartyEntity, 'PartyName' | 'PartyRole' | 'OrganizationName' | 'NormalizedName'>>;
     activeMatterParties: ReadonlyArray<ActiveMatterPartyRecord>;
+    credentials?: ReadonlyArray<Pick<ProfessionalCredentialEntity, 'ProfessionalProfileID' | 'JurisdictionID' | 'VerificationStatus' | 'ExpiresAt' | 'IsPrimary'>>;
   }): MatchCandidateScore {
-    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties } = params;
+    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials } = params;
 
     const allParties = [
       ...conflictParties,
@@ -75,6 +77,40 @@ export class MatchingEngine {
       disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict screening unavailable.';
     } else if (conflictResult.HasConflict) {
       disqualificationReason = conflictResult.Reasons[0] ?? 'Conflict of interest detected.';
+    } else if (credentials && credentials.length > 0) {
+      const nowMs = Date.now();
+      const isCredentialActive = (
+        c: Pick<ProfessionalCredentialEntity, 'VerificationStatus' | 'ExpiresAt'>,
+      ): boolean =>
+        c.VerificationStatus === 'Verified' && (!c.ExpiresAt || new Date(c.ExpiresAt).getTime() > nowMs);
+
+      const isCredentialFailed = (
+        c: Pick<ProfessionalCredentialEntity, 'VerificationStatus' | 'ExpiresAt'>,
+      ): boolean =>
+        c.VerificationStatus === 'Revoked' ||
+        c.VerificationStatus === 'Expired' ||
+        c.VerificationStatus === 'Rejected' ||
+        (c.VerificationStatus === 'Verified' && Boolean(c.ExpiresAt) && new Date(c.ExpiresAt!).getTime() <= nowMs);
+
+      const hasAnyActive = credentials.some(isCredentialActive);
+      const jurisdictionCreds = credentials.filter(
+        (c) => c.JurisdictionID && UUIDsEqual(c.JurisdictionID, criteria.JurisdictionID),
+      );
+      const primaryCreds = credentials.filter((c) => c.IsPrimary);
+
+      const jurisdictionInvalid =
+        jurisdictionCreds.length > 0 &&
+        jurisdictionCreds.some(isCredentialFailed) &&
+        !jurisdictionCreds.some(isCredentialActive);
+
+      const primaryInvalid =
+        primaryCreds.length > 0 &&
+        primaryCreds.some(isCredentialFailed) &&
+        !primaryCreds.some(isCredentialActive);
+
+      if (!hasAnyActive || jurisdictionInvalid || primaryInvalid) {
+        disqualificationReason = 'Required professional credential is expired, revoked, or unverified.';
+      }
     }
 
     let practiceAreaScore = 0;
@@ -364,6 +400,25 @@ export class MatchingEngine {
       jurisdictionByPro.set(link.ProfessionalProfileID.toLowerCase(), link);
     }
 
+    const credsByPro = new Map<string, ProfessionalCredentialEntity[]>();
+    if (profiles.length > 0) {
+      const credRes = await rv.RunView<ProfessionalCredentialEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (credRes.Success && credRes.Results) {
+        for (const cred of credRes.Results) {
+          const key = cred.ProfessionalProfileID.toLowerCase();
+          const list = credsByPro.get(key) ?? [];
+          list.push(cred);
+          credsByPro.set(key, list);
+        }
+      }
+    }
+
     const scored = profiles.map((profile) =>
       MatchingEngine.ScoreCandidate({
         profile,
@@ -372,6 +427,7 @@ export class MatchingEngine {
         criteria: effectiveCriteria,
         conflictParties: requestConflictParties,
         activeMatterParties,
+        credentials: credsByPro.get(profile.ID.toLowerCase()),
       }),
     );
 

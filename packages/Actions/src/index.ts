@@ -462,32 +462,46 @@ export class VerifyCredentialAction extends BaseAction {
     }
 
     const forceStatusRaw = getStringParam(params, 'ForceStatus');
-    const forceStatus = forceStatusRaw as CredentialVerificationStatus | undefined;
+    const allowedStatuses: ReadonlyArray<CredentialVerificationStatus> = [
+      'Pending',
+      'Verified',
+      'Rejected',
+      'Expired',
+      'Revoked',
+    ];
+    const forceStatus = allowedStatuses.find((s) => s === forceStatusRaw);
 
-    const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
-      {
-        ProfessionalProfileID: profileId,
-        ProfessionalCredentialID: getStringParam(params, 'ProfessionalCredentialID'),
-        CredentialCode: credentialCode,
-        CredentialName: getStringParam(params, 'CredentialName'),
-        LicenseNumber: getStringParam(params, 'LicenseNumber'),
-        IssuerName: getStringParam(params, 'IssuerName'),
-        JurisdictionID: getStringParam(params, 'JurisdictionID'),
-        ExternalReferenceID: getStringParam(params, 'ExternalReferenceID'),
-        EvidenceURL: getStringParam(params, 'EvidenceURL'),
-        ProviderKey: getStringParam(params, 'ProviderKey') ?? 'Manual',
-        VerifiedByPersonID: getStringParam(params, 'VerifiedByPersonID'),
-        ForceStatus: forceStatus,
-      },
-      params.ContextUser,
-      resolveActionProvider(),
-    );
+    try {
+      const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
+        {
+          ProfessionalProfileID: profileId,
+          ProfessionalCredentialID: getStringParam(params, 'ProfessionalCredentialID'),
+          CredentialCode: credentialCode,
+          CredentialName: getStringParam(params, 'CredentialName'),
+          LicenseNumber: getStringParam(params, 'LicenseNumber'),
+          IssuerName: getStringParam(params, 'IssuerName'),
+          JurisdictionID: getStringParam(params, 'JurisdictionID'),
+          ExternalReferenceID: getStringParam(params, 'ExternalReferenceID'),
+          EvidenceURL: getStringParam(params, 'EvidenceURL'),
+          ProviderKey: getStringParam(params, 'ProviderKey') ?? 'Manual',
+          ForceStatus: forceStatus,
+        },
+        params.ContextUser,
+        resolveActionProvider(),
+      );
 
-    return {
-      Success: true,
-      ResultCode: 'SUCCESS',
-      Message: JSON.stringify(result),
-    };
+      return {
+        Success: result.Success,
+        ResultCode: result.Success ? 'SUCCESS' : 'VERIFICATION_FAILED',
+        Message: JSON.stringify(result),
+      };
+    } catch (error) {
+      return {
+        Success: false,
+        ResultCode: error instanceof Error ? error.name : 'VERIFICATION_ERROR',
+        Message: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
 
@@ -504,18 +518,26 @@ export class SyncProfileCredentialsAction extends BaseAction {
     }
 
     const providerKey = getStringParam(params, 'ProviderKey') ?? 'Manual';
-    const result = await ReferralCredentialService.Instance.SyncProfileCredentials(
-      profileId,
-      providerKey,
-      params.ContextUser,
-      resolveActionProvider(),
-    );
+    try {
+      const result = await ReferralCredentialService.Instance.SyncProfileCredentials(
+        profileId,
+        providerKey,
+        params.ContextUser,
+        resolveActionProvider(),
+      );
 
-    return {
-      Success: true,
-      ResultCode: 'SUCCESS',
-      Message: JSON.stringify(result),
-    };
+      return {
+        Success: result.Success,
+        ResultCode: result.Success ? 'SUCCESS' : 'SYNC_FAILED',
+        Message: JSON.stringify(result),
+      };
+    } catch (error) {
+      return {
+        Success: false,
+        ResultCode: error instanceof Error ? error.name : 'SYNC_ERROR',
+        Message: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
 
