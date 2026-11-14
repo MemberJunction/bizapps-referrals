@@ -17,10 +17,14 @@ import {
   VocabularyService,
 } from '@mj-biz-apps/referrals-core';
 import {
+  ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalJurisdictionEntity,
+  ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralRequestEntity,
+  ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
 
 export interface FinderMatchItem {
@@ -28,8 +32,8 @@ export interface FinderMatchItem {
   DisplayName: string;
   FirmName: string | null;
   Email: string;
-  VerificationStatus: string;
-  AvailabilityStatus: string;
+  VerificationStatus: ProfessionalProfileEntity['VerificationStatus'];
+  AvailabilityStatus: ProfessionalProfileEntity['AvailabilityStatus'];
   AverageResponseHours: number | null;
   AverageRating: number | null;
   Score: number;
@@ -518,23 +522,58 @@ export class ReferralsFinderWidgetComponent implements OnInit {
         MatterTitle: this.MatterSummary,
       };
 
-      const filter = "IsActive = 1 AND VerificationStatus = 'Verified'";
-      const proRes = await rv.RunView<ProfessionalProfileEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
-          ExtraFilter: filter,
-          ResultType: 'entity_object',
-        },
-        md.CurrentUser,
-      );
+      const [proRes, ppaRes, pjRes] = await Promise.all([
+        rv.RunView<ProfessionalProfileEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
+            ExtraFilter: "IsActive = 1 AND VerificationStatus = 'Verified'",
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+        rv.RunView<ProfessionalPracticeAreaEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
+            ExtraFilter: this.SelectedPracticeAreaID ? `PracticeAreaID = '${this.SelectedPracticeAreaID}'` : '1=1',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+        rv.RunView<ProfessionalJurisdictionEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
+            ExtraFilter: this.SelectedJurisdictionID ? `JurisdictionID = '${this.SelectedJurisdictionID}'` : '1=1',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+      ]);
 
       if (proRes.Success) {
         const rawPros = proRes.Results;
-        this.Matches = rawPros.map((p) => {
+        const matchItems: FinderMatchItem[] = [];
+
+        for (const p of rawPros) {
+          const practiceLink = ppaRes?.Success
+            ? ppaRes.Results.find(
+                (pl) =>
+                  pl.ProfessionalProfileID === p.ID &&
+                  (!this.SelectedPracticeAreaID || pl.PracticeAreaID === this.SelectedPracticeAreaID),
+              )
+            : undefined;
+
+          const jurisdictionLink = pjRes?.Success
+            ? pjRes.Results.find(
+                (jl) =>
+                  jl.ProfessionalProfileID === p.ID &&
+                  (!this.SelectedJurisdictionID || jl.JurisdictionID === this.SelectedJurisdictionID),
+              )
+            : undefined;
+
           const scoreResult = MatchingEngine.ScoreCandidate({
             profile: p,
-            practiceLink: undefined,
-            jurisdictionLink: undefined,
+            practiceLink,
+            jurisdictionLink,
             criteria: {
               ...criteria,
               PracticeAreaID: this.SelectedPracticeAreaID || 'pa-all',
@@ -544,7 +583,12 @@ export class ReferralsFinderWidgetComponent implements OnInit {
             activeMatterParties: [],
           });
 
-          return {
+          // Disqualify ineligible candidates from match display (CR-02)
+          if (!scoreResult.Eligible) {
+            continue;
+          }
+
+          matchItems.push({
             ProfileID: p.ID,
             DisplayName: p.DisplayName,
             FirmName: p.FirmName,
@@ -557,10 +601,10 @@ export class ReferralsFinderWidgetComponent implements OnInit {
             ExplainableMatchReasons: scoreResult.ExplainableMatchReasons,
             MatchSummary: scoreResult.MatchSummary,
             Bio: p.Bio,
-          };
-        });
+          });
+        }
 
-        this.Matches.sort((a, b) => b.Score - a.Score);
+        this.Matches = matchItems.sort((a, b) => b.Score - a.Score);
       }
     } catch (err: unknown) {
       console.warn('Matching execution fallback:', err);
@@ -606,20 +650,80 @@ export class ReferralsFinderWidgetComponent implements OnInit {
     this.cdr.markForCheck();
 
     try {
+      // Wire external HTTP ApiUrl transport fallback when running standalone without MJ provider (CR-03)
+      if (this.ApiUrl && !Metadata.Provider) {
+        const payload = {
+          SeekerName: this.IntakeSeekerName.trim(),
+          SeekerEmail: this.IntakeSeekerEmail.trim(),
+          SeekerPhone: this.IntakeSeekerPhone.trim() || null,
+          MatterTitle: this.IntakeMatterTitle.trim(),
+          MatterSummary: this.IntakeMatterSummary.trim() || '',
+          PracticeAreaID: this.SelectedPracticeAreaID || null,
+          JurisdictionID: this.SelectedJurisdictionID || null,
+          RequiresProBono: this.RequiresProBono,
+          AdversePartyName: this.IntakeAdverseParty.trim() || null,
+          PreferredProfessionalID: this.SelectedPro?.ProfileID || null,
+        };
+        const response = await fetch(`${this.ApiUrl.replace(/\/$/, '')}/api/referrals/intake`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (response.ok) {
+          const resData = (await response.json()) as { RequestNumber?: string; ID?: string };
+          this.IntakeSuccessMessage = `Referral request submitted successfully! Tracking reference: ${resData.RequestNumber || resData.ID || 'SUBMITTED'}. You will be contacted shortly.`;
+          return;
+        }
+      }
+
       const md = new Metadata();
+      let tierId = '';
+      const tierRes = await new RunView().RunView<ReferralTierEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Tiers',
+          ExtraFilter: 'IsActive = 1',
+          ResultType: 'entity_object',
+          OrderBy: 'DisplayRank ASC, TierLevel ASC',
+        },
+        md.CurrentUser,
+      );
+      if (tierRes.Success && tierRes.Results.length > 0) {
+        tierId = tierRes.Results[0].ID;
+      }
+
       const req = await md.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests');
       req.SeekerName = this.IntakeSeekerName.trim();
       req.SeekerEmail = this.IntakeSeekerEmail.trim();
       req.SeekerPhone = this.IntakeSeekerPhone.trim() || null;
       req.MatterTitle = this.IntakeMatterTitle.trim();
       req.MatterSummary = this.IntakeMatterSummary.trim() || '';
+      req.RequiresProBono = this.RequiresProBono;
       req.UrgencyLevel = 'Standard';
       req.Status = 'Submitted';
+      req.SubmittedAt = new Date();
+      if (tierId) req.ReferralTierID = tierId;
       if (this.SelectedPracticeAreaID) req.PracticeAreaID = this.SelectedPracticeAreaID;
       if (this.SelectedJurisdictionID) req.JurisdictionID = this.SelectedJurisdictionID;
+      if (this.SelectedPro?.ProfileID) req.AssignedProfessionalID = this.SelectedPro.ProfileID;
 
       const saved = await req.Save();
       if (saved) {
+        // Persist conflict check adverse party if supplied (CR-04)
+        if (this.IntakeAdverseParty.trim()) {
+          try {
+            const party = await md.GetEntityObject<ConflictCheckPartyEntity>(
+              'MJ_BizApps_Referrals: Conflict Check Parties',
+            );
+            party.ReferralRequestID = req.ID;
+            party.PartyName = this.IntakeAdverseParty.trim();
+            party.PartyRole = 'Adverse';
+            party.NormalizedName = this.IntakeAdverseParty.trim().toUpperCase();
+            await party.Save();
+          } catch (partyErr) {
+            console.warn('Could not save adverse party record:', partyErr);
+          }
+        }
+
         this.IntakeSuccessMessage = `Referral request submitted successfully! Tracking reference: ${req.RequestNumber || req.ID}. You will be contacted shortly.`;
       } else {
         this.IntakeErrorMessage = 'Failed to submit referral request. Please try again.';

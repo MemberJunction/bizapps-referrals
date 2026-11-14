@@ -5,7 +5,7 @@ import { UserInfoEngine } from '@memberjunction/core-entities';
 import { RegisterClassEx } from '@memberjunction/global';
 import { BaseFormPanel } from '@memberjunction/ng-base-forms';
 import { NavigationService } from '@memberjunction/ng-shared';
-import { CascadeRoutingService } from '@mj-biz-apps/referrals-core';
+import { AssertValidUUID, CascadeRoutingService } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
@@ -712,6 +712,11 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
   async ngOnInit(): Promise<void> {
     const recId = this.RecordID;
     if (!recId) return;
+    try {
+      AssertValidUUID(recId, 'RecordID');
+    } catch {
+      return;
+    }
     const rv = new RunView();
     const md = new Metadata();
     const proRes = await rv.RunView<ProfessionalProfileEntity>(
@@ -788,6 +793,11 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
   async ngOnInit(): Promise<void> {
     const recId = this.RecordID;
     if (!recId) return;
+    try {
+      AssertValidUUID(recId, 'RecordID');
+    } catch {
+      return;
+    }
     const rv = new RunView();
     const md = new Metadata();
     const proRes = await rv.RunView<ProfessionalProfileEntity>(
@@ -864,6 +874,11 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
   async ngOnInit(): Promise<void> {
     const recId = this.RecordID;
     if (!recId) return;
+    try {
+      AssertValidUUID(recId, 'RecordID');
+    } catch {
+      return;
+    }
     const rv = new RunView();
     const md = new Metadata();
     const res = await rv.RunView<ProfessionalProfileEntity>(

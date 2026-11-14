@@ -109,9 +109,13 @@ function resolveTransactionalProvider(
   return candidate as TransactionalProvider;
 }
 
+export interface TransactionCompensationContext {
+  registerCompensation(action: () => Promise<void>): void;
+}
+
 async function withEntityTransaction<T>(
   provider: TransactionalProvider,
-  fn: (txProvider: TransactionalProvider) => Promise<T>,
+  fn: (txProvider: TransactionalProvider, compensation?: TransactionCompensationContext) => Promise<T>,
 ): Promise<T> {
   if (hasTransactionSupport(provider)) {
     const tx = await provider.BeginEntityTransaction();
@@ -129,8 +133,27 @@ async function withEntityTransaction<T>(
     }
   }
 
-  // Graceful fallback for GraphQL client and non-transactional metadata providers
-  return await fn(provider);
+  // Graceful transactional compensation for client GraphQL and non-transactional metadata providers
+  const compensations: Array<() => Promise<void>> = [];
+  const compensationContext: TransactionCompensationContext = {
+    registerCompensation(action: () => Promise<void>) {
+      compensations.push(action);
+    },
+  };
+
+  try {
+    return await fn(provider, compensationContext);
+  } catch (err) {
+    // Run compensating actions in reverse order to undo operations atomically
+    for (let i = compensations.length - 1; i >= 0; i--) {
+      try {
+        await compensations[i]();
+      } catch (compErr) {
+        console.warn('Compensation error during rollback cleanup:', compErr);
+      }
+    }
+    throw err;
+  }
 }
 
 async function atomicClaimAssignmentOffer(
@@ -265,7 +288,7 @@ export class CascadeRoutingService {
     const validJurisdictionId = AssertValidUUID(input.JurisdictionID, 'JurisdictionID');
     const validTierId = AssertValidUUID(input.ReferralTierID, 'ReferralTierID');
 
-    const created = await withEntityTransaction(txProvider, async (tx) => {
+    const created = await withEntityTransaction(txProvider, async (tx, compensation) => {
       const req = await tx.GetEntityObject<ReferralRequestEntity>(
         'MJ_BizApps_Referrals: Referral Requests',
         contextUser,
@@ -286,6 +309,9 @@ export class CascadeRoutingService {
       }
       req.Status = 'Draft';
       await saveOrThrow(req, 'Draft ReferralRequest');
+      compensation?.registerCompensation(async () => {
+        await req.Delete();
+      });
 
       const parties = input.ConflictParties ?? [];
       for (let i = 0; i < parties.length; i++) {
@@ -300,6 +326,9 @@ export class CascadeRoutingService {
         party.OrganizationName = draft.OrganizationName ?? null;
         party.NormalizedName = NormalizePartyName(draft.PartyName);
         await saveOrThrow(party, `ConflictCheckParty #${i + 1}`);
+        compensation?.registerCompensation(async () => {
+          await party.Delete();
+        });
       }
 
       req.Status = 'Submitted';

@@ -342,6 +342,10 @@ export class ReferralsReportGalleryComponent implements OnInit {
     { PracticeArea: 'Tax & Estate Planning', Jurisdiction: 'Florida', RequestsCount: 6, AvailablePros: 3, Status: 'Deficit' },
   ];
 
+  private _cachedRequests: ReferralRequestEntity[] = [];
+  private _cachedAssignments: ReferralAssignmentEntity[] = [];
+  private _cachedFeedbacks: ReferralFeedbackEntity[] = [];
+
   async ngOnInit(): Promise<void> {
     await this.LoadRealTelemetry();
     this.cdr.markForCheck();
@@ -349,6 +353,7 @@ export class ReferralsReportGalleryComponent implements OnInit {
 
   public SetPeriod(p: '30d' | '90d' | 'all'): void {
     this.SelectedPeriod = p;
+    this.ComputeMetricsFromCache();
     this.cdr.markForCheck();
   }
 
@@ -356,18 +361,115 @@ export class ReferralsReportGalleryComponent implements OnInit {
     try {
       const rv = new RunView();
       const md = new Metadata();
-      const res = await rv.RunView<ReferralRequestEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Requests',
-          ResultType: 'entity_object',
-        },
-        md.CurrentUser,
-      );
-      if (res.Success && res.Results.length > 0) {
-        this.TotalRequests = Math.max(res.Results.length, this.TotalRequests);
+      const [reqRes, assignRes, fbRes] = await Promise.all([
+        rv.RunView<ReferralRequestEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+        rv.RunView<ReferralAssignmentEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+        rv.RunView<ReferralFeedbackEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks',
+            ResultType: 'entity_object',
+          },
+          md.CurrentUser,
+        ),
+      ]);
+
+      if (reqRes.Success) {
+        this._cachedRequests = reqRes.Results;
       }
+      if (assignRes.Success) {
+        this._cachedAssignments = assignRes.Results;
+      }
+      if (fbRes.Success) {
+        this._cachedFeedbacks = fbRes.Results;
+      }
+
+      this.ComputeMetricsFromCache();
     } catch {
       // Graceful telemetry fallback
+    }
+  }
+
+  private ComputeMetricsFromCache(): void {
+    const now = Date.now();
+    const periodDays = this.SelectedPeriod === '30d' ? 30 : this.SelectedPeriod === '90d' ? 90 : Infinity;
+    const cutoff = periodDays === Infinity ? 0 : now - periodDays * 24 * 60 * 60 * 1000;
+
+    const filteredRequests = this._cachedRequests.filter((r) => {
+      const d = r.SubmittedAt ? new Date(r.SubmittedAt).getTime() : 0;
+      return d >= cutoff;
+    });
+
+    if (filteredRequests.length > 0) {
+      this.TotalRequests = filteredRequests.length;
+      const accepted = filteredRequests.filter((r) => r.Status === 'Accepted' || r.Status === 'Completed').length;
+      this.AcceptanceRate = Math.round((accepted / this.TotalRequests) * 1000) / 10;
+
+      const completed = filteredRequests.filter((r) => r.Status === 'Completed').length;
+      const offered = filteredRequests.filter((r) => r.Status !== 'Draft').length;
+
+      const activeReqIds = new Set(filteredRequests.map((r) => r.ID));
+      const filteredAssignments = this._cachedAssignments.filter((a) => activeReqIds.has(a.ReferralRequestID));
+
+      const firstStepAccepted = filteredAssignments.filter((a) => a.Status === 'Accepted' && a.CascadeOrder === 1).length;
+      const cascaded = filteredAssignments.filter((a) => a.CascadeOrder > 1).length;
+
+      this.CascadeFunnel = [
+        { StageName: 'Intake Submitted', Count: this.TotalRequests, Rate: 100 },
+        { StageName: 'Matched & Offered', Count: offered, Rate: Math.round((offered / this.TotalRequests) * 1000) / 10 },
+        { StageName: 'First Offer Accepted', Count: firstStepAccepted, Rate: Math.round((firstStepAccepted / this.TotalRequests) * 1000) / 10 },
+        { StageName: 'Second Step Cascaded', Count: cascaded, Rate: Math.round((cascaded / this.TotalRequests) * 1000) / 10 },
+        { StageName: 'Completed Retained', Count: completed, Rate: Math.round((completed / this.TotalRequests) * 1000) / 10 },
+      ];
+
+      // SLA Distribution & Median
+      const responseDurations: number[] = [];
+      for (const a of filteredAssignments) {
+        if (a.RespondedAt && a.OfferedAt) {
+          const diffHours = (new Date(a.RespondedAt).getTime() - new Date(a.OfferedAt).getTime()) / (1000 * 60 * 60);
+          if (diffHours >= 0) responseDurations.push(diffHours);
+        }
+      }
+
+      if (responseDurations.length > 0) {
+        responseDurations.sort((a, b) => a - b);
+        const mid = Math.floor(responseDurations.length / 2);
+        this.MedianResponseHours =
+          responseDurations.length % 2 !== 0
+            ? Math.round(responseDurations[mid] * 10) / 10
+            : Math.round(((responseDurations[mid - 1] + responseDurations[mid]) / 2) * 10) / 10;
+
+        const b1 = responseDurations.filter((h) => h < 1).length;
+        const b2 = responseDurations.filter((h) => h >= 1 && h <= 4).length;
+        const b3 = responseDurations.filter((h) => h > 4 && h <= 24).length;
+        const b4 = responseDurations.filter((h) => h > 24).length;
+        const totalA = responseDurations.length;
+
+        this.SlaDistribution = [
+          { Label: '< 1 Hour (Ultra-Fast)', Count: b1, Percentage: Math.round((b1 / totalA) * 1000) / 10 },
+          { Label: '1 - 4 Hours (Target)', Count: b2, Percentage: Math.round((b2 / totalA) * 1000) / 10 },
+          { Label: '4 - 24 Hours (Standard)', Count: b3, Percentage: Math.round((b3 / totalA) * 1000) / 10 },
+          { Label: '> 24 Hours (Delayed)', Count: b4, Percentage: Math.round((b4 / totalA) * 1000) / 10 },
+        ];
+      }
+
+      const filteredFb = this._cachedFeedbacks.filter((f) => activeReqIds.has(f.ReferralRequestID));
+      if (filteredFb.length > 0) {
+        this.FeedbackCount = filteredFb.length;
+        const sum = filteredFb.reduce((acc, curr) => acc + (curr.Rating || 5), 0);
+        this.AverageRating = Math.round((sum / filteredFb.length) * 100) / 100;
+      }
     }
   }
 }
