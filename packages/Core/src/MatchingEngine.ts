@@ -5,15 +5,40 @@ import {
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { ActiveMatterPartyRecord, ConflictScreeningService } from './ConflictScreeningService.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import { MatchCandidateScore, MatchCriteria, ScoreBreakdown } from './types.js';
 import { AssertValidUUID, ConflictScreeningUnavailableError, UUIDsEqual } from './validation.js';
 
+const STOP_WORDS = new Set([
+  'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren',
+  'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
+  'can', 'could', 'did', 'do', 'does', 'doing', 'down', 'during', 'each', 'few', 'for', 'from',
+  'further', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'hers', 'herself', 'him', 'himself',
+  'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it', 'its', 'itself', 'just', 'me', 'more', 'most',
+  'my', 'myself', 'no', 'nor', 'not', 'now', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'our',
+  'ours', 'ourselves', 'out', 'over', 'own', 'same', 'she', 'should', 'so', 'some', 'such', 'than',
+  'that', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'these', 'they', 'this',
+  'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'we', 'were', 'what', 'when',
+  'where', 'which', 'while', 'who', 'whom', 'why', 'with', 'would', 'you', 'your', 'yours', 'yourself',
+]);
+
+function extractTokens(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 2 && !STOP_WORDS.has(t));
+}
+
 export class MatchingEngine {
   /**
-   * Pure multi-factor scoring function for a single professional candidate.
+   * Pure multi-factor hybrid scoring function for a single professional candidate.
+   * Evaluates deterministic compliance filters + multi-attribute scoring + semantic similarity.
    */
   public static ScoreCandidate(params: {
     profile: ProfessionalProfileEntity;
@@ -96,15 +121,53 @@ export class MatchingEngine {
 
     let languageBonus = 0;
     if (criteria.PreferredLanguage && profile.Languages) {
-      const langs = profile.Languages.toLowerCase().split(',').map((l) => l.trim());
+      const langs = profile.Languages.toLowerCase().split(',').map((l: string) => l.trim());
       if (langs.includes(criteria.PreferredLanguage.toLowerCase().trim())) {
         languageBonus = 5;
       }
     }
 
+    // Hybrid Semantic / Keyword Similarity
+    let semanticScore = 0;
+    const matchedTerms: string[] = [];
+    const queryTokens = [
+      ...extractTokens(criteria.MatterTitle),
+      ...extractTokens(criteria.MatterSummary),
+      ...(criteria.Keywords ?? []).flatMap((k) => extractTokens(k)),
+    ];
+
+    if (queryTokens.length > 0) {
+      const uniqueQueryTokens = Array.from(new Set(queryTokens));
+      const profileText = [
+        profile.Bio ?? '',
+        profile.DisplayName ?? '',
+        profile.FirmName ?? '',
+      ].join(' ');
+      const candidateTokens = new Set(extractTokens(profileText));
+
+      for (const token of uniqueQueryTokens) {
+        if (candidateTokens.has(token)) {
+          matchedTerms.push(token);
+        }
+      }
+
+      if (uniqueQueryTokens.length > 0) {
+        const overlapRatio = matchedTerms.length / uniqueQueryTokens.length;
+        const baseScore = overlapRatio * 10;
+        const explicitKeywords = (criteria.Keywords ?? []).flatMap((k) => extractTokens(k));
+        const matchedExplicit = explicitKeywords.filter((k) => candidateTokens.has(k)).length;
+        const keywordBonus = explicitKeywords.length > 0 ? (matchedExplicit / explicitKeywords.length) * 5 : 0;
+
+        semanticScore = Math.min(15, Math.round((baseScore + keywordBonus) * 100) / 100);
+        if (matchedTerms.length > 0 && semanticScore < 3) {
+          semanticScore = 3;
+        }
+      }
+    }
+
     const totalScore = Math.min(
       100,
-      Math.round((practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus) * 100) / 100,
+      Math.round((practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus + semanticScore) * 100) / 100,
     );
 
     const breakdown: ScoreBreakdown = {
@@ -114,8 +177,51 @@ export class MatchingEngine {
       ResponsivenessScore: responsivenessScore,
       RatingScore: ratingScore,
       LanguageBonus: languageBonus,
+      SemanticScore: semanticScore,
       TotalScore: totalScore,
     };
+
+    const explainableReasons: string[] = [];
+    if (practiceLink) {
+      explainableReasons.push(
+        `${practiceLink.ProficiencyLevel} proficiency (${practiceLink.YearsInPractice} yrs experience)`,
+      );
+    }
+    if (jurisdictionLink) {
+      explainableReasons.push(
+        `Good standing in jurisdiction (${jurisdictionLink.IsPrimary ? 'Primary' : 'Admitted'})`,
+      );
+    }
+    if (matchedTerms.length > 0) {
+      explainableReasons.push(
+        `Matched keywords: ${matchedTerms.slice(0, 4).join(', ')}${matchedTerms.length > 4 ? ` (+${matchedTerms.length - 4} more)` : ''}`,
+      );
+    }
+    if (profile.AverageResponseHours != null) {
+      explainableReasons.push(`Avg response SLA: ${profile.AverageResponseHours}h (target ${targetSla}h)`);
+    }
+    if (profile.AverageRating != null) {
+      explainableReasons.push(`Client rating: ${profile.AverageRating}/5.0`);
+    }
+    if (languageBonus > 0 && criteria.PreferredLanguage) {
+      explainableReasons.push(`Speaks preferred language (${criteria.PreferredLanguage})`);
+    }
+    const headroom = profile.MaxConcurrentReferrals - profile.ActiveReferralCount;
+    explainableReasons.push(
+      `${profile.AvailabilityStatus} (${headroom} of ${profile.MaxConcurrentReferrals} capacity slots open)`,
+    );
+
+    const summaryParts: string[] = [];
+    if (matchedTerms.length > 0) {
+      summaryParts.push(`Matched on ${matchedTerms.slice(0, 3).join(', ')}`);
+    } else if (practiceLink) {
+      summaryParts.push(`${practiceLink.ProficiencyLevel} practice match`);
+    }
+    if (profile.AverageResponseHours != null) {
+      summaryParts.push(`${profile.AverageResponseHours}h SLA`);
+    }
+    summaryParts.push(`${Math.round(totalScore)}% match`);
+    const matchSummary = summaryParts.join(' • ');
 
     return {
       ProfessionalProfileID: profile.ID,
@@ -132,6 +238,8 @@ export class MatchingEngine {
       ConflictReasons: conflictResult.Reasons,
       Eligible: disqualificationReason === null,
       DisqualificationReason: disqualificationReason,
+      ExplainableMatchReasons: explainableReasons,
+      MatchSummary: matchSummary,
     };
   }
 
@@ -181,6 +289,11 @@ export class MatchingEngine {
         ExtraFilter: `ReferralRequestID = '${validatedRequestId}'`,
         ResultType: 'entity_object' as const,
       });
+      viewsToRun.push({
+        EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+        ExtraFilter: `ID = '${validatedRequestId}'`,
+        ResultType: 'entity_object' as const,
+      });
     }
 
     const results = await rv.RunViews(viewsToRun, contextUser);
@@ -200,6 +313,16 @@ export class MatchingEngine {
     const requestConflictParties = validatedRequestId
       ? (results[4].Results as ConflictCheckPartyEntity[])
       : [];
+
+    let effectiveCriteria = { ...criteria };
+    if (validatedRequestId && results[5]?.Results?.length) {
+      const requestEntity = results[5].Results[0] as ReferralRequestEntity;
+      effectiveCriteria = {
+        ...effectiveCriteria,
+        MatterTitle: effectiveCriteria.MatterTitle ?? requestEntity.MatterTitle,
+        MatterSummary: effectiveCriteria.MatterSummary ?? requestEntity.MatterSummary,
+      };
+    }
 
     const activeMatterParties: ActiveMatterPartyRecord[] = [];
     if (activeAssignments.length > 0) {
@@ -246,7 +369,7 @@ export class MatchingEngine {
         profile,
         practiceLink: practiceByPro.get(profile.ID.toLowerCase()),
         jurisdictionLink: jurisdictionByPro.get(profile.ID.toLowerCase()),
-        criteria,
+        criteria: effectiveCriteria,
         conflictParties: requestConflictParties,
         activeMatterParties,
       }),

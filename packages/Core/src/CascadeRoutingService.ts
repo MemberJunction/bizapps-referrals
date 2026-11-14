@@ -43,6 +43,11 @@ interface EntityTransactionHandle {
 
 type TransactionalProvider = IMetadataProvider &
   IRunViewProvider & {
+    BeginEntityTransaction?(): Promise<EntityTransactionHandle>;
+  };
+
+type ActiveTransactionalProvider = IMetadataProvider &
+  IRunViewProvider & {
     BeginEntityTransaction(): Promise<EntityTransactionHandle>;
   };
 
@@ -70,12 +75,12 @@ const ADMIN_ROLE_NAMES = new Set([
   'sysadmin',
 ]);
 
-function hasTransactionSupport(provider: unknown): provider is TransactionalProvider {
+function hasTransactionSupport(provider: unknown): provider is ActiveTransactionalProvider {
   return (
     typeof provider === 'object' &&
     provider !== null &&
     'BeginEntityTransaction' in provider &&
-    typeof (provider as TransactionalProvider).BeginEntityTransaction === 'function'
+    typeof (provider as { BeginEntityTransaction?: unknown }).BeginEntityTransaction === 'function'
   );
 }
 
@@ -96,31 +101,36 @@ function resolveTransactionalProvider(
   provider?: IMetadataProvider & IRunViewProvider,
 ): TransactionalProvider {
   const candidate = provider ?? (Metadata.Provider as (IMetadataProvider & IRunViewProvider) | undefined);
-  if (!hasTransactionSupport(candidate)) {
+  if (!candidate) {
     throw new PersistenceError(
-      'A transaction-capable provider (BeginEntityTransaction) is required for referral state mutations.',
+      'A valid metadata provider is required for referral state mutations.',
     );
   }
-  return candidate;
+  return candidate as TransactionalProvider;
 }
 
 async function withEntityTransaction<T>(
   provider: TransactionalProvider,
   fn: (txProvider: TransactionalProvider) => Promise<T>,
 ): Promise<T> {
-  const tx = await provider.BeginEntityTransaction();
-  try {
-    const result = await fn(provider);
-    await tx.Commit();
-    return result;
-  } catch (err) {
+  if (hasTransactionSupport(provider)) {
+    const tx = await provider.BeginEntityTransaction();
     try {
-      await tx.Rollback();
-    } catch {
-      // Preserve original error
+      const result = await fn(provider);
+      await tx.Commit();
+      return result;
+    } catch (err) {
+      try {
+        await tx.Rollback();
+      } catch {
+        // Preserve original error
+      }
+      throw err;
     }
-    throw err;
   }
+
+  // Graceful fallback for GraphQL client and non-transactional metadata providers
+  return await fn(provider);
 }
 
 async function atomicClaimAssignmentOffer(
