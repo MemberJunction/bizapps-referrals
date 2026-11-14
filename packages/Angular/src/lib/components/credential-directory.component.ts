@@ -9,7 +9,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { CompositeKey, Metadata, RunView } from '@memberjunction/core';
 import { ResourceData } from '@memberjunction/core-entities';
-import { RegisterClass } from '@memberjunction/global';
+import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
   MJPageBodyComponent,
@@ -565,32 +565,32 @@ export class ReferralsCredentialDirectoryComponent extends BaseResourceComponent
       if (proRes.Success) {
         const paMap = new Map<string, string>();
         if (paRes.Success) {
-          paRes.Results.forEach((pa) => paMap.set(pa.ID, pa.Name));
+          paRes.Results.forEach((pa) => paMap.set(pa.ID.toLowerCase(), pa.Name));
         }
 
         const jurMap = new Map<string, string>();
         if (jurRes.Success) {
-          jurRes.Results.forEach((j) => jurMap.set(j.ID, j.Name));
+          jurRes.Results.forEach((j) => jurMap.set(j.ID.toLowerCase(), j.Name));
         }
 
         const ppaList = ppaRes.Success ? ppaRes.Results : [];
         const pjList = pjRes.Success ? pjRes.Results : [];
         const credList = credRes.Success ? credRes.Results : [];
         const profileNameMap = new Map<string, string>();
-        proRes.Results.forEach((p) => profileNameMap.set(p.ID, p.DisplayName));
+        proRes.Results.forEach((p) => profileNameMap.set(p.ID.toLowerCase(), p.DisplayName));
 
         this.AllCards = proRes.Results.map((p) => {
           const paNames = ppaList
-            .filter((l) => l.ProfessionalProfileID === p.ID)
-            .map((l) => paMap.get(l.PracticeAreaID) || '')
+            .filter((l) => UUIDsEqual(l.ProfessionalProfileID, p.ID))
+            .map((l) => paMap.get(l.PracticeAreaID.toLowerCase()) || '')
             .filter(Boolean);
 
           const jurNames = pjList
-            .filter((l) => l.ProfessionalProfileID === p.ID)
-            .map((l) => jurMap.get(l.JurisdictionID) || '')
+            .filter((l) => UUIDsEqual(l.ProfessionalProfileID, p.ID))
+            .map((l) => jurMap.get(l.JurisdictionID.toLowerCase()) || '')
             .filter(Boolean);
 
-          const creds = credList.filter((c) => c.ProfessionalProfileID === p.ID);
+          const creds = credList.filter((c) => UUIDsEqual(c.ProfessionalProfileID, p.ID));
 
           return {
             Profile: p,
@@ -604,7 +604,7 @@ export class ReferralsCredentialDirectoryComponent extends BaseResourceComponent
           .filter((c) => c.VerificationStatus === 'Pending')
           .map((c) => ({
             Credential: c,
-            ProfileName: profileNameMap.get(c.ProfessionalProfileID) ?? 'Professional',
+            ProfileName: profileNameMap.get(c.ProfessionalProfileID.toLowerCase()) ?? 'Professional',
           }));
 
         this.ApplyFilters();

@@ -12,15 +12,18 @@ import {
 } from '@memberjunction/ng-ui-components';
 import {
   CascadeRoutingService,
+  FeedbackOutcomeStatus,
   MatchCandidateScore,
   MatchingEngine,
   NormalizePartyName,
+  ReferralCredentialService,
   ReferralTelemetry,
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ReferralAssignmentEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -173,6 +176,58 @@ export interface ConflictCheckPartyDraft {
                 {{ IsSubmitting ? 'Submitting...' : 'Submit Referral Request' }}
               </button>
             </div>
+
+            @if (FeedbackAssignments.length > 0) {
+              <div class="seeker-feedback-panel" aria-label="Seeker Post-Acceptance Feedback">
+                <h3>Post-Acceptance Engagement Feedback</h3>
+                <div class="field-row">
+                  <label class="field-label">
+                    <span>Accepted / Completed Assignment</span>
+                    <select [(ngModel)]="SelectedFeedbackAssignmentID">
+                      @for (a of FeedbackAssignments; track a.ID) {
+                        <option [value]="a.ID">{{ a.ProfessionalProfileID }} ({{ a.Status }})</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="field-label">
+                    <span>Outcome Status</span>
+                    <select [(ngModel)]="SeekerFeedbackOutcome">
+                      <option value="Engaged">Engaged</option>
+                      <option value="ConsultedOnly">Consulted Only</option>
+                      <option value="NoResponse">No Response</option>
+                      <option value="NotAFit">Not A Fit</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label class="field-label">
+                    <span>Rating (1–5 ★)</span>
+                    <select [(ngModel)]="SeekerFeedbackRating">
+                      <option [ngValue]="5">5 ★ — Excellent</option>
+                      <option [ngValue]="4">4 ★ — Good</option>
+                      <option [ngValue]="3">3 ★ — Fair</option>
+                      <option [ngValue]="2">2 ★ — Poor</option>
+                      <option [ngValue]="1">1 ★ — Unsatisfactory</option>
+                    </select>
+                  </label>
+                  <label class="field-label">
+                    <span>Feedback Comments</span>
+                    <input type="text" [(ngModel)]="SeekerFeedbackComments" placeholder="Share consultation experience..." />
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="IsSubmittingFeedback"
+                    (click)="SubmitSeekerFeedback()"
+                  >
+                    {{ IsSubmittingFeedback ? 'Saving Feedback...' : 'Submit Seeker Feedback' }}
+                  </button>
+                </div>
+              </div>
+            }
           </section>
 
           @if (Prefs.DrawerOpen) {
@@ -376,6 +431,12 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   public NewPartyOrg = '';
   public IsMatching = false;
   public IsSubmitting = false;
+  public FeedbackAssignments: ReferralAssignmentEntity[] = [];
+  public SelectedFeedbackAssignmentID = '';
+  public SeekerFeedbackRating = 5;
+  public SeekerFeedbackOutcome: FeedbackOutcomeStatus = 'Engaged';
+  public SeekerFeedbackComments = '';
+  public IsSubmittingFeedback = false;
   public StatusBanner = '';
   public StatusTone: 'info' | 'success' | 'error' = 'info';
 
@@ -400,6 +461,12 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
         { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: 'IsActive = 1', OrderBy: 'DisplayRank ASC', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: 'IsActive = 1', OrderBy: 'Name ASC', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Referral Tiers', ExtraFilter: 'IsActive = 1', OrderBy: 'SLAResponseHours DESC', ResultType: 'entity_object' },
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+          ExtraFilter: "Status = 'Accepted'",
+          OrderBy: '__mj_UpdatedAt DESC',
+          ResultType: 'entity_object',
+        },
       ],
       md.CurrentUser,
     );
@@ -409,6 +476,12 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       this.ReferralTiers = results[2].Results as ReferralTierEntity[];
       if (!this.SelectedTierID && this.ReferralTiers.length > 0) {
         this.SelectedTierID = this.ReferralTiers[0].ID;
+      }
+    }
+    if (results[3]?.Success) {
+      this.FeedbackAssignments = results[3].Results as ReferralAssignmentEntity[];
+      if (!this.SelectedFeedbackAssignmentID && this.FeedbackAssignments.length > 0) {
+        this.SelectedFeedbackAssignmentID = this.FeedbackAssignments[0].ID;
       }
     }
   }
@@ -619,6 +692,34 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       }
     } finally {
       this.IsSubmitting = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  public async SubmitSeekerFeedback(): Promise<void> {
+    if (!this.SelectedFeedbackAssignmentID) return;
+    this.IsSubmittingFeedback = true;
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      const result = await ReferralCredentialService.Instance.SubmitReferralFeedback(
+        {
+          ReferralAssignmentID: this.SelectedFeedbackAssignmentID,
+          Rating: Math.max(1, Math.min(5, Number(this.SeekerFeedbackRating) || 5)),
+          OutcomeStatus: this.SeekerFeedbackOutcome,
+          SubmittedByType: 'Seeker',
+          Comments: this.SeekerFeedbackComments.trim() || null,
+        },
+        md.CurrentUser,
+      );
+      this.SeekerFeedbackComments = '';
+      this.StatusBanner = `Seeker feedback saved (${result.AverageRating ?? 'N/A'} ★ avg across ${result.TotalCompletedCount} completed referral(s)).`;
+      this.StatusTone = 'success';
+    } catch (err) {
+      this.StatusBanner = err instanceof Error ? err.message : 'Failed to submit seeker feedback.';
+      this.StatusTone = 'error';
+    } finally {
+      this.IsSubmittingFeedback = false;
       this.cdr.markForCheck();
     }
   }

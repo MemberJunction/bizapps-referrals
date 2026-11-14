@@ -189,7 +189,7 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                       <select [(ngModel)]="FeedbackSubmittedBy">
                         <option value="Professional">Professional</option>
                         <option value="Seeker">Seeker</option>
-                        <option value="Coordinator">Coordinator</option>
+                        <option value="Operator">Operator</option>
                       </select>
                     </label>
                   </div>
@@ -607,30 +607,21 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
     this.cdr.markForCheck();
     try {
       const md = new Metadata();
-      const fb = await md.GetEntityObject<ReferralFeedbackEntity>(
-        'MJ_BizApps_Referrals: Referral Feedbacks',
+      const result = await ReferralCredentialService.Instance.SubmitReferralFeedback(
+        {
+          ReferralAssignmentID: this.SelectedAssignment.ID,
+          ReferralRequestID: this.SelectedAssignment.ReferralRequestID,
+          ProfessionalProfileID: this.SelectedAssignment.ProfessionalProfileID,
+          SubmittedByType: this.FeedbackSubmittedBy,
+          Rating: Math.max(1, Math.min(5, Number(this.FeedbackRating) || 5)),
+          OutcomeStatus: this.FeedbackOutcome,
+          Comments: this.FeedbackComments.trim() || null,
+        },
         md.CurrentUser,
       );
-      fb.NewRecord();
-      fb.ReferralAssignmentID = this.SelectedAssignment.ID;
-      fb.ProfessionalProfileID = this.SelectedAssignment.ProfessionalProfileID;
-      fb.SubmittedByType = this.FeedbackSubmittedBy;
-      fb.Rating = Math.max(1, Math.min(5, Number(this.FeedbackRating) || 5));
-      fb.OutcomeStatus = this.FeedbackOutcome;
-      fb.Comments = this.FeedbackComments.trim() || null;
 
-      const saved = await fb.Save();
-      if (!saved) {
-        this.ActionMessage = fb.LatestResult?.CompleteMessage ?? 'Failed to save referral feedback.';
-        return;
-      }
-
-      const recomputed = await ReferralCredentialService.Instance.RecomputeProfileRatingAndCount(
-        this.SelectedAssignment.ProfessionalProfileID,
-        md.CurrentUser,
-      );
       this.FeedbackComments = '';
-      this.ActionMessage = `Saved ${fb.OutcomeStatus} outcome (${fb.Rating} ★). Profile rating is now ${recomputed.AverageRating ?? 'N/A'} across ${recomputed.TotalCompletedCount} completed referral(s).`;
+      this.ActionMessage = `Saved ${this.FeedbackOutcome} outcome (${this.FeedbackRating} ★). Profile rating is now ${result.AverageRating ?? 'N/A'} across ${result.TotalCompletedCount} completed referral(s).`;
       await this.Refresh();
     } catch (err) {
       this.ActionMessage = err instanceof Error ? err.message : 'Failed to submit referral feedback.';
