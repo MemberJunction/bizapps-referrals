@@ -27,11 +27,21 @@ function makeParams(pairs: Array<[string, string]>): RunActionParams {
 }
 
 describe('Credential Verification MJ Actions', () => {
-  it('VerifyCredentialAction validates required parameters', async () => {
+  it('VerifyCredentialAction validates required parameters and rejects invalid ForceStatus', async () => {
     const action = new VerifyCredentialAction();
     const res = await action.Run(makeParams([['ProfessionalProfileID', 'D2000001-0000-0000-0000-000000000101']]));
     expect(res.Success).toBe(false);
     expect(res.ResultCode).toBe('INVALID_PARAMETERS');
+
+    const badStatus = await action.Run(
+      makeParams([
+        ['ProfessionalProfileID', 'D2000001-0000-0000-0000-000000000101'],
+        ['CredentialCode', 'NY-BAR-441021'],
+        ['ForceStatus', 'SuperVerified'],
+      ]),
+    );
+    expect(badStatus.Success).toBe(false);
+    expect(badStatus.ResultCode).toBe('INVALID_PARAMETERS');
   });
 
   it('VerifyCredentialAction fails closed when no metadata provider is configured', async () => {
@@ -61,14 +71,18 @@ describe('Credential Verification MJ Actions', () => {
     expect(resNoProvider.Success).toBe(false);
   });
 
-  it('ListCredentialProvidersAction returns registered providers JSON', async () => {
+  it('ListCredentialProvidersAction returns registered providers JSON and populates Providers output parameter', async () => {
     const action = new ListCredentialProvidersAction();
-    const res = await action.Run(makeParams([]));
+    const runParams = makeParams([]);
+    const res = await action.Run(runParams);
     expect(res.Success).toBe(true);
     expect(res.ResultCode).toBe('SUCCESS');
     const parsed = JSON.parse(res.Message) as Array<{ ProviderKey: string }>;
     expect(parsed.map((p) => p.ProviderKey)).toEqual(
       expect.arrayContaining(['Manual', 'ExternalAction', 'BizAppsCredentialingBridge']),
     );
+    const outParam = runParams.Params.find((p) => p.Name === 'Providers' && p.Type === 'Output');
+    expect(outParam).toBeDefined();
+    expect(Array.isArray(outParam?.Value)).toBe(true);
   });
 });

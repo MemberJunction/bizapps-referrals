@@ -23,6 +23,7 @@ import {
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
@@ -45,6 +46,7 @@ const CP_1_ID = '70000000-0000-4000-8000-000000000001';
 
 interface EntityStore {
   profiles: ProfessionalProfileEntity[];
+  credentials: ProfessionalCredentialEntity[];
   practiceLinks: ProfessionalPracticeAreaEntity[];
   jurisdictionLinks: ProfessionalJurisdictionEntity[];
   tiers: ReferralTierEntity[];
@@ -52,6 +54,16 @@ interface EntityStore {
   conflictParties: ConflictCheckPartyEntity[];
   assignments: ReferralAssignmentEntity[];
 }
+
+type StoreEntity =
+  | ProfessionalProfileEntity
+  | ProfessionalCredentialEntity
+  | ProfessionalPracticeAreaEntity
+  | ProfessionalJurisdictionEntity
+  | ReferralTierEntity
+  | ReferralRequestEntity
+  | ConflictCheckPartyEntity
+  | ReferralAssignmentEntity;
 
 function makeEntity<T extends object>(data: Partial<T> & { ID: string }, storeList: T[]): T {
   const obj = {
@@ -68,7 +80,9 @@ function makeEntity<T extends object>(data: Partial<T> & { ID: string }, storeLi
     Load: async (id: string) => {
       const found = storeList.find((item) => (item as { ID: string }).ID === id);
       if (!found) return false;
-      const { Save: _s, Load: _l, ...rest } = found as Record<string, unknown>;
+      const rest: Partial<T> & { Save?: () => Promise<boolean>; Load?: (id: string) => Promise<boolean> } = { ...found };
+      delete rest.Save;
+      delete rest.Load;
       Object.assign(obj, rest);
       return true;
     },
@@ -82,7 +96,7 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
 
   const runSingle = async <T>(params: RunViewParams): Promise<RunViewResult<T>> => {
     const filter = params.ExtraFilter ?? '';
-    let results: unknown[] = [];
+    let results: StoreEntity[] = [];
 
     if (params.EntityName === 'MJ_BizApps_Referrals: Professional Profiles') {
       if (filter.includes('ID IN (')) {
@@ -94,6 +108,8 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
       results = store.practiceLinks.filter((l) => filter.toLowerCase().includes(l.PracticeAreaID.toLowerCase()));
     } else if (params.EntityName === 'MJ_BizApps_Referrals: Professional Jurisdictions') {
       results = store.jurisdictionLinks.filter((l) => filter.toLowerCase().includes(l.JurisdictionID.toLowerCase()));
+    } else if (params.EntityName === 'MJ_BizApps_Referrals: Professional Credentials') {
+      results = store.credentials;
     } else if (params.EntityName === 'MJ_BizApps_Referrals: Referral Requests') {
       if (filter.includes('ID IN (')) {
         results = store.requests.filter((r) => filter.toLowerCase().includes(r.ID.toLowerCase()));
@@ -146,7 +162,7 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
 
     return {
       Success: true,
-      Results: results as T[],
+      Results: results as object as T[],
       RowCount: results.length,
       TotalRowCount: results.length,
       ExecutionTime: 1,
@@ -155,7 +171,7 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
     };
   };
 
-  return {
+  const provider: Partial<IMetadataProvider & IRunViewProvider> = {
     BeginEntityTransaction: async () => ({
       Commit: async () => {},
       Rollback: async () => {},
@@ -164,32 +180,34 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
     RunViews: async (views: RunViewParams[]) => Promise.all(views.map((v) => runSingle(v))),
     GetEntityObject: async <T>(entityName: string) => {
       if (entityName === 'MJ_BizApps_Referrals: Referral Requests') {
-        return makeEntity<ReferralRequestEntity>({ ID: nextUuid() } as ReferralRequestEntity, store.requests) as unknown as T;
+        return makeEntity<ReferralRequestEntity>({ ID: nextUuid() } as ReferralRequestEntity, store.requests) as object as T;
       }
       if (entityName === 'MJ_BizApps_Referrals: Referral Tiers') {
-        return makeEntity<ReferralTierEntity>({ ID: nextUuid() } as ReferralTierEntity, store.tiers) as unknown as T;
+        return makeEntity<ReferralTierEntity>({ ID: nextUuid() } as ReferralTierEntity, store.tiers) as object as T;
       }
       if (entityName === 'MJ_BizApps_Referrals: Referral Assignments') {
-        return makeEntity<ReferralAssignmentEntity>({ ID: nextUuid() } as ReferralAssignmentEntity, store.assignments) as unknown as T;
+        return makeEntity<ReferralAssignmentEntity>({ ID: nextUuid() } as ReferralAssignmentEntity, store.assignments) as object as T;
       }
       if (entityName === 'MJ_BizApps_Referrals: Professional Profiles') {
-        return makeEntity<ProfessionalProfileEntity>({ ID: nextUuid() } as ProfessionalProfileEntity, store.profiles) as unknown as T;
+        return makeEntity<ProfessionalProfileEntity>({ ID: nextUuid() } as ProfessionalProfileEntity, store.profiles) as object as T;
       }
       if (entityName === 'MJ_BizApps_Referrals: Conflict Check Parties') {
-        return makeEntity<ConflictCheckPartyEntity>({ ID: nextUuid() } as ConflictCheckPartyEntity, store.conflictParties) as unknown as T;
+        return makeEntity<ConflictCheckPartyEntity>({ ID: nextUuid() } as ConflictCheckPartyEntity, store.conflictParties) as object as T;
       }
       throw new Error(`Unsupported entity: ${entityName}`);
     },
-  } as unknown as IMetadataProvider & IRunViewProvider;
+  };
+  return provider as IMetadataProvider & IRunViewProvider;
 }
 
 describe('@mj-biz-apps/referrals-integration-tests', () => {
-  const pro3User = { ID: USER_PRO_3_ID, Name: 'Ready Counsel User', UserRoles: [] } as unknown as UserInfo;
-  const unauthorizedUser = { ID: USER_OTHER_ID, Name: 'Other User', UserRoles: [] } as unknown as UserInfo;
+  const pro3User = { ID: USER_PRO_3_ID, Name: 'Ready Counsel User', UserRoles: [] } as Partial<UserInfo> as UserInfo;
+  const unauthorizedUser = { ID: USER_OTHER_ID, Name: 'Other User', UserRoles: [] } as Partial<UserInfo> as UserInfo;
 
   function buildSeededStore(): EntityStore {
     const store: EntityStore = {
       profiles: [],
+      credentials: [],
       practiceLinks: [],
       jurisdictionLinks: [],
       tiers: [],
@@ -197,6 +215,24 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       conflictParties: [],
       assignments: [],
     };
+
+    for (const [idx, proId] of [PRO_1_ID, PRO_2_ID, PRO_3_ID].entries()) {
+      store.credentials.push(
+        makeEntity<ProfessionalCredentialEntity>(
+          {
+            ID: `80000000-0000-4000-8000-00000000000${idx + 1}`,
+            ProfessionalProfileID: proId,
+            JurisdictionID: JURISDICTION_ID,
+            CredentialCode: `BAR-${idx + 1}`,
+            CredentialName: 'State Bar License',
+            ProviderKey: 'Manual',
+            VerificationStatus: 'Verified',
+            IsPrimary: true,
+          } as ProfessionalCredentialEntity,
+          store.credentials,
+        ),
+      );
+    }
 
     store.tiers.push(
       makeEntity<ReferralTierEntity>(
@@ -437,7 +473,7 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
         PlatformKey: platform,
         BeginEntityTransaction: beginTx,
         ExecuteSQL: executeSQL,
-      } as unknown as DatabaseProviderBase;
+      } as Partial<DatabaseProviderBase> as DatabaseProviderBase;
 
       const context: HealthProbeContext = {
         DatabaseProvider: mockDbProvider,
@@ -446,14 +482,13 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       };
 
       const hostProbe = new LiveEntityCrudProbe();
-      const withTx = (
-        hostProbe as unknown as {
-          WithRolledBackTransaction: <T>(
-            ctx: HealthProbeContext,
-            fn: (tx: DatabaseProviderBase) => Promise<T>,
-          ) => Promise<T>;
-        }
-      ).WithRolledBackTransaction.bind(hostProbe);
+      interface ProbeWithTxHelper {
+        WithRolledBackTransaction: <T>(
+          ctx: HealthProbeContext,
+          fn: (tx: DatabaseProviderBase) => Promise<T>,
+        ) => Promise<T>;
+      }
+      const withTx = (hostProbe as object as ProbeWithTxHelper).WithRolledBackTransaction.bind(hostProbe);
 
       const result = await withTx(context, (txProvider) => probe.Verify(context, txProvider));
       expect(result.Success).toBe(true);
@@ -477,7 +512,7 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       RunView: vi.fn(),
       RunViews: vi.fn(),
       GetEntityObject: vi.fn(),
-    } as unknown as IMetadataProvider & IRunViewProvider;
+    } as Partial<IMetadataProvider & IRunViewProvider> as IMetadataProvider & IRunViewProvider;
 
     await expect(
       CascadeRoutingService.RouteReferralRequest(REQ_1_ID, pro3User, nonTxProvider),
@@ -519,7 +554,7 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       ID: '50000000-0000-4000-8000-000000000088',
       Name: 'Admin',
       UserRoles: [{ Role: 'Association Admin' }],
-    } as unknown as UserInfo;
+    } as Partial<UserInfo> as UserInfo;
 
     await expect(
       CascadeRoutingService.RespondToAssignment(

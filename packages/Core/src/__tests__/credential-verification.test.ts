@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,6 +18,7 @@ import type {
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralFeedbackEntity,
+  ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 import {
   AuthorizationError,
@@ -38,13 +40,15 @@ const ASSIGN_2_ID = '77777777-7777-4777-8777-777777777777';
 const PA_ID = '88888888-8888-4888-8888-888888888888';
 const JUR_ID = '99999999-9999-4999-8999-999999999999';
 const ADMIN_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const SEEKER_USER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const OUTSIDER_USER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
-function makeUser(roles: string[]): UserInfo {
+function makeUser(roles: string[], id: string = ADMIN_USER_ID, email: string = 'reviewer@example.com'): UserInfo {
   return new UserInfo(undefined, {
-    ID: ADMIN_USER_ID,
+    ID: id,
     Name: 'Test Reviewer',
-    Email: 'reviewer@example.com',
-    UserRoles: roles.map((Role) => ({ UserID: ADMIN_USER_ID, RoleID: '00000000-0000-0000-0000-000000000001', Role })),
+    Email: email,
+    UserRoles: roles.map((Role) => ({ UserID: id, RoleID: '00000000-0000-0000-0000-000000000001', Role })),
   });
 }
 
@@ -60,10 +64,25 @@ interface MockStore {
   profiles: Map<string, ProfessionalProfileEntity>;
   credentials: Map<string, ProfessionalCredentialEntity>;
   assignments: Map<string, ReferralAssignmentEntity>;
+  requests?: Map<string, ReferralRequestEntity>;
   feedbacks: Map<string, ReferralFeedbackEntity>;
   bridgeRows: Array<Record<string, string | null>>;
   failSave?: boolean;
   failRunView?: boolean;
+}
+
+function makeRequestRecord(id: string, seekerEmail: string = 'seeker@example.com'): ReferralRequestEntity {
+  const data: Record<string, string | null> = {
+    ID: id,
+    SeekerEmail: seekerEmail,
+    SeekerPersonID: null,
+    Status: 'Accepted',
+  };
+  return Object.assign(data, {
+    NewRecord: () => undefined,
+    Load: async (loadId: string) => loadId.toLowerCase() === id.toLowerCase(),
+    Save: async () => true,
+  }) as ReferralRequestEntity;
 }
 
 function makeProfileRecord(
@@ -265,6 +284,17 @@ class MockCredentialDataProvider implements IMetadataProvider, IRunViewProvider 
       return base as T;
     }
 
+    if (entityName === 'MJ_BizApps_Referrals: Referral Requests') {
+      const base = makeRequestRecord(REQ_1_ID);
+      base.Load = async (id: string) => {
+        const found = this.store.requests?.get(id.toLowerCase());
+        if (!found) return false;
+        Object.assign(base, found);
+        return true;
+      };
+      return base as T;
+    }
+
     if (entityName === 'MJ_BizApps_Referrals: Referral Feedbacks') {
       const newId = `f0000000-0000-4000-8000-${String(this.seq++).padStart(12, '0')}`;
       return this.attachFeedbackHandlers(makeFeedbackRecord(newId, ASSIGN_1_ID, REQ_1_ID, PROFILE_A_ID)) as T;
@@ -279,8 +309,12 @@ class MockCredentialDataProvider implements IMetadataProvider, IRunViewProvider 
     }
 
     const filter = params.ExtraFilter ?? '';
-    if (params.EntityName === 'MJ_BizAppsCommon: People') {
+    if (params.EntityName === 'MJ_BizApps_Common: People') {
       return { Success: true, Results: [{ ID: PERSON_A_ID }] as T[] } as RunViewResult<T>;
+    }
+    if (params.EntityName === 'MJ_BizApps_Referrals: Referral Requests') {
+      const items = Array.from(this.store.requests?.values() ?? []);
+      return { Success: true, Results: items as T[] } as RunViewResult<T>;
     }
     if (params.EntityName === 'MJ_BizApps_Referrals: Professional Profiles') {
       const items = Array.from(this.store.profiles.values()).filter(
@@ -539,19 +573,35 @@ describe('Pluggable Credential Verification & Security Remediation', () => {
     expect(matchScore.DisqualificationReason).toContain('credential');
   });
 
-  it('CR-09 & CR-10: SubmitReferralFeedback populates ReferralRequestID, prevents duplicates, and counts distinct completed assignments', async () => {
+  it('CR-09 & CR-10: SubmitReferralFeedback populates ReferralRequestID, enforces participant auth, prevents duplicates, and counts distinct completed assignments', async () => {
     const store: MockStore = {
-      profiles: new Map([[PROFILE_A_ID.toLowerCase(), makeProfileRecord(PROFILE_A_ID, 'Verified')]]),
+      profiles: new Map([[PROFILE_A_ID.toLowerCase(), makeProfileRecord(PROFILE_A_ID, 'Verified', null)]]),
       credentials: new Map(),
       assignments: new Map([
         [ASSIGN_1_ID.toLowerCase(), makeAssignmentRecord(ASSIGN_1_ID, REQ_1_ID, PROFILE_A_ID, 'Accepted')],
-        [ASSIGN_2_ID.toLowerCase(), makeAssignmentRecord(ASSIGN_2_ID, REQ_1_ID, PROFILE_A_ID, 'Accepted')],
+        [ASSIGN_2_ID.toLowerCase(), makeAssignmentRecord(ASSIGN_2_ID, REQ_1_ID, PROFILE_A_ID, 'InProgress')],
       ]),
+      requests: new Map([[REQ_1_ID.toLowerCase(), makeRequestRecord(REQ_1_ID, 'seeker@example.com')]]),
       feedbacks: new Map(),
       bridgeRows: [],
     };
     const dp = new MockCredentialDataProvider(store, []);
-    const user = makeUser(['Seeker']);
+    const seekerUser = makeUser(['Seeker'], SEEKER_USER_ID, 'seeker@example.com');
+    const proUser = makeUser(['Professional'], ADMIN_USER_ID, 'counsel@example.com');
+    const outsiderUser = makeUser(['Seeker'], OUTSIDER_USER_ID, 'outsider@example.com');
+
+    await expect(
+      ReferralCredentialService.Instance.SubmitReferralFeedback(
+        {
+          ReferralAssignmentID: ASSIGN_1_ID,
+          Rating: 5,
+          OutcomeStatus: 'Resolved',
+          SubmittedByType: 'Seeker',
+        },
+        outsiderUser,
+        dp,
+      ),
+    ).rejects.toThrow(AuthorizationError);
 
     // Both Seeker and Professional submit feedback for ASSIGN_1_ID -> distinct completed assignments should be 1
     const r1 = await ReferralCredentialService.Instance.SubmitReferralFeedback(
@@ -562,7 +612,7 @@ describe('Pluggable Credential Verification & Security Remediation', () => {
         SubmittedByType: 'Seeker',
         Comments: 'Great work',
       },
-      user,
+      seekerUser,
       dp,
     );
     expect(r1.ReferralRequestID).toBe(REQ_1_ID);
@@ -575,7 +625,7 @@ describe('Pluggable Credential Verification & Security Remediation', () => {
         OutcomeStatus: 'Engaged',
         SubmittedByType: 'Professional',
       },
-      user,
+      proUser,
       dp,
     );
     expect(r2.AverageRating).toBe(4);
@@ -589,7 +639,7 @@ describe('Pluggable Credential Verification & Security Remediation', () => {
         OutcomeStatus: 'Engaged',
         SubmittedByType: 'Professional',
       },
-      user,
+      proUser,
       dp,
     );
     expect(store.feedbacks.size).toBe(2);
@@ -603,10 +653,104 @@ describe('Pluggable Credential Verification & Security Remediation', () => {
         OutcomeStatus: 'Resolved',
         SubmittedByType: 'Seeker',
       },
-      user,
+      seekerUser,
       dp,
     );
     expect(r4.TotalCompletedCount).toBe(2);
+  });
+
+  it('CR-01 & CR-04 & CR-05 Round 2: HMAC verification, bridge VerifiedAt/ambiguity, and 0-credential demotion', async () => {
+    const secret = 'test-hmac-secret-round-2';
+    ExternalActionCredentialProvider.ConfigureAdapter(null);
+    ExternalActionCredentialProvider.ConfigureHmacSecret(secret);
+    const provider = new ExternalActionCredentialProvider();
+    const coordinator = makeUser(['Coordinator']);
+
+    const issuedAtIso = new Date(Date.now() - 60_000).toISOString();
+    const expiresAtIso = new Date(Date.now() + 86_400_000).toISOString();
+    const canonical = `${PROFILE_A_ID}|NY-BAR-HMAC|${issuedAtIso}|${expiresAtIso}`;
+    const validSig = createHmac('sha256', secret).update(canonical).digest('hex');
+
+    const validResult = await provider.VerifyCredential(
+      {
+        ProfessionalProfileID: PROFILE_A_ID,
+        CredentialCode: 'NY-BAR-HMAC',
+        Metadata: {
+          subjectProfileId: PROFILE_A_ID,
+          credentialCode: 'NY-BAR-HMAC',
+          issuedAt: issuedAtIso,
+          expiresAt: expiresAtIso,
+          hmacSignature: validSig,
+        },
+      },
+      coordinator,
+    );
+    expect(validResult.Success).toBe(true);
+    expect(validResult.VerificationStatus).toBe('Verified');
+
+    const tamperedResult = await provider.VerifyCredential(
+      {
+        ProfessionalProfileID: PROFILE_A_ID,
+        CredentialCode: 'NY-BAR-HMAC',
+        Metadata: {
+          subjectProfileId: PROFILE_A_ID,
+          credentialCode: 'NY-BAR-HMAC',
+          issuedAt: issuedAtIso,
+          expiresAt: expiresAtIso,
+          hmacSignature: '0'.repeat(64),
+        },
+      },
+      coordinator,
+    );
+    expect(tamperedResult.Success).toBe(false);
+    expect(tamperedResult.VerificationStatus).toBe('Rejected');
+    ExternalActionCredentialProvider.ConfigureHmacSecret(null);
+
+    // Bridge fails closed on duplicate/ambiguous rows
+    const bridge = new OptionalCredentialingBridgeProvider();
+    const storeAmbiguous: MockStore = {
+      profiles: new Map([[PROFILE_A_ID.toLowerCase(), makeProfileRecord(PROFILE_A_ID)]]),
+      credentials: new Map(),
+      assignments: new Map(),
+      feedbacks: new Map(),
+      bridgeRows: [
+        { ID: '1', PersonID: PERSON_A_ID, CredentialCode: 'DUP-1', VerificationStatus: 'Verified' },
+        { ID: '2', PersonID: PERSON_A_ID, CredentialCode: 'DUP-1', VerificationStatus: 'Revoked' },
+      ],
+    };
+    const dpBridge = new MockCredentialDataProvider(storeAmbiguous, [
+      makeEntityInfo('MJ_BizApps_Credentialing: Credentials', ['ID', 'PersonID', 'CredentialCode']),
+    ]);
+    const ambigResult = await bridge.VerifyCredential(
+      { ProfessionalProfileID: PROFILE_A_ID, CredentialCode: 'DUP-1' },
+      coordinator,
+      dpBridge,
+    );
+    expect(ambigResult.Success).toBe(false);
+    expect(ambigResult.VerificationStatus).toBe('Pending');
+
+    // MatchingEngine rejects Verified profile when credentials array is empty (0 active verified credentials)
+    const zeroCredScore = MatchingEngine.ScoreCandidate({
+      profile: makeProfileRecord(PROFILE_A_ID, 'Verified'),
+      practiceLink: {
+        ProfessionalProfileID: PROFILE_A_ID,
+        PracticeAreaID: PA_ID,
+        ProficiencyLevel: 'Primary',
+        YearsInPractice: 10,
+      } as ProfessionalPracticeAreaEntity,
+      jurisdictionLink: {
+        ProfessionalProfileID: PROFILE_A_ID,
+        JurisdictionID: JUR_ID,
+        StandingStatus: 'GoodStanding',
+        IsPrimary: true,
+      } as ProfessionalJurisdictionEntity,
+      criteria: { PracticeAreaID: PA_ID, JurisdictionID: JUR_ID },
+      conflictParties: [],
+      activeMatterParties: [],
+      credentials: [],
+    });
+    expect(zeroCredScore.Eligible).toBe(false);
+    expect(zeroCredScore.DisqualificationReason).toContain('credential');
   });
 
   it('CR-13: verifies zero handwritten .Get() or .Set() calls across all hand-authored packages', () => {

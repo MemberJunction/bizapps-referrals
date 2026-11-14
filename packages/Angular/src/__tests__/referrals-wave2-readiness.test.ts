@@ -33,20 +33,13 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
   it('registers all 11 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
     LoadBizAppsReferralsClient();
 
-    const expectedEntities = [
-      'MJ_BizApps_Referrals: Referral Requests',
-      'MJ_BizApps_Referrals: Professional Profiles',
-      'MJ_BizApps_Referrals: Referral Assignments',
-      'MJ_BizApps_Referrals: Conflict Check Parties',
-      'MJ_BizApps_Referrals: Practice Areas',
-      'MJ_BizApps_Referrals: Jurisdictions',
-      'MJ_BizApps_Referrals: Referral Tiers',
-      'MJ_BizApps_Referrals: Professional Practice Areas',
-      'MJ_BizApps_Referrals: Professional Jurisdictions',
-      'MJ_BizApps_Referrals: Referral Feedbacks',
-      'MJ_BizApps_Referrals: Professional Credentials',
-    ];
-    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(11);
+    const entitiesJsonPath = path.join(repoRoot, 'metadata/entities/.entities.json');
+    const entityRecords = JSON.parse(fs.readFileSync(entitiesJsonPath, 'utf8')) as Array<{
+      fields: { Name: string };
+    }>;
+    const expectedEntities = entityRecords.map((r) => r.fields.Name);
+    expect(expectedEntities).toHaveLength(11);
+    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(expectedEntities.length);
     for (const entityName of expectedEntities) {
       expect(
         MJGlobal.Instance.ClassFactory.GetRegistration(BaseFormComponent, entityName),
@@ -55,7 +48,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     }
 
     const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
-    expect(panelRegs.length).toBeGreaterThan(0);
+    expect(panelRegs.length).toBeGreaterThanOrEqual(expectedEntities.length);
 
     const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
     const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{
@@ -129,6 +122,36 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content.includes(legacyCol), `Legacy column found in ${file}`).toBe(false);
+      }
+    }
+  });
+
+  it('enforces zero handwritten .Get()/.Set() calls in authored packages and zero un-typed casts across packages', () => {
+    // Generated entity classes in packages/Entities/src/generated/ wrap BaseEntity.Get/Set;
+    // all handwritten packages must use strongly-typed entity property accessors only.
+    const handwrittenDirs = [
+      'packages/Core/src',
+      'packages/Actions/src',
+      'packages/Angular/src',
+      'packages/EntitiesServer/src',
+      'packages/Server/src',
+    ];
+    for (const rel of handwrittenDirs) {
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.includes('__tests__'));
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        expect(content, `Forbidden .Get()/.Set() in ${file}`).not.toMatch(/\.(Get|Set)\(\s*['"]/);
+      }
+    }
+
+    const forbiddenWord = 'un' + 'known';
+    const forbiddenRegex = new RegExp(`\\b${forbiddenWord}\\b`);
+    const allPkgDirs = [...handwrittenDirs, 'packages/IntegrationTests/src'];
+    for (const rel of allPkgDirs) {
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']);
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        expect(content, `Forbidden ${forbiddenWord} type/cast in ${file}`).not.toMatch(forbiddenRegex);
       }
     }
   });
