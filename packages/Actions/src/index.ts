@@ -1,4 +1,4 @@
-import { ActionResultSimple, RunActionParams } from '@memberjunction/actions-base';
+import { ActionParam, ActionResultSimple, RunActionParams } from '@memberjunction/actions-base';
 import { BaseAction } from '@memberjunction/actions';
 import {
   BaseRemotableOperation,
@@ -16,9 +16,12 @@ import {
   CascadeRoutingService,
   CascadeRoutingResult,
   ConflictPartyInput,
+  CredentialVerificationStatus,
+  LoadCredentialProviders,
   MatchCandidateScore,
   MatchCriteria,
   MatchingEngine,
+  ReferralCredentialService,
   ReferralRequestStatus,
   ResponseOutcome,
   SweepResult,
@@ -445,6 +448,132 @@ export class SubmitReferralIntakeAction extends BaseAction {
   }
 }
 
+@RegisterClass(BaseAction, 'Referrals.VerifyCredential')
+export class VerifyCredentialAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const profileId = getStringParam(params, 'ProfessionalProfileID');
+    const credentialCode = getStringParam(params, 'CredentialCode');
+    if (!profileId || !credentialCode) {
+      return {
+        Success: false,
+        ResultCode: 'INVALID_PARAMETERS',
+        Message: 'ProfessionalProfileID and CredentialCode are required.',
+      };
+    }
+
+    const forceStatusRaw = getStringParam(params, 'ForceStatus');
+    const allowedStatuses: ReadonlyArray<CredentialVerificationStatus> = [
+      'Pending',
+      'Verified',
+      'Rejected',
+      'Expired',
+      'Revoked',
+    ];
+    let forceStatus: CredentialVerificationStatus | undefined;
+    if (forceStatusRaw !== undefined) {
+      const matched = allowedStatuses.find((s) => s === forceStatusRaw);
+      if (!matched) {
+        return {
+          Success: false,
+          ResultCode: 'INVALID_PARAMETERS',
+          Message: `Invalid ForceStatus '${forceStatusRaw}'. Allowed values: ${allowedStatuses.join(', ')}.`,
+        };
+      }
+      forceStatus = matched;
+    }
+
+    try {
+      const result = await ReferralCredentialService.Instance.VerifyAndPersistCredential(
+        {
+          ProfessionalProfileID: profileId,
+          ProfessionalCredentialID: getStringParam(params, 'ProfessionalCredentialID'),
+          CredentialCode: credentialCode,
+          CredentialName: getStringParam(params, 'CredentialName'),
+          LicenseNumber: getStringParam(params, 'LicenseNumber'),
+          IssuerName: getStringParam(params, 'IssuerName'),
+          JurisdictionID: getStringParam(params, 'JurisdictionID'),
+          ExternalReferenceID: getStringParam(params, 'ExternalReferenceID'),
+          EvidenceURL: getStringParam(params, 'EvidenceURL'),
+          ProviderKey: getStringParam(params, 'ProviderKey') ?? 'Manual',
+          ForceStatus: forceStatus,
+        },
+        params.ContextUser,
+        resolveActionProvider(),
+      );
+
+      return {
+        Success: result.Success,
+        ResultCode: result.Success ? 'SUCCESS' : 'VERIFICATION_FAILED',
+        Message: JSON.stringify(result),
+      };
+    } catch (error) {
+      return {
+        Success: false,
+        ResultCode: error instanceof Error ? error.name : 'VERIFICATION_ERROR',
+        Message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.SyncProfileCredentials')
+export class SyncProfileCredentialsAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const profileId = getStringParam(params, 'ProfessionalProfileID');
+    if (!profileId) {
+      return {
+        Success: false,
+        ResultCode: 'INVALID_PARAMETERS',
+        Message: 'ProfessionalProfileID is required.',
+      };
+    }
+
+    const providerKey = getStringParam(params, 'ProviderKey') ?? 'Manual';
+    try {
+      const result = await ReferralCredentialService.Instance.SyncProfileCredentials(
+        profileId,
+        providerKey,
+        params.ContextUser,
+        resolveActionProvider(),
+      );
+
+      return {
+        Success: result.Success,
+        ResultCode: result.Success ? 'SUCCESS' : 'SYNC_FAILED',
+        Message: JSON.stringify(result),
+      };
+    } catch (error) {
+      return {
+        Success: false,
+        ResultCode: error instanceof Error ? error.name : 'SYNC_ERROR',
+        Message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.ListCredentialProviders')
+export class ListCredentialProvidersAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const providers = ReferralCredentialService.Instance.ListProviders(resolveActionProvider());
+    const existingOutput = params.Params?.find((p) => p.Name === 'Providers');
+    if (existingOutput) {
+      existingOutput.Value = providers;
+    } else if (params.Params) {
+      const outputParam = new ActionParam();
+      outputParam.Name = 'Providers';
+      outputParam.Type = 'Output';
+      outputParam.Value = providers;
+      params.Params.push(outputParam);
+    }
+    return {
+      Success: true,
+      ResultCode: 'SUCCESS',
+      Message: JSON.stringify(providers),
+    };
+  }
+}
+
 export function LoadReferralsActions(): void {
-  // Ensures module side-effect class registrations are preserved by bundlers.
+  LoadCredentialProviders();
 }

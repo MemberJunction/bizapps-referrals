@@ -51,23 +51,23 @@ export interface FinderMatchItem {
     :host {
       display: block;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #1e293b;
+      color: var(--mj-text-primary);
       box-sizing: border-box;
       max-width: 1080px;
       margin: 0 auto;
     }
     *, *:before, *:after { box-sizing: inherit; }
     .finder-container {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
+      background: var(--mj-bg-surface);
+      border: 1px solid var(--mj-border-default);
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 6px -1px var(--mj-shadow-color), 0 2px 4px -2px var(--mj-shadow-color);
     }
     .finder-header {
       padding: 1.5rem 2rem;
-      background: linear-gradient(135deg, var(--mj-finder-accent, #1e40af), #1e293b);
-      color: #ffffff;
+      background: linear-gradient(135deg, var(--mj-finder-accent, var(--mj-brand-primary)), var(--mj-text-primary));
+      color: var(--mj-bg-surface);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -78,24 +78,24 @@ export interface FinderMatchItem {
       margin: 0 0 0.25rem 0;
       font-size: 1.4rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--mj-bg-surface);
     }
     .finder-title-group p {
       margin: 0;
       font-size: 0.9rem;
-      color: #cbd5e1;
+      color: var(--mj-border-default);
     }
     .domain-badge {
       display: inline-flex;
       align-items: center;
       gap: 0.35rem;
-      background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: var(--mj-bg-surface-hover);
+      border: 1px solid var(--mj-border-default);
       padding: 0.3rem 0.75rem;
       border-radius: 999px;
       font-size: 0.75rem;
       font-weight: 600;
-      color: #ffffff;
+      color: var(--mj-bg-surface);
     }
     .finder-body {
       padding: 1.5rem 2rem;
@@ -116,21 +116,21 @@ export interface FinderMatchItem {
     .form-group label {
       font-size: 0.8rem;
       font-weight: 600;
-      color: #475569;
+      color: var(--mj-text-secondary);
     }
     .form-control {
       padding: 0.6rem 0.8rem;
-      border: 1px solid #cbd5e1;
+      border: 1px solid var(--mj-border-default);
       border-radius: 6px;
       font-size: 0.88rem;
-      color: #1e293b;
-      background: #ffffff;
+      color: var(--mj-text-primary);
+      background: var(--mj-bg-surface);
       outline: none;
       transition: border-color 0.15s ease-in-out;
     }
     .form-control:focus {
-      border-color: var(--mj-finder-accent, #1e40af);
-      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.15);
+      border-color: var(--mj-finder-accent, var(--mj-brand-primary));
+      box-shadow: 0 0 0 3px var(--mj-bg-surface-hover);
     }
     .search-actions {
       display: flex;
@@ -149,19 +149,19 @@ export interface FinderMatchItem {
       transition: all 0.15s ease-in-out;
     }
     .btn-primary {
-      background: var(--mj-finder-accent, #1e40af);
-      color: #ffffff;
+      background: var(--mj-finder-accent, var(--mj-brand-primary));
+      color: var(--mj-bg-surface);
     }
     .btn-primary:hover {
       opacity: 0.92;
     }
     .btn-secondary {
-      background: #f1f5f9;
-      color: #334155;
-      border-color: #cbd5e1;
+      background: var(--mj-bg-surface-sunken);
+      color: var(--mj-text-primary);
+      border-color: var(--mj-border-default);
     }
     .btn-secondary:hover {
-      background: #e2e8f0;
+      background: var(--mj-border-default);
     }
     .results-grid {
       display: grid;
@@ -170,10 +170,10 @@ export interface FinderMatchItem {
       margin-top: 0.5rem;
     }
     .pro-card {
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--mj-border-default);
       border-radius: 8px;
       padding: 1rem 1.25rem;
-      background: #ffffff;
+      background: var(--mj-bg-surface);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -182,7 +182,7 @@ export interface FinderMatchItem {
     }
     .pro-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 6px -1px var(--mj-shadow-color);
     }
     .card-top {
       display: flex;
@@ -193,18 +193,18 @@ export interface FinderMatchItem {
     .card-title {
       font-size: 1rem;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--mj-text-primary);
       margin: 0;
     }
     .card-firm {
       font-size: 0.82rem;
-      color: #64748b;
+      color: var(--mj-text-muted);
       margin-top: 0.15rem;
     }
     .score-badge {
-      background: #ecfdf5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
+      background: var(--mj-status-success-bg);
+      color: var(--mj-status-success-text);
+      border: 1px solid var(--mj-status-success-border);
       padding: 0.2rem 0.5rem;
       border-radius: 999px;
       font-size: 0.75rem;
@@ -217,25 +217,25 @@ export interface FinderMatchItem {
       margin: 0.25rem 0;
     }
     .reason-chip {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      background: var(--mj-bg-page);
+      border: 1px solid var(--mj-border-default);
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.74rem;
-      color: #334155;
+      color: var(--mj-text-primary);
     }
     .card-stats {
       display: flex;
       gap: 1rem;
       font-size: 0.78rem;
-      color: #64748b;
-      border-top: 1px solid #f1f5f9;
+      color: var(--mj-text-muted);
+      border-top: 1px solid var(--mj-bg-surface-sunken);
       padding-top: 0.5rem;
     }
     .intake-modal-backdrop {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 23, 42, 0.6);
+      background: var(--mj-bg-overlay);
       backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
@@ -244,14 +244,14 @@ export interface FinderMatchItem {
       padding: 1rem;
     }
     .intake-modal {
-      background: #ffffff;
+      background: var(--mj-bg-surface);
       border-radius: 12px;
       max-width: 600px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
       padding: 1.5rem 2rem;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 20px 25px -5px var(--mj-shadow-color), 0 10px 10px -5px var(--mj-shadow-color);
     }
   `],
   template: `
@@ -300,7 +300,7 @@ export interface FinderMatchItem {
         </div>
 
         <div class="search-actions">
-          <label style="font-size: 0.8rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem;">
+          <label style="font-size: 0.8rem; color: var(--mj-text-muted); display: flex; align-items: center; gap: 0.35rem;">
             <input type="checkbox" [(ngModel)]="RequiresProBono" />
             Accepts Pro Bono / Financial Need
           </label>
@@ -350,7 +350,7 @@ export interface FinderMatchItem {
             }
           </div>
         } @else if (HasSearched && !IsSearching) {
-          <div style="text-align: center; padding: 2rem; color: #64748b;">
+          <div style="text-align: center; padding: 2rem; color: var(--mj-text-muted);">
             <p>No verified {{ Vocab.ProfessionalPluralLabel }} matched your current criteria.</p>
           </div>
         }
@@ -361,7 +361,7 @@ export interface FinderMatchItem {
         <div class="intake-modal-backdrop" (click)="CloseIntake()">
           <div class="intake-modal" (click)="$event.stopPropagation()">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-              <h3 style="margin: 0; font-size: 1.2rem; color: #0f172a;">
+              <h3 style="margin: 0; font-size: 1.2rem; color: var(--mj-text-primary);">
                 Request Referral with {{ SelectedPro.DisplayName }}
               </h3>
               <button type="button" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;" (click)="CloseIntake()">✕</button>
@@ -401,13 +401,13 @@ export interface FinderMatchItem {
               }
 
               @if (IntakeErrorMessage) {
-                <div style="padding: 0.5rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 6px; font-size: 0.82rem;">
+                <div style="padding: 0.5rem; background: var(--mj-status-error-bg); border: 1px solid var(--mj-status-error-border); color: var(--mj-status-error-text); border-radius: 6px; font-size: 0.82rem;">
                   {{ IntakeErrorMessage }}
                 </div>
               }
 
               @if (IntakeSuccessMessage) {
-                <div style="padding: 0.75rem; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 6px; font-size: 0.88rem; font-weight: 600;">
+                <div style="padding: 0.75rem; background: var(--mj-status-success-bg); border: 1px solid var(--mj-status-success-border); color: var(--mj-status-success-text); border-radius: 6px; font-size: 0.88rem; font-weight: 600;">
                   {{ IntakeSuccessMessage }}
                 </div>
               } @else {
@@ -443,7 +443,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
   }
 
   @Input('accent-color')
-  public AccentColor: string = '#1e40af';
+  public AccentColor: string = 'var(--mj-brand-primary)';
 
   @Input('api-url')
   public ApiUrl: string = '';
@@ -612,7 +612,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
 
         this.Matches = matchItems.sort((a, b) => b.Score - a.Score);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.warn('Matching execution fallback:', err);
     } finally {
       this.IsSearching = false;
@@ -734,7 +734,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
       } else {
         this.IntakeErrorMessage = 'Failed to submit referral request. Please try again.';
       }
-    } catch (err: unknown) {
+    } catch (err) {
       this.IntakeErrorMessage = err instanceof Error ? err.message : 'An error occurred while submitting.';
     } finally {
       this.IsSubmittingIntake = false;

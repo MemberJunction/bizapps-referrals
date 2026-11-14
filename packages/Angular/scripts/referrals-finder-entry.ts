@@ -31,6 +31,6 @@ void createApplication({
       customElements.define('mj-referrals-finder', el);
     }
   })
-  .catch((err: unknown) => {
+  .catch((err: Error) => {
     console.error('[mj-referrals-finder] bootstrap failed', err);
   });

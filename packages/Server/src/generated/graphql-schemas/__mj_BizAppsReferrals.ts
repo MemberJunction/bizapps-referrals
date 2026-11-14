@@ -1062,7 +1062,7 @@ export class mjBizAppsReferralsProfessionalProfile_ {
         
     @Field({nullable: true}) 
     @MaxLength(100)
-    BarOrLicenseNumber?: string;
+    LicenseNumber?: string;
         
     @Field({nullable: true}) 
     @MaxLength(30)
@@ -1168,7 +1168,7 @@ export class CreatemjBizAppsReferralsProfessionalProfileInput {
     Phone: string | null;
 
     @Field(() => String, { nullable: true })
-    BarOrLicenseNumber: string | null;
+    LicenseNumber: string | null;
 
     @Field({ nullable: true })
     VerificationStatus?: string;
@@ -1253,7 +1253,7 @@ export class UpdatemjBizAppsReferralsProfessionalProfileInput {
     Phone?: string | null;
 
     @Field(() => String, { nullable: true })
-    BarOrLicenseNumber?: string | null;
+    LicenseNumber?: string | null;
 
     @Field({ nullable: true })
     VerificationStatus?: string;
@@ -2423,4 +2423,292 @@ export class mjBizAppsReferralsReferralTierResolver extends ResolverBase {
         return this.DeleteRecord('MJ_BizApps_Referrals: Referral Tiers', key, options, provider, userPayload, pubSub);
     }
     
+}
+
+
+//****************************************************************************
+// ENTITY CLASS for MJ_BizApps_Referrals: Professional Credentials
+//****************************************************************************
+@ObjectType({ description: "Normalized professional credentials, licenses, certifications, and verification provider records linked to a ProfessionalProfile." })
+export class mjBizAppsReferralsProfessionalCredential_ {
+    @Field()
+    @MaxLength(36)
+    ID: string;
+
+    @Field()
+    @MaxLength(36)
+    ProfessionalProfileID: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    JurisdictionID?: string;
+
+    @Field()
+    @MaxLength(100)
+    CredentialCode: string;
+
+    @Field()
+    @MaxLength(255)
+    CredentialName: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    IssuerName?: string;
+
+    @Field()
+    @MaxLength(100)
+    ProviderKey: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    ExternalReferenceID?: string;
+
+    @Field()
+    @MaxLength(30)
+    VerificationStatus: string;
+
+    @Field(() => Date, {nullable: true})
+    IssuedAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    ExpiresAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    VerifiedAt?: Date;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    VerifiedByPersonID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(1000)
+    EvidenceURL?: string;
+
+    @Field({nullable: true})
+    MetadataJSON?: string;
+
+    @Field(() => Boolean)
+    IsPrimary: boolean;
+
+    @Field(() => Date)
+    __mj_CreatedAt: Date;
+
+    @Field(() => Date)
+    __mj_UpdatedAt: Date;
+
+    @Field({nullable: true})
+    ProfessionalProfile?: string;
+
+    @Field({nullable: true})
+    Jurisdiction?: string;
+
+    @Field({nullable: true})
+    VerifiedByPerson?: string;
+}
+
+@InputType()
+export class CreatemjBizAppsReferralsProfessionalCredentialInput {
+    @Field({nullable: true})
+    @MaxLength(36)
+    ID?: string;
+
+    @Field()
+    @MaxLength(36)
+    ProfessionalProfileID: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    JurisdictionID?: string;
+
+    @Field()
+    @MaxLength(100)
+    CredentialCode: string;
+
+    @Field()
+    @MaxLength(255)
+    CredentialName: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    IssuerName?: string;
+
+    @Field({nullable: true})
+    @MaxLength(100)
+    ProviderKey?: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    ExternalReferenceID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(30)
+    VerificationStatus?: string;
+
+    @Field(() => Date, {nullable: true})
+    IssuedAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    ExpiresAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    VerifiedAt?: Date;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    VerifiedByPersonID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(1000)
+    EvidenceURL?: string;
+
+    @Field({nullable: true})
+    MetadataJSON?: string;
+
+    @Field(() => Boolean, {nullable: true})
+    IsPrimary?: boolean;
+}
+
+@InputType()
+export class UpdatemjBizAppsReferralsProfessionalCredentialInput {
+    @Field()
+    @MaxLength(36)
+    ID: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    ProfessionalProfileID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    JurisdictionID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(100)
+    CredentialCode?: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    CredentialName?: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    IssuerName?: string;
+
+    @Field({nullable: true})
+    @MaxLength(100)
+    ProviderKey?: string;
+
+    @Field({nullable: true})
+    @MaxLength(255)
+    ExternalReferenceID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(30)
+    VerificationStatus?: string;
+
+    @Field(() => Date, {nullable: true})
+    IssuedAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    ExpiresAt?: Date;
+
+    @Field(() => Date, {nullable: true})
+    VerifiedAt?: Date;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    VerifiedByPersonID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(1000)
+    EvidenceURL?: string;
+
+    @Field({nullable: true})
+    MetadataJSON?: string;
+
+    @Field(() => Boolean, {nullable: true})
+    IsPrimary?: boolean;
+}
+
+@ObjectType()
+export class RunmjBizAppsReferralsProfessionalCredentialViewResult {
+    @Field(() => [mjBizAppsReferralsProfessionalCredential_])
+    Results: mjBizAppsReferralsProfessionalCredential_[];
+
+    @Field(() => String, {nullable: true})
+    UserViewRunID?: string;
+
+    @Field(() => Int, {nullable: true})
+    RowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    TotalRowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    ExecutionTime: number;
+
+    @Field({nullable: true})
+    ErrorMessage?: string;
+
+    @Field(() => Boolean, {nullable: false})
+    Success: boolean;
+}
+
+@Resolver(mjBizAppsReferralsProfessionalCredential_)
+export class mjBizAppsReferralsProfessionalCredentialResolver extends ResolverBase {
+    @Query(() => RunmjBizAppsReferralsProfessionalCredentialViewResult)
+    async RunmjBizAppsReferralsProfessionalCredentialViewByID(@Arg('input', () => RunViewByIDInput) input: RunViewByIDInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByIDGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsProfessionalCredentialViewResult)
+    async RunmjBizAppsReferralsProfessionalCredentialViewByName(@Arg('input', () => RunViewByNameInput) input: RunViewByNameInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByNameGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsProfessionalCredentialViewResult)
+    async RunmjBizAppsReferralsProfessionalCredentialDynamicView(@Arg('input', () => RunDynamicViewInput) input: RunDynamicViewInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        input.EntityName = 'MJ_BizApps_Referrals: Professional Credentials';
+        return super.RunDynamicViewGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => mjBizAppsReferralsProfessionalCredential_, { nullable: true })
+    async mjBizAppsReferralsProfessionalCredential(@Arg('ID', () => String) ID: string, @Ctx() { userPayload, providers }: AppContext, @PubSub() pubSub: PubSubEngine): Promise<mjBizAppsReferralsProfessionalCredential_ | null> {
+        this.CheckUserReadPermissions('MJ_BizApps_Referrals: Professional Credentials', userPayload);
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        const sSQL = `SELECT * FROM ${provider.QuoteSchemaAndView('__mj_BizAppsReferrals', 'vwProfessionalCredentials')} WHERE ${provider.QuoteIdentifier('ID')}=${provider.BuildParameterPlaceholder(0)} ` + this.getRowLevelSecurityWhereClause(provider, 'MJ_BizApps_Referrals: Professional Credentials', userPayload, EntityPermissionType.Read, 'AND');
+        const rows = await provider.ExecuteSQL(sSQL, [ID], undefined, this.GetUserFromPayload(userPayload));
+        const result = await this.MapFieldNamesToCodeNames('MJ_BizApps_Referrals: Professional Credentials', rows && rows.length > 0 ? rows[0] : null, this.GetUserFromPayload(userPayload));
+        return result;
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalCredential_)
+    async CreatemjBizAppsReferralsProfessionalCredential(
+        @Arg('input', () => CreatemjBizAppsReferralsProfessionalCredentialInput) input: CreatemjBizAppsReferralsProfessionalCredentialInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.CreateRecord('MJ_BizApps_Referrals: Professional Credentials', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalCredential_)
+    async UpdatemjBizAppsReferralsProfessionalCredential(
+        @Arg('input', () => UpdatemjBizAppsReferralsProfessionalCredentialInput) input: UpdatemjBizAppsReferralsProfessionalCredentialInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.UpdateRecord('MJ_BizApps_Referrals: Professional Credentials', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalCredential_)
+    async DeletemjBizAppsReferralsProfessionalCredential(@Arg('ID', () => String) ID: string, @Arg('options___', () => DeleteOptionsInput) options: DeleteOptionsInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadWriteProvider(providers);
+        const key = new CompositeKey([{FieldName: 'ID', Value: ID}]);
+        return this.DeleteRecord('MJ_BizApps_Referrals: Professional Credentials', key, options, provider, userPayload, pubSub);
+    }
 }

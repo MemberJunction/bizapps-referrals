@@ -62,9 +62,9 @@ This single command:
 
 1. Fetches `mj-app.json` and validates MJ version compatibility (`>=6.2.1 <7.0.0`)
 2. Resolves dependencies: [BizApps Common](https://github.com/MemberJunction/bizapps-common) and [BizApps Tasks](https://github.com/MemberJunction/bizapps-tasks)
-3. Creates the `__mj_BizAppsReferrals` schema and deploys all 10 tables via Skyway migrations
-4. Syncs application, action, practice-area, jurisdiction, and referral-tier metadata
-5. Installs and wires `@mj-biz-apps/referrals-server` and `@mj-biz-apps/referrals-ng`
+3. Creates the `__mj_BizAppsReferrals` schema and deploys all 11 tables (including `ProfessionalCredential` and normalized `ProfessionalProfile.LicenseNumber`) via dual-dialect SQL Server & PostgreSQL Skyway migrations
+4. Syncs application, entity, action, practice-area, jurisdiction, and referral-tier metadata
+5. Installs and wires `@mj-biz-apps/referrals-server`, `@mj-biz-apps/referrals-entities-server`, and `@mj-biz-apps/referrals-ng`
 
 ### Managing an installed app
 
@@ -147,6 +147,15 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **Custom Entity Forms (`BaseFormPanel`)**:
   - `ReferralRequestHeroPanel` — intake status, conflict screening summary, and `Candidate Cascade Ladder`
   - `ProfessionalProfileHeroPanel` — bar/license verification audit, capacity & routing policy, and historical acceptance/rating metrics
+
+---
+
+## Wave 2: Normalized Credentials & Pluggable Verification
+
+- **Normalized Schema (`V202611141200`)**: Replaces the legacy profile-level license column with `ProfessionalProfile.LicenseNumber` and adds `[__mj_BizAppsReferrals].[ProfessionalCredential]` across both SQL Server (`migrations/`) and PostgreSQL (`migrations-pg/`), including views, CRUD procedures, and MJ entity metadata.
+- **Pluggable Verification Providers (`@mj-biz-apps/referrals-core`)**: `ReferralCredentialService` supports `Manual` (coordinator/admin-verified with `ContextUser` derivation), `ExternalAction` (requires configured adapter or HMAC-SHA256 signed verification payload; fails closed), and `BizAppsCredentialingBridge` (dynamic discovery of `MJ_BizApps_Credentialing` entities with person-level subject matching and ambiguity fail-closed).
+- **Credential Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.VerifyCredential`, `Referrals.SyncProfileCredentials`, and `Referrals.ListCredentialProviders`.
+- **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: Includes `Directory & Pros` (`ReferralsCredentialDirectoryResource`), `BaseFormComponent` + `BaseFormPanel` registrations for all 11 entities, and `--mj-*` design token compliance.
 
 ---
 

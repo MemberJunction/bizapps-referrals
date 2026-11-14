@@ -1,0 +1,7 @@
+{
+  "entity": "MJ: AI Agents",
+  "filePattern": "**/.*.json",
+  "defaults": {
+    "Status": "Active"
+  }
+}

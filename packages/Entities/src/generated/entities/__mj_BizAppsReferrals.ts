@@ -355,9 +355,9 @@ export const mjBizAppsReferralsProfessionalProfileSchema = z.object({
         * * Field Name: Phone
         * * Display Name: Phone
         * * SQL Data Type: nvarchar(50)`),
-    BarOrLicenseNumber: z.string().nullable().describe(`
-        * * Field Name: BarOrLicenseNumber
-        * * Display Name: Bar or License Number
+    LicenseNumber: z.string().nullable().describe(`
+        * * Field Name: LicenseNumber
+        * * Display Name: License Number
         * * SQL Data Type: nvarchar(100)`),
     VerificationStatus: z.union([z.literal('Expired'), z.literal('Pending'), z.literal('Suspended'), z.literal('Verified')]).describe(`
         * * Field Name: VerificationStatus
@@ -1912,15 +1912,15 @@ export class mjBizAppsReferralsProfessionalProfileEntity extends BaseEntity<mjBi
     }
 
     /**
-    * * Field Name: BarOrLicenseNumber
-    * * Display Name: Bar or License Number
+    * * Field Name: LicenseNumber
+    * * Display Name: License Number
     * * SQL Data Type: nvarchar(100)
     */
-    get BarOrLicenseNumber(): string | null {
-        return this.Get('BarOrLicenseNumber');
+    get LicenseNumber(): string | null {
+        return this.Get('LicenseNumber');
     }
-    set BarOrLicenseNumber(value: string | null) {
-        this.Set('BarOrLicenseNumber', value);
+    set LicenseNumber(value: string | null) {
+        this.Set('LicenseNumber', value);
     }
 
     /**
@@ -3265,5 +3265,365 @@ export class mjBizAppsReferralsReferralTierEntity extends BaseEntity<mjBizAppsRe
     */
     get __mj_UpdatedAt(): Date {
         return this.Get('__mj_UpdatedAt');
+    }
+}
+
+
+export const mjBizAppsReferralsProfessionalCredentialSchema = z.object({
+    ID: z.string().describe(`
+        * * Field Name: ID
+        * * Display Name: ID
+        * * SQL Data Type: uniqueidentifier
+        * * Default Value: newsequentialid()`),
+    ProfessionalProfileID: z.string().describe(`
+        * * Field Name: ProfessionalProfileID
+        * * Display Name: Professional Profile
+        * * SQL Data Type: uniqueidentifier
+        * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
+    JurisdictionID: z.string().nullable().describe(`
+        * * Field Name: JurisdictionID
+        * * Display Name: Jurisdiction
+        * * SQL Data Type: uniqueidentifier
+        * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Jurisdictions (vwJurisdictions.ID)`),
+    CredentialCode: z.string().describe(`
+        * * Field Name: CredentialCode
+        * * Display Name: Credential Code
+        * * SQL Data Type: nvarchar(100)`),
+    CredentialName: z.string().describe(`
+        * * Field Name: CredentialName
+        * * Display Name: Credential Name
+        * * SQL Data Type: nvarchar(255)`),
+    IssuerName: z.string().nullable().describe(`
+        * * Field Name: IssuerName
+        * * Display Name: Issuer Name
+        * * SQL Data Type: nvarchar(255)`),
+    ProviderKey: z.string().describe(`
+        * * Field Name: ProviderKey
+        * * Display Name: Provider Key
+        * * SQL Data Type: nvarchar(100)
+        * * Default Value: Manual`),
+    ExternalReferenceID: z.string().nullable().describe(`
+        * * Field Name: ExternalReferenceID
+        * * Display Name: External Reference ID
+        * * SQL Data Type: nvarchar(255)`),
+    VerificationStatus: z.union([z.literal('Expired'), z.literal('Pending'), z.literal('Rejected'), z.literal('Revoked'), z.literal('Verified')]).describe(`
+        * * Field Name: VerificationStatus
+        * * Display Name: Verification Status
+        * * SQL Data Type: nvarchar(30)
+        * * Default Value: Pending
+    * * Value List Type: List
+    * * Possible Values 
+    *   * Expired
+    *   * Pending
+    *   * Rejected
+    *   * Revoked
+    *   * Verified`),
+    IssuedAt: z.date().nullable().describe(`
+        * * Field Name: IssuedAt
+        * * Display Name: Issued At
+        * * SQL Data Type: datetimeoffset`),
+    ExpiresAt: z.date().nullable().describe(`
+        * * Field Name: ExpiresAt
+        * * Display Name: Expires At
+        * * SQL Data Type: datetimeoffset`),
+    VerifiedAt: z.date().nullable().describe(`
+        * * Field Name: VerifiedAt
+        * * Display Name: Verified At
+        * * SQL Data Type: datetimeoffset`),
+    VerifiedByPersonID: z.string().nullable().describe(`
+        * * Field Name: VerifiedByPersonID
+        * * Display Name: Verified By Person
+        * * SQL Data Type: uniqueidentifier
+        * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    EvidenceURL: z.string().nullable().describe(`
+        * * Field Name: EvidenceURL
+        * * Display Name: Evidence URL
+        * * SQL Data Type: nvarchar(1000)`),
+    MetadataJSON: z.string().nullable().describe(`
+        * * Field Name: MetadataJSON
+        * * Display Name: Metadata JSON
+        * * SQL Data Type: nvarchar(MAX)`),
+    IsPrimary: z.boolean().describe(`
+        * * Field Name: IsPrimary
+        * * Display Name: Is Primary
+        * * SQL Data Type: bit
+        * * Default Value: 0`),
+    __mj_CreatedAt: z.date().describe(`
+        * * Field Name: __mj_CreatedAt
+        * * Display Name: Created At
+        * * SQL Data Type: datetimeoffset
+        * * Default Value: getutcdate()`),
+    __mj_UpdatedAt: z.date().describe(`
+        * * Field Name: __mj_UpdatedAt
+        * * Display Name: Updated At
+        * * SQL Data Type: datetimeoffset
+        * * Default Value: getutcdate()`),
+    ProfessionalProfile: z.string().optional().nullable().describe(`
+        * * Field Name: ProfessionalProfile
+        * * Display Name: Professional Profile
+        * * SQL Data Type: nvarchar(200)`),
+    Jurisdiction: z.string().optional().nullable().describe(`
+        * * Field Name: Jurisdiction
+        * * Display Name: Jurisdiction
+        * * SQL Data Type: nvarchar(150)`),
+    VerifiedByPerson: z.string().optional().nullable().describe(`
+        * * Field Name: VerifiedByPerson
+        * * Display Name: Verified By Person
+        * * SQL Data Type: nvarchar(255)`),
+});
+
+export type mjBizAppsReferralsProfessionalCredentialEntityType = z.infer<typeof mjBizAppsReferralsProfessionalCredentialSchema>;
+
+/**
+ * Strongly-typed Entity Subclass for the MJ_BizApps_Referrals: Professional Credentials entity.
+ * Normalized professional credentials, licenses, certifications, and verification provider records linked to a ProfessionalProfile.
+ */
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Credentials')
+export class mjBizAppsReferralsProfessionalCredentialEntity extends BaseEntity<mjBizAppsReferralsProfessionalCredentialEntityType> {
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]): Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
+    /**
+    * * Field Name: ID
+    * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()
+    */
+    get ID(): string {
+        return this.Get('ID');
+    }
+    set ID(value: string) {
+        this.Set('ID', value);
+    }
+
+    /**
+    * * Field Name: ProfessionalProfileID
+    * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    */
+    get ProfessionalProfileID(): string {
+        return this.Get('ProfessionalProfileID');
+    }
+    set ProfessionalProfileID(value: string) {
+        this.Set('ProfessionalProfileID', value);
+    }
+
+    /**
+    * * Field Name: JurisdictionID
+    * * Display Name: Jurisdiction
+    * * SQL Data Type: uniqueidentifier
+    */
+    get JurisdictionID(): string | null {
+        return this.Get('JurisdictionID');
+    }
+    set JurisdictionID(value: string | null) {
+        this.Set('JurisdictionID', value);
+    }
+
+    /**
+    * * Field Name: CredentialCode
+    * * Display Name: Credential Code
+    * * SQL Data Type: nvarchar(100)
+    */
+    get CredentialCode(): string {
+        return this.Get('CredentialCode');
+    }
+    set CredentialCode(value: string) {
+        this.Set('CredentialCode', value);
+    }
+
+    /**
+    * * Field Name: CredentialName
+    * * Display Name: Credential Name
+    * * SQL Data Type: nvarchar(255)
+    */
+    get CredentialName(): string {
+        return this.Get('CredentialName');
+    }
+    set CredentialName(value: string) {
+        this.Set('CredentialName', value);
+    }
+
+    /**
+    * * Field Name: IssuerName
+    * * Display Name: Issuer Name
+    * * SQL Data Type: nvarchar(255)
+    */
+    get IssuerName(): string | null {
+        return this.Get('IssuerName');
+    }
+    set IssuerName(value: string | null) {
+        this.Set('IssuerName', value);
+    }
+
+    /**
+    * * Field Name: ProviderKey
+    * * Display Name: Provider Key
+    * * SQL Data Type: nvarchar(100)
+    * * Default Value: Manual
+    */
+    get ProviderKey(): string {
+        return this.Get('ProviderKey');
+    }
+    set ProviderKey(value: string) {
+        this.Set('ProviderKey', value);
+    }
+
+    /**
+    * * Field Name: ExternalReferenceID
+    * * Display Name: External Reference ID
+    * * SQL Data Type: nvarchar(255)
+    */
+    get ExternalReferenceID(): string | null {
+        return this.Get('ExternalReferenceID');
+    }
+    set ExternalReferenceID(value: string | null) {
+        this.Set('ExternalReferenceID', value);
+    }
+
+    /**
+    * * Field Name: VerificationStatus
+    * * Display Name: Verification Status
+    * * SQL Data Type: nvarchar(30)
+    * * Default Value: Pending
+    */
+    get VerificationStatus(): 'Expired' | 'Pending' | 'Rejected' | 'Revoked' | 'Verified' {
+        return this.Get('VerificationStatus');
+    }
+    set VerificationStatus(value: 'Expired' | 'Pending' | 'Rejected' | 'Revoked' | 'Verified') {
+        this.Set('VerificationStatus', value);
+    }
+
+    /**
+    * * Field Name: IssuedAt
+    * * Display Name: Issued At
+    * * SQL Data Type: datetimeoffset
+    */
+    get IssuedAt(): Date | null {
+        return this.Get('IssuedAt');
+    }
+    set IssuedAt(value: Date | null) {
+        this.Set('IssuedAt', value);
+    }
+
+    /**
+    * * Field Name: ExpiresAt
+    * * Display Name: Expires At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ExpiresAt(): Date | null {
+        return this.Get('ExpiresAt');
+    }
+    set ExpiresAt(value: Date | null) {
+        this.Set('ExpiresAt', value);
+    }
+
+    /**
+    * * Field Name: VerifiedAt
+    * * Display Name: Verified At
+    * * SQL Data Type: datetimeoffset
+    */
+    get VerifiedAt(): Date | null {
+        return this.Get('VerifiedAt');
+    }
+    set VerifiedAt(value: Date | null) {
+        this.Set('VerifiedAt', value);
+    }
+
+    /**
+    * * Field Name: VerifiedByPersonID
+    * * Display Name: Verified By Person
+    * * SQL Data Type: uniqueidentifier
+    */
+    get VerifiedByPersonID(): string | null {
+        return this.Get('VerifiedByPersonID');
+    }
+    set VerifiedByPersonID(value: string | null) {
+        this.Set('VerifiedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: EvidenceURL
+    * * Display Name: Evidence URL
+    * * SQL Data Type: nvarchar(1000)
+    */
+    get EvidenceURL(): string | null {
+        return this.Get('EvidenceURL');
+    }
+    set EvidenceURL(value: string | null) {
+        this.Set('EvidenceURL', value);
+    }
+
+    /**
+    * * Field Name: MetadataJSON
+    * * Display Name: Metadata JSON
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get MetadataJSON(): string | null {
+        return this.Get('MetadataJSON');
+    }
+    set MetadataJSON(value: string | null) {
+        this.Set('MetadataJSON', value);
+    }
+
+    /**
+    * * Field Name: IsPrimary
+    * * Display Name: Is Primary
+    * * SQL Data Type: bit
+    * * Default Value: 0
+    */
+    get IsPrimary(): boolean {
+        return this.Get('IsPrimary');
+    }
+    set IsPrimary(value: boolean) {
+        this.Set('IsPrimary', value);
+    }
+
+    /**
+    * * Field Name: __mj_CreatedAt
+    * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    */
+    get __mj_CreatedAt(): Date {
+        return this.Get('__mj_CreatedAt');
+    }
+
+    /**
+    * * Field Name: __mj_UpdatedAt
+    * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    */
+    get __mj_UpdatedAt(): Date {
+        return this.Get('__mj_UpdatedAt');
+    }
+
+    /**
+    * * Field Name: ProfessionalProfile
+    * * Display Name: Professional Profile
+    * * SQL Data Type: nvarchar(200)
+    */
+    get ProfessionalProfile(): string | null {
+        return this.Get('ProfessionalProfile');
+    }
+
+    /**
+    * * Field Name: Jurisdiction
+    * * Display Name: Jurisdiction
+    * * SQL Data Type: nvarchar(150)
+    */
+    get Jurisdiction(): string | null {
+        return this.Get('Jurisdiction');
+    }
+
+    /**
+    * * Field Name: VerifiedByPerson
+    * * Display Name: Verified By Person
+    * * SQL Data Type: nvarchar(255)
+    */
+    get VerifiedByPerson(): string | null {
+        return this.Get('VerifiedByPerson');
     }
 }

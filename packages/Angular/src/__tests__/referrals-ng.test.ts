@@ -39,8 +39,8 @@ describe('@mj-biz-apps/referrals-ng', () => {
     expect(ProfessionalProfileHeroPanel).toBeDefined();
   });
 
-  it('exports all 10 left-rail BaseFormComponent classes and bundles them in REFERRALS_ENTITY_FORM_COMPONENTS', () => {
-    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(10);
+  it('exports all 11 left-rail BaseFormComponent classes and bundles them in REFERRALS_ENTITY_FORM_COMPONENTS', () => {
+    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(11);
     expect(ReferralRequestFormComponent).toBeDefined();
     expect(ProfessionalProfileFormComponent).toBeDefined();
     expect(ReferralAssignmentFormComponent).toBeDefined();

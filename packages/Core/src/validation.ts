@@ -65,3 +65,10 @@ export function UUIDsEqual(a: string | null | undefined, b: string | null | unde
   }
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
+
+/**
+ * Escapes single quotes for safe SQL string literal interpolation in ExtraFilter expressions.
+ */
+export function EscapeSqlLiteral(value: string): string {
+  return value.replace(/'/g, "''");
+}

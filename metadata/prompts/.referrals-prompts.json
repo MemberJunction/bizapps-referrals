@@ -1,0 +1,14 @@
+[
+  {
+    "fields": {
+      "Name": "Referrals Triage & Concierge System Prompt",
+      "Description": "System prompt for the Referrals Triage & Concierge Loop AI Agent.",
+      "TypeID": "@lookup:MJ: AI Prompt Types.Name=Chat",
+      "TemplateText": "@file:templates/referrals-triage-concierge.template.md",
+      "Status": "Active"
+    },
+    "primaryKey": {
+      "ID": "A4000001-0000-0000-0000-000000000001"
+    }
+  }
+]

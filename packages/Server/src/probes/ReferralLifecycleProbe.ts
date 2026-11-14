@@ -1,15 +1,39 @@
-import { DatabaseProviderBase } from '@memberjunction/core';
+import { DatabaseProviderBase, IMetadataProvider, UserInfo } from '@memberjunction/core';
 import { RegisterClass } from '@memberjunction/global';
-import {
-  BaseLiveCrudVerifier,
-  HealthProbeContext,
-  LiveCrudVerifierResult,
-} from '@memberjunction/health';
 import {
   ConflictScreeningService,
   MatchingEngine,
   NormalizePartyName,
 } from '@mj-biz-apps/referrals-core';
+
+/** Context supplied when executing a live transactional health verifier. */
+export interface HealthProbeContext {
+  DatabaseProvider: DatabaseProviderBase;
+  MetadataProvider: IMetadataProvider;
+  SystemUser: UserInfo;
+}
+
+/** Structured outcome returned by {@link BaseLiveCrudVerifier.Verify}. */
+export interface LiveCrudVerifierResult {
+  Success: boolean;
+  Summary: string;
+  ObservedMetrics?: Record<string, string | number | boolean | null>;
+  DiagnosticError?: string;
+}
+
+/**
+ * Self-contained live CRUD verifier base contract matching MJ Health
+ * without requiring unpublished edge packages at standalone install time.
+ */
+export abstract class BaseLiveCrudVerifier {
+  public abstract get VerifierKey(): string;
+  public abstract get OwnerApp(): string;
+  public abstract get Title(): string;
+  public abstract Verify(
+    context: HealthProbeContext,
+    txProvider: DatabaseProviderBase,
+  ): Promise<LiveCrudVerifierResult>;
+}
 import {
   ConflictCheckPartyEntity,
   ProfessionalJurisdictionEntity,

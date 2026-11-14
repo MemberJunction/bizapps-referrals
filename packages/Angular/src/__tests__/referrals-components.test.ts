@@ -17,7 +17,16 @@ Object.assign(globalThis, {
   CustomEvent: dom.window.CustomEvent,
 });
 
-const savedEntities: Array<{ entityName: string; record: Record<string, unknown> }> = [];
+type MockFieldValue = string | number | boolean | Date | null | undefined;
+interface MockEntityRecord {
+  ID: string;
+  RequestNumber: string;
+  Save: () => Promise<boolean>;
+  Delete: () => Promise<boolean>;
+  [key: string]: MockFieldValue | (() => Promise<boolean>);
+}
+
+const savedEntities: Array<{ entityName: string; record: MockEntityRecord }> = [];
 const deletedIds: string[] = [];
 let failNextPartySave = false;
 const settingsStore = new Map<string, string>();
@@ -37,8 +46,8 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
       get CurrentUser() {
         return mockCurrentUser;
       }
-      async GetEntityObject<T>(entityName: string): Promise<T> {
-        const record: Record<string, unknown> = {
+      async GetEntityObject<T extends object>(entityName: string): Promise<T> {
+        const record: MockEntityRecord = {
           ID: '99999999-0000-4000-8000-000000000001',
           RequestNumber: 'REF-TEST-001',
           Save: async () => {
@@ -56,7 +65,7 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
             return true;
           },
         };
-        return record as unknown as T;
+        return record as object as T;
       }
     },
     RunView: class {
@@ -107,12 +116,12 @@ vi.mock('@memberjunction/ng-base-forms', async (importOriginal) => {
   return {
     ...actual,
     BaseFormComponent: class {
-      public record: unknown;
+      public record: object | undefined;
       public EditMode = false;
-      public formContext: unknown;
+      public formContext: object | undefined;
       public initSections(): void {}
-      public BuildRelationshipViewParamsByEntityName(): unknown { return {}; }
-      public NewRecordValues(): unknown { return {}; }
+      public BuildRelationshipViewParamsByEntityName(): object { return {}; }
+      public NewRecordValues(): object { return {}; }
       public IsSectionExpanded(): boolean { return false; }
       public GetSectionRowCount(): number { return 0; }
       public SetSectionRowCount(): void {}

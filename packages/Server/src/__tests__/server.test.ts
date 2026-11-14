@@ -5,8 +5,8 @@ vi.mock('../generated/generated.js', () => ({}));
 
 import { UserInfo } from '@memberjunction/core';
 import { MJGlobal } from '@memberjunction/global';
-import { BaseLiveCrudVerifier } from '@memberjunction/health';
 import {
+  BaseLiveCrudVerifier,
   LoadBizAppsReferralsServer,
   ReferralLifecycleProbe,
   ReferralsSlaSweepScheduler,

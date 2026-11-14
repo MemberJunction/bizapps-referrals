@@ -1,8 +1,14 @@
-import { BaseEntity, EntitySaveOptions, ValidationResult } from '@memberjunction/core';
+import { BaseEntity, EntitySaveOptions, IMetadataProvider, IRunViewProvider, ValidationResult } from '@memberjunction/core';
 import { RegisterClass, ValidationErrorInfo, ValidationErrorType } from '@memberjunction/global';
-import { NormalizePartyName } from '@mj-biz-apps/referrals-core';
+import {
+  AuthorizationError,
+  IsCoordinatorOrAdmin,
+  NormalizePartyName,
+  ResolvePersonIdForUser,
+} from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalCredentialEntity,
   ProfessionalProfileEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -50,6 +56,85 @@ export class ReferralRequestServerEntity extends ReferralRequestEntity {
       const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
       this.RequestNumber = `REF-${stamp}-${suffix}`;
+    }
+    return super.Save(options);
+  }
+}
+
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Credentials')
+export class ProfessionalCredentialServerEntity extends ProfessionalCredentialEntity {
+  public override Validate(): ValidationResult {
+    const result = super.Validate();
+    if (!this.CredentialCode || !this.CredentialCode.trim()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('CredentialCode', 'CredentialCode is required.', this.CredentialCode, ValidationErrorType.Failure),
+      );
+    }
+    if (!this.CredentialName || !this.CredentialName.trim()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('CredentialName', 'CredentialName is required.', this.CredentialName, ValidationErrorType.Failure),
+      );
+    }
+    if (this.IssuedAt && this.ExpiresAt && new Date(this.ExpiresAt).getTime() < new Date(this.IssuedAt).getTime()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('ExpiresAt', 'ExpiresAt must be on or after IssuedAt.', this.ExpiresAt, ValidationErrorType.Failure),
+      );
+    }
+    return result;
+  }
+
+  public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+    const statusField = this.Fields.find((f) => f.Name === 'VerificationStatus');
+    const verifiedByField = this.Fields.find((f) => f.Name === 'VerifiedByPersonID');
+    const isProtectedTransition =
+      (statusField?.Dirty &&
+        (this.VerificationStatus === 'Verified' ||
+          this.VerificationStatus === 'Rejected' ||
+          this.VerificationStatus === 'Revoked')) ||
+      Boolean(verifiedByField?.Dirty);
+
+    if (isProtectedTransition) {
+      if (!this.ContextCurrentUser || !IsCoordinatorOrAdmin(this.ContextCurrentUser)) {
+        throw new AuthorizationError(
+          'Coordinator or Administrator authority is required to transition credential VerificationStatus or modify VerifiedByPersonID.',
+        );
+      }
+      const rawProvider: object | undefined = this.ProviderToUse;
+      const isMetadataAndRunView = (
+        p: object | undefined,
+      ): p is IMetadataProvider & IRunViewProvider =>
+        Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
+      if (isMetadataAndRunView(rawProvider)) {
+        const dp = rawProvider;
+        if (this.ProfessionalProfileID) {
+          const profile = await dp.GetEntityObject<ProfessionalProfileEntity>(
+            'MJ_BizApps_Referrals: Professional Profiles',
+            this.ContextCurrentUser,
+          );
+          if (!(await profile.Load(this.ProfessionalProfileID))) {
+            throw new AuthorizationError(
+              `Parent ProfessionalProfile '${this.ProfessionalProfileID}' not found for credential verification.`,
+            );
+          }
+        }
+        const resolvedPersonId = await ResolvePersonIdForUser(this.ContextCurrentUser, dp);
+        if (!resolvedPersonId) {
+          throw new AuthorizationError(
+            'Authenticated coordinator must resolve to a valid Person record before saving credential verification decision.',
+          );
+        }
+        this.VerifiedByPersonID = resolvedPersonId;
+      }
+    }
+
+    if (this.VerificationStatus === 'Verified' && !this.VerifiedAt) {
+      this.VerifiedAt = new Date();
+    }
+    if (!this.ProviderKey || !this.ProviderKey.trim()) {
+      this.ProviderKey = 'Manual';
     }
     return super.Save(options);
   }
