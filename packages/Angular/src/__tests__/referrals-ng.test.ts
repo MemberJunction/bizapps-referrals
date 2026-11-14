@@ -1,4 +1,7 @@
 import '@angular/compiler';
+import { MJGlobal } from '@memberjunction/global';
+import { BaseFormComponent } from '@memberjunction/ng-base-forms';
+import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { describe, expect, it } from 'vitest';
 import {
   ConflictCheckPartyFormComponent,
@@ -18,6 +21,7 @@ import {
   ReferralsModule,
   ReferralsOpsTelemetryComponent,
   ReferralsProInboxComponent,
+  ReferralsReportGalleryComponent,
   ReferralsSeekerIntakeComponent,
 } from '../public-api.js';
 
@@ -50,5 +54,29 @@ describe('@mj-biz-apps/referrals-ng', () => {
       expect(typeof FormClass).toBe('function');
       expect(typeof FormClass.prototype.ngOnInit).toBe('function');
     }
+
+    const expectedEntities = [
+      'MJ_BizApps_Referrals: Referral Requests',
+      'MJ_BizApps_Referrals: Professional Profiles',
+      'MJ_BizApps_Referrals: Referral Assignments',
+      'MJ_BizApps_Referrals: Conflict Check Parties',
+      'MJ_BizApps_Referrals: Practice Areas',
+      'MJ_BizApps_Referrals: Jurisdictions',
+      'MJ_BizApps_Referrals: Referral Tiers',
+      'MJ_BizApps_Referrals: Professional Practice Areas',
+      'MJ_BizApps_Referrals: Professional Jurisdictions',
+      'MJ_BizApps_Referrals: Referral Feedbacks',
+    ];
+    for (const entityName of expectedEntities) {
+      const registered = MJGlobal.Instance.ClassFactory.GetRegistration(BaseFormComponent, entityName);
+      expect(registered).toBeDefined();
+    }
+
+    expect(ReferralsReportGalleryComponent).toBeDefined();
+    const galleryReg = MJGlobal.Instance.ClassFactory.GetRegistration(
+      BaseResourceComponent,
+      'ReferralsReportGalleryResource',
+    );
+    expect(galleryReg).toBeDefined();
   });
 });

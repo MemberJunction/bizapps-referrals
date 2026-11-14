@@ -24,6 +24,12 @@
           "Icon": "fa-solid fa-chart-line",
           "ResourceType": "Custom",
           "DriverClass": "ReferralsOpsTelemetryResource"
+        },
+        {
+          "Label": "Report Gallery",
+          "Icon": "fa-solid fa-chart-pie",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsReportGalleryResource"
         }
       ]
     },

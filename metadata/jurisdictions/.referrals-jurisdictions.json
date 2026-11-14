@@ -48,5 +48,65 @@
       "StateProvinceCode": null,
       "IsActive": true
     }
+  },
+  {
+    "fields": {
+      "Name": "Massachusetts",
+      "Code": "US-MA",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "MA",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Washington",
+      "Code": "US-WA",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "WA",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Illinois",
+      "Code": "US-IL",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "IL",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "Florida",
+      "Code": "US-FL",
+      "JurisdictionType": "State",
+      "CountryCode": "US",
+      "StateProvinceCode": "FL",
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "United Kingdom",
+      "Code": "GB-UK",
+      "JurisdictionType": "Country",
+      "CountryCode": "GB",
+      "StateProvinceCode": null,
+      "IsActive": true
+    }
+  },
+  {
+    "fields": {
+      "Name": "European Union",
+      "Code": "EU-REG",
+      "JurisdictionType": "International",
+      "CountryCode": "EU",
+      "StateProvinceCode": null,
+      "IsActive": true
+    }
   }
 ]

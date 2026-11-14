@@ -431,8 +431,14 @@ export class ReferralsFinderWidgetComponent implements OnInit {
 
   @Input('domain')
   public set Domain(val: string) {
-    if (val in VOCABULARY_PRESETS) {
-      this.Vocab = { ...VOCABULARY_PRESETS[val as keyof typeof VOCABULARY_PRESETS] };
+    const normalized = val.trim().toLowerCase();
+    const matchedKey = (Object.keys(VOCABULARY_PRESETS) as Array<keyof typeof VOCABULARY_PRESETS>).find(
+      (k) =>
+        k.toLowerCase() === normalized ||
+        ((normalized === 'it' || normalized === 'itconsulting' || normalized === 'tech') && k === 'Consulting'),
+    );
+    if (matchedKey) {
+      this.Vocab = { ...VOCABULARY_PRESETS[matchedKey] };
     }
   }
 

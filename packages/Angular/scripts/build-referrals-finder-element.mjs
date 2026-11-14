@@ -43,6 +43,29 @@ function angularLinkerPlugin() {
   };
 }
 
+/**
+ * Guard zone.js prototype walks against null-prototype or proxy objects where
+ * `proto.hasOwnProperty` is undefined (`proto.hasOwnProperty is not a function`).
+ */
+function zoneJsSafeHasOwnPropPlugin() {
+  return {
+    name: 'zone-js-safe-has-own-prop',
+    setup(build) {
+      build.onLoad({ filter: /[\\/]zone\.js[\\/].*\.[cm]?js$/ }, async (args) => {
+        const source = await fs.promises.readFile(args.path, 'utf8');
+        if (!source.includes('proto.hasOwnProperty(')) {
+          return null;
+        }
+        const patched = source.replace(
+          /proto\.hasOwnProperty\(/g,
+          'Object.prototype.hasOwnProperty.call(proto, ',
+        );
+        return { contents: patched, loader: 'js' };
+      });
+    },
+  };
+}
+
 const outdir = path.join(pkgRoot, 'dist/finder-element');
 fs.mkdirSync(outdir, { recursive: true });
 
@@ -61,7 +84,7 @@ await esbuild.build({
   ],
   sourcemap: process.env.REFERRALS_FINDER_SOURCEMAP === '1',
   legalComments: 'none',
-  plugins: [angularLinkerPlugin()],
+  plugins: [angularLinkerPlugin(), zoneJsSafeHasOwnPropPlugin()],
   logOverride: { 'empty-import-meta': 'silent' },
 });
 
