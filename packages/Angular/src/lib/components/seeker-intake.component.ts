@@ -50,7 +50,7 @@ export interface ConflictCheckPartyDraft {
   template: `
     <mj-page-layout>
       <mj-page-header Title="Find a Verified Professional" Icon="fa-solid fa-scale-balanced">
-        <div class="header-actions">
+        <div class="header-actions" actions>
           <button type="button" class="btn-outline" (click)="ToggleDrawer()">
             {{ Prefs.DrawerOpen ? 'Hide Filters' : 'Directory Filters' }}
           </button>
@@ -567,6 +567,9 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
 
       // Client GraphQL fallback: create in Draft, persist and verify every ConflictCheckParty, then promote to Submitted
       const req = await md.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', md.CurrentUser);
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+      req.RequestNumber = `REF-${stamp}-${suffix}`;
       req.SeekerName = this.SeekerName;
       req.SeekerEmail = this.SeekerEmail;
       req.PracticeAreaID = this.Prefs.PracticeAreaID;

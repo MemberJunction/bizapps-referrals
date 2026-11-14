@@ -1,9 +1,18 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Metadata, UserInfo } from '@memberjunction/core';
 import '@mj-biz-apps/referrals-entities';
 import { LoadReferralsServerEntities } from '@mj-biz-apps/referrals-entities-server';
 import { LoadReferralsActions } from '@mj-biz-apps/referrals-actions';
 import { ReferralLifecycleProbe } from './probes/ReferralLifecycleProbe.js';
 import { ReferralsSlaSweepScheduler } from './SweepScheduler.js';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+export const RESOLVER_PATHS: string[] = [
+  resolve(__dirname, 'generated/*.js'),
+  resolve(__dirname, 'generated/graphql-schemas/*.js'),
+];
 
 export * from '@mj-biz-apps/referrals-entities';
 export * from '@mj-biz-apps/referrals-core';

@@ -43,7 +43,7 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
   template: `
     <mj-page-layout>
       <mj-page-header Title="Member Pro Lead Inbox" Icon="fa-solid fa-inbox">
-        <div class="toolbar">
+        <div class="toolbar" actions>
           @if (CurrentProfile) {
             <div class="capacity-controls">
               <label class="cap-label">
