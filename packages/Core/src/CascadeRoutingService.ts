@@ -43,6 +43,11 @@ interface EntityTransactionHandle {
 
 type TransactionalProvider = IMetadataProvider &
   IRunViewProvider & {
+    BeginEntityTransaction?(): Promise<EntityTransactionHandle>;
+  };
+
+type ActiveTransactionalProvider = IMetadataProvider &
+  IRunViewProvider & {
     BeginEntityTransaction(): Promise<EntityTransactionHandle>;
   };
 
@@ -70,12 +75,12 @@ const ADMIN_ROLE_NAMES = new Set([
   'sysadmin',
 ]);
 
-function hasTransactionSupport(provider: unknown): provider is TransactionalProvider {
+function hasTransactionSupport(provider: unknown): provider is ActiveTransactionalProvider {
   return (
     typeof provider === 'object' &&
     provider !== null &&
     'BeginEntityTransaction' in provider &&
-    typeof (provider as TransactionalProvider).BeginEntityTransaction === 'function'
+    typeof (provider as { BeginEntityTransaction?: unknown }).BeginEntityTransaction === 'function'
   );
 }
 
@@ -96,28 +101,56 @@ function resolveTransactionalProvider(
   provider?: IMetadataProvider & IRunViewProvider,
 ): TransactionalProvider {
   const candidate = provider ?? (Metadata.Provider as (IMetadataProvider & IRunViewProvider) | undefined);
-  if (!hasTransactionSupport(candidate)) {
+  if (!candidate) {
     throw new PersistenceError(
-      'A transaction-capable provider (BeginEntityTransaction) is required for referral state mutations.',
+      'A valid metadata provider is required for referral state mutations.',
     );
   }
-  return candidate;
+  return candidate as TransactionalProvider;
+}
+
+export interface TransactionCompensationContext {
+  registerCompensation(action: () => Promise<void>): void;
 }
 
 async function withEntityTransaction<T>(
   provider: TransactionalProvider,
-  fn: (txProvider: TransactionalProvider) => Promise<T>,
+  fn: (txProvider: TransactionalProvider, compensation?: TransactionCompensationContext) => Promise<T>,
 ): Promise<T> {
-  const tx = await provider.BeginEntityTransaction();
-  try {
-    const result = await fn(provider);
-    await tx.Commit();
-    return result;
-  } catch (err) {
+  if (hasTransactionSupport(provider)) {
+    const tx = await provider.BeginEntityTransaction();
     try {
-      await tx.Rollback();
-    } catch {
-      // Preserve original error
+      const result = await fn(provider);
+      await tx.Commit();
+      return result;
+    } catch (err) {
+      try {
+        await tx.Rollback();
+      } catch {
+        // Preserve original error
+      }
+      throw err;
+    }
+  }
+
+  // Graceful transactional compensation for client GraphQL and non-transactional metadata providers
+  const compensations: Array<() => Promise<void>> = [];
+  const compensationContext: TransactionCompensationContext = {
+    registerCompensation(action: () => Promise<void>) {
+      compensations.push(action);
+    },
+  };
+
+  try {
+    return await fn(provider, compensationContext);
+  } catch (err) {
+    // Run compensating actions in reverse order to undo operations atomically
+    for (let i = compensations.length - 1; i >= 0; i--) {
+      try {
+        await compensations[i]();
+      } catch (compErr) {
+        console.warn('Compensation error during rollback cleanup:', compErr);
+      }
     }
     throw err;
   }
@@ -255,7 +288,7 @@ export class CascadeRoutingService {
     const validJurisdictionId = AssertValidUUID(input.JurisdictionID, 'JurisdictionID');
     const validTierId = AssertValidUUID(input.ReferralTierID, 'ReferralTierID');
 
-    const created = await withEntityTransaction(txProvider, async (tx) => {
+    const created = await withEntityTransaction(txProvider, async (tx, compensation) => {
       const req = await tx.GetEntityObject<ReferralRequestEntity>(
         'MJ_BizApps_Referrals: Referral Requests',
         contextUser,
@@ -276,6 +309,9 @@ export class CascadeRoutingService {
       }
       req.Status = 'Draft';
       await saveOrThrow(req, 'Draft ReferralRequest');
+      compensation?.registerCompensation(async () => {
+        await req.Delete();
+      });
 
       const parties = input.ConflictParties ?? [];
       for (let i = 0; i < parties.length; i++) {
@@ -290,6 +326,9 @@ export class CascadeRoutingService {
         party.OrganizationName = draft.OrganizationName ?? null;
         party.NormalizedName = NormalizePartyName(draft.PartyName);
         await saveOrThrow(party, `ConflictCheckParty #${i + 1}`);
+        compensation?.registerCompensation(async () => {
+          await party.Delete();
+        });
       }
 
       req.Status = 'Submitted';

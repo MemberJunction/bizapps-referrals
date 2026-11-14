@@ -19,7 +19,8 @@
     "/dist"
   ],
   "scripts": {
-    "build": "ngc",
+    "build": "ngc && npm run build:element",
+    "build:element": "node scripts/build-referrals-finder-element.mjs",
     "test": "vitest run"
   },
   "author": "MemberJunction.com",
@@ -44,7 +45,8 @@
     "@memberjunction/ng-link-directives": "^6.2.1",
     "@memberjunction/ng-shared": "^6.2.1",
     "@memberjunction/ng-shared-generic": "^6.2.1",
-    "@memberjunction/ng-ui-components": "^6.2.1"
+    "@memberjunction/ng-ui-components": "^6.2.1",
+    "@angular/elements": "^21.1.3"
   },
   "devDependencies": {
     "@angular/animations": "21.1.3",
@@ -52,7 +54,10 @@
     "@angular/compiler": "21.1.3",
     "@angular/compiler-cli": "21.1.3",
     "@angular/core": "21.1.3",
+    "@angular/elements": "21.1.3",
     "@angular/forms": "21.1.3",
+    "@babel/core": "^7.28.0",
+    "esbuild": "^0.25.0",
     "@memberjunction/core": "6.2.1",
     "@memberjunction/core-entities": "6.2.1",
     "@memberjunction/global": "6.2.1",
@@ -65,7 +70,8 @@
     "@memberjunction/ng-shared-generic": "6.2.1",
     "@memberjunction/ng-ui-components": "6.2.1",
     "typescript": "^5.9.3",
-    "vitest": "1.6.1"
+    "vitest": "1.6.1",
+    "zone.js": "^0.16.0"
   },
   "repository": {
     "type": "git",

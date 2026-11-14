@@ -27,6 +27,7 @@ export interface ScoreBreakdown {
   ResponsivenessScore: number;
   RatingScore: number;
   LanguageBonus: number;
+  SemanticScore?: number;
   TotalScore: number;
 }
 
@@ -45,6 +46,8 @@ export interface MatchCandidateScore {
   ConflictReasons: string[];
   Eligible: boolean;
   DisqualificationReason: string | null;
+  ExplainableMatchReasons?: string[];
+  MatchSummary?: string;
 }
 
 export interface MatchCriteria {
@@ -55,6 +58,9 @@ export interface MatchCriteria {
   SLAResponseHours?: number;
   ConflictParties?: ConflictPartyInput[];
   MaxResults?: number;
+  MatterTitle?: string | null;
+  MatterSummary?: string | null;
+  Keywords?: string[];
 }
 
 export interface ConflictPartyInput {
