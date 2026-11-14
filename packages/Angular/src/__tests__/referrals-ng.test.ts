@@ -1,4 +1,6 @@
 import '@angular/compiler';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { MJGlobal } from '@memberjunction/global';
 import { BaseFormComponent } from '@memberjunction/ng-base-forms';
 import { BaseResourceComponent } from '@memberjunction/ng-shared';
@@ -78,5 +80,27 @@ describe('@mj-biz-apps/referrals-ng', () => {
       'ReferralsReportGalleryResource',
     );
     expect(galleryReg).toBeDefined();
+  });
+
+  it('uses --mj-* design tokens in report-gallery.component.ts without hardcoded hex or rgb colors', () => {
+    const galleryPath = fileURLToPath(
+      new URL('../lib/components/report-gallery.component.ts', import.meta.url),
+    );
+    const gallerySrc = readFileSync(galleryPath, 'utf8');
+
+    expect(gallerySrc).toContain('--mj-bg-page');
+    expect(gallerySrc).toContain('--mj-bg-surface');
+    expect(gallerySrc).toContain('--mj-bg-surface-card');
+    expect(gallerySrc).toContain('--mj-text-primary');
+    expect(gallerySrc).toContain('--mj-text-secondary');
+    expect(gallerySrc).toContain('--mj-border-default');
+    expect(gallerySrc).toContain('--mj-brand-primary');
+    expect(gallerySrc).toContain('--mj-status-success');
+    expect(gallerySrc).toContain('--mj-status-warning');
+    expect(gallerySrc).toContain('--mj-status-error');
+    expect(gallerySrc).toContain('--mj-status-info');
+
+    expect(gallerySrc).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(gallerySrc).not.toMatch(/\brgba?\(/);
   });
 });
