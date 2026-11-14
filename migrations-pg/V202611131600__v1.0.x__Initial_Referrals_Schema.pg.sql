@@ -5767,7 +5767,7 @@ BEGIN
         '7492A921-FFCF-4A3E-B59A-56C88D16DDE1', -- "Entity": "MJ_BizApps_Referrals": "Professional" "Profiles"
         (SELECT COALESCE(MAX("Sequence"), 0) + 1 FROM __mj_BizAppsReferrals."EntityField" WHERE "EntityID" = '7492A921-FFCF-4A3E-B59A-56C88D16DDE1'),
         'LicenseNumber',
-        'Bar Or License Number',
+        'License Number',
         NULL,
         'TEXT',
         200,
