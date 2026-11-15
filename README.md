@@ -140,6 +140,8 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 | `EvaluateEscalationsAction` / `AcknowledgeEscalationAction` / `ResolveEscalationAction` | SLA-warning/urgent-unassigned escalation evaluation and coordinator/admin-gated lifecycle transitions |
 | `ReopenExhaustedReferralAction` | Admin-only reopen of an `Exhausted` request, excluding previously-assigned professionals |
 | `RecomputeReciprocityAction` / `GetReciprocityScorecardAction` | Batch recompute and on-demand read of per-professional reciprocity scorecards |
+| `ExplainMatchAction` | AI (or deterministic fallback) match rationale, persisted onto each candidate's `ReferralAssignment.AIRationaleJSON` |
+| `RecommendEscalationActionAction` | AI-advised (or rules-fallback) `RecommendedAction` + rationale for an open `ReferralEscalation` |
 
 ---
 
@@ -183,6 +185,21 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **`ReciprocityScorecardService` (`@mj-biz-apps/referrals-core`)**: `ComputeScorecard` computes `ReciprocityIndex = round((Sent + 1) / (Accepted + 1), 3)` plus Sent/Received/Accepted/Resolved/SLABreachCount/AcceptanceRate/MedianResponseHours/AttributedFeeTotal; `RecomputeSnapshots` batch-upserts `ReciprocitySnapshot` rows per professional per UTC calendar quarter and updates `ProfessionalProfile.ReciprocityIndex` / `ReadinessScore` / `ReadinessComputedAt`. `MatchingEngine.ScoreCandidate` can apply an optional reciprocity-based match-score boost (`ApplyReciprocityBoost`).
 - **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.EvaluateEscalations`, `Referrals.AcknowledgeEscalation`, `Referrals.ResolveEscalation`, `Referrals.ReopenExhaustedReferral`, `Referrals.RecomputeReciprocity`, `Referrals.GetReciprocityScorecard`.
 - **`ReferralsSlaSweepScheduler` (`@mj-biz-apps/referrals-server`)**: `RunOnce` now runs the SLA sweep followed by `EvaluateEscalations` and reports `EscalationsRaised` on `SlaSweepRunRecord`; a second recurring timer (`reciprocityIntervalMs`, default 24h; `disableAutoReciprocity` to turn it off) drives daily `RecomputeReciprocity` passes. `LoadBizAppsReferralsServer` accepts an `escalationNotifierKey` option (default `BizAppsTasks`), safely falling back to `None` at evaluation time when that notifier isn't registered.
+
+---
+
+## Wave 3 Slice 3: AI Match Rationale & Escalation Advisor
+
+- **Schema**: `ReferralEscalation.AIRationaleJSON`, folded into the single consolidated `V202611151000__v1.2.0__SLA_Escalation_Outcomes_And_Readiness` migration alongside the rest of Wave 3 (Spec SS2.1 requires exactly one migration per dialect).
+- **Client-safe operation bases (`@mj-biz-apps/referrals-core/operations/ai-operations`)**: `ExplainMatchOperationBase` and `RecommendEscalationOperationBase` declare only their `OperationKey` and typed input/output contract (no server implementation) so client bundles can resolve and `.Execute()` them without pulling in any `@memberjunction/ai-*` package - `@mj-biz-apps/referrals-core` has zero AI dependencies.
+- **`ReferralAIRationaleService` (`@mj-biz-apps/referrals-actions/ai`)**:
+  - `BuildRationaleContext` hands the AI advisor only practice area/jurisdiction names, urgency, tier, conflict-party counts per role, and each candidate's match score/breakdown/explainable reasons/readiness/reciprocity - never seeker name/email/phone/company, matter text, or conflict party names/organizations.
+  - `ExplainMatch` generates and persists a `{Source: 'AI'|'Deterministic', Summary, Rationale, Risks[], GeneratedAt}` rationale onto every `Offered`/`Queued` `ReferralAssignment.AIRationaleJSON` for a request, dropping any AI-returned entry whose ID isn't in the candidate set and falling back to a deterministic rationale built from `ExplainableMatchReasons` when the AI prompt is missing/unavailable or its output is invalid. Never throws to the caller.
+  - `RecommendEscalationAction` validates and persists a `RecommendedAction` (from the `Notify`/`Reassign`/`AdminAlert`/`EscalateToTier` union) and rationale on the escalation; skips the AI call (0 executor invocations) when a rationale already exists unless `Force` is set (1 invocation); never mutates `Status`, `EscalationLevel`, `CascadeOrder`, or any assignment row.
+  - `IReferralPromptExecutor` / `MJReferralPromptExecutor` wrap `AIPromptRunner` + `AIEngineBase` prompt-by-name lookup; tests inject a fake executor via `ReferralAIRationaleService.ConfigureExecutor`.
+- **New Actions**: `Referrals.ExplainMatch`, `Referrals.RecommendEscalationAction`.
+- **Prompts & Agents**: `Referrals Match Rationale` and `Referrals Escalation Advisor` prompts; new Loop agent **Referrals Escalation Advisor** linked to `EvaluateEscalations`, `RecommendEscalationAction`, `ExplainMatch`, `GetReciprocityScorecard`, and `AcknowledgeEscalation`; Wave 3 lifecycle/reopen actions (`SubmitReferralIntake`, `MarkReferralInProgress`, `CompleteReferral`, `SetAvailabilityWindow`, `ReopenExhaustedReferral`) linked to the existing **Referrals Triage & Concierge** agent.
+- **Dependencies**: `@memberjunction/ai-prompts`, `@memberjunction/ai-core-plus`, `@memberjunction/ai-engine-base` pinned to `6.2.1` in `packages/Actions/package.json` only.
 
 ---
 

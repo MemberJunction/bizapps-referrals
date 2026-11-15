@@ -1034,5 +1034,72 @@
         }
       ]
     }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.ExplainMatch",
+      "Description": "Generates an AI (or deterministic fallback) match rationale for every Offered/Queued candidate on a ReferralRequest, persisted onto each ReferralAssignment.AIRationaleJSON. Never passes seeker PII, matter text, or conflict party names/organizations to the AI advisor.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.ExplainMatch",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000012"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralRequestID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ReferralRequest whose Offered/Queued candidates should receive a match rationale."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.RecommendEscalationAction",
+      "Description": "Recommends (and persists) a RecommendedAction and rationale for an open ReferralEscalation via AI advisor with a deterministic rules fallback. Skips the AI call when a rationale already exists unless Force is set. Never mutates Status, EscalationLevel, CascadeOrder, or any assignment row.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.RecommendEscalationAction",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000013"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralEscalationID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ReferralEscalation to recommend an action for."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Force",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "When true, re-runs the AI advisor even if an AIRationaleJSON already exists."
+          }
+        }
+      ]
+    }
   }
 ]

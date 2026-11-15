@@ -10,5 +10,47 @@
     "primaryKey": {
       "ID": "A4000001-0000-0000-0000-000000000001"
     }
+  },
+  {
+    "fields": {
+      "Name": "Referrals Match Rationale",
+      "Description": "Explains (or, on invalid/unavailable output, is bypassed in favor of a deterministic fallback for) why each candidate professional was matched or disqualified for a referral request, from privacy-scrubbed match data only (no seeker PII, matter text, or conflict party names).",
+      "TypeID": "@lookup:MJ: AI Prompt Types.Name=Chat",
+      "TemplateText": "@file:templates/referrals-match-rationale.template.md",
+      "Status": "Active",
+      "ResponseFormat": "JSON",
+      "SelectionStrategy": "Default",
+      "PowerPreference": "Balanced",
+      "ParallelizationMode": "None",
+      "MaxRetries": 2,
+      "RetryDelayMS": 1000,
+      "RetryStrategy": "Fixed",
+      "PromptRole": "System",
+      "PromptPosition": "First"
+    },
+    "primaryKey": {
+      "ID": "A4000001-0000-0000-0000-000000000003"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals Escalation Advisor",
+      "Description": "Recommends a RecommendedAction (Notify/Reassign/AdminAlert/EscalateToTier) and rationale for an open referral escalation from structured lifecycle state only (no PII); also serves as the Referrals Escalation Advisor Loop AI Agent's system prompt.",
+      "TypeID": "@lookup:MJ: AI Prompt Types.Name=Chat",
+      "TemplateText": "@file:templates/referrals-escalation-advisor.template.md",
+      "Status": "Active",
+      "ResponseFormat": "JSON",
+      "SelectionStrategy": "Default",
+      "PowerPreference": "Balanced",
+      "ParallelizationMode": "None",
+      "MaxRetries": 2,
+      "RetryDelayMS": 1000,
+      "RetryStrategy": "Fixed",
+      "PromptRole": "System",
+      "PromptPosition": "First"
+    },
+    "primaryKey": {
+      "ID": "A4000001-0000-0000-0000-000000000004"
+    }
   }
 ]

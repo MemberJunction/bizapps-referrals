@@ -27,6 +27,9 @@
   "devDependencies": {
     "@memberjunction/actions": "6.2.1",
     "@memberjunction/actions-base": "6.2.1",
+    "@memberjunction/ai-core-plus": "6.2.1",
+    "@memberjunction/ai-engine-base": "6.2.1",
+    "@memberjunction/ai-prompts": "6.2.1",
     "@memberjunction/core": "6.2.1",
     "@memberjunction/global": "6.2.1",
     "typescript": "^5.9.3",
@@ -39,6 +42,9 @@
   "peerDependencies": {
     "@memberjunction/actions": "^6.2.1",
     "@memberjunction/actions-base": "^6.2.1",
+    "@memberjunction/ai-core-plus": "^6.2.1",
+    "@memberjunction/ai-engine-base": "^6.2.1",
+    "@memberjunction/ai-prompts": "^6.2.1",
     "@memberjunction/core": "^6.2.1",
     "@memberjunction/global": "^6.2.1"
   },

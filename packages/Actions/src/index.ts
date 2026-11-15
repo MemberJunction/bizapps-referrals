@@ -580,10 +580,15 @@ export * from './escalation-actions.js';
 import { LoadReferralsEscalationActions } from './escalation-actions.js';
 export * from './reciprocity-actions.js';
 import { LoadReferralsReciprocityActions } from './reciprocity-actions.js';
+export * from './ai/ReferralPromptExecutor.js';
+export * from './ai/ReferralAIRationaleService.js';
+export * from './ai-actions.js';
+import { LoadReferralsAIActions } from './ai-actions.js';
 
 export function LoadReferralsActions(): void {
   LoadCredentialProviders();
   LoadReferralsLifecycleActions();
   LoadReferralsEscalationActions();
   LoadReferralsReciprocityActions();
+  LoadReferralsAIActions();
 }
