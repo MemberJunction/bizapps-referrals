@@ -283,6 +283,13 @@ CREATE INDEX IF NOT EXISTS "IX_ReferralEscalation_DedupKey"
     WHERE "DedupKey" IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
+-- 8a-ii. Additive column on "ReferralEscalation": AI escalation-advisor rationale
+--        (Wave 3 Slice 3 - Referrals.RecommendEscalationAction).
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "AIRationaleJSON" TEXT NULL;
+
+-- -----------------------------------------------------------------------------
 -- 8b. Additive column on "ReferralOutcome": attributed fee value for reciprocity scorecards
 -- -----------------------------------------------------------------------------
 ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"

@@ -4009,6 +4009,10 @@ export const mjBizAppsReferralsReferralEscalationSchema = z.object({
         * * Field Name: ResolutionNotes
         * * Display Name: Resolution Notes
     * * SQL Data Type: nvarchar(MAX)`),
+    AIRationaleJSON: z.string().nullable().describe(`
+        * * Field Name: AIRationaleJSON
+        * * Display Name: AIRationale JSON
+    * * SQL Data Type: nvarchar(MAX)`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4495,6 +4499,18 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     }
     set ResolutionNotes(value: string | null) {
         this.Set('ResolutionNotes', value);
+    }
+
+    /**
+    * * Field Name: AIRationaleJSON
+    * * Display Name: AIRationale JSON
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get AIRationaleJSON(): string | null {
+        return this.Get('AIRationaleJSON');
+    }
+    set AIRationaleJSON(value: string | null) {
+        this.Set('AIRationaleJSON', value);
     }
 
     /**

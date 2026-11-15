@@ -2914,6 +2914,9 @@ export class mjBizAppsReferralsReferralEscalation_ {
     @Field({nullable: true})
     ResolutionNotes?: string;
 
+    @Field({nullable: true})
+    AIRationaleJSON?: string;
+
     @Field()
     _mj__CreatedAt: Date;
 
@@ -2978,6 +2981,9 @@ export class CreatemjBizAppsReferralsReferralEscalationInput {
     @Field(() => String, { nullable: true })
     ResolutionNotes: string | null;
 
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON: string | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
@@ -3035,6 +3041,9 @@ export class UpdatemjBizAppsReferralsReferralEscalationInput {
 
     @Field(() => String, { nullable: true })
     ResolutionNotes?: string | null;
+
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON?: string | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];

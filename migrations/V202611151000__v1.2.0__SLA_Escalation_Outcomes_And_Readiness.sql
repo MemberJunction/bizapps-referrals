@@ -397,6 +397,17 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReferralEscalation_D
 GO
 
 -- -----------------------------------------------------------------------------
+-- 8a-ii. Additive column on [ReferralEscalation]: AI escalation-advisor rationale
+--        (Wave 3 Slice 3 - Referrals.RecommendEscalationAction).
+-- -----------------------------------------------------------------------------
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'AIRationaleJSON') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
+        ADD [AIRationaleJSON] NVARCHAR(MAX) NULL;
+END
+GO
+
+-- -----------------------------------------------------------------------------
 -- 8b. Additive column on [ReferralOutcome]: attributed fee value for reciprocity scorecards
 -- -----------------------------------------------------------------------------
 IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'FeeAmount') IS NULL

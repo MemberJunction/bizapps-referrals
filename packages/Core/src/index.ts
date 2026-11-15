@@ -9,3 +9,4 @@ export * from './CredentialVerification.js';
 export * from './CapacityReadinessService.js';
 export * from './ReciprocityScorecardService.js';
 export * from './SlaEscalationService.js';
+export * from './operations/ai-operations.js';
