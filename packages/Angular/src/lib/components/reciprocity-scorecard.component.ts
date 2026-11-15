@@ -285,13 +285,13 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
     const period = this.GetSelectedPeriod();
     const rv = new RunView();
     const md = new Metadata();
-    const periodStartIso = period.Start.toISOString();
-    const periodEndIso = period.End.toISOString();
+    const periodStartIso = period.Start.toISOString().slice(0, 10);
+    const periodEndIso = period.End.toISOString().slice(0, 10);
 
     const snapshotsRes = await rv.RunView<ReciprocitySnapshotEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
-        ExtraFilter: `PeriodStartDate = '${periodStartIso}' AND PeriodEndDate = '${periodEndIso}'`,
+        ExtraFilter: `PeriodStart = '${periodStartIso}' AND PeriodEnd = '${periodEndIso}'`,
         OrderBy: 'ReciprocityIndex DESC',
         ResultType: 'entity_object',
       },

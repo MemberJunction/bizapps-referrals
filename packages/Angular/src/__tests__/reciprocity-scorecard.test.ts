@@ -131,6 +131,28 @@ describe('ReferralsReciprocityScorecardComponent (Wave 3 Slice 4, AC-37/AC-39)',
     });
   }
 
+  it('AC-39: queries ReciprocitySnapshots with PeriodStart/PeriodEnd (not the stale PeriodStartDate/PeriodEndDate names)', async () => {
+    mockViews([snapshotFor(highProfile, 2.0)], [highProfile]);
+
+    TestBed.configureTestingModule({
+      imports: [ReferralsReciprocityScorecardComponent],
+      providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(ReferralsReciprocityScorecardComponent);
+    const cmp = fixture.componentInstance;
+    await cmp.ngOnInit();
+
+    const snapshotCall = runViewMock.mock.calls.find(
+      ([params]) => params?.EntityName === 'MJ_BizApps_Referrals: Reciprocity Snapshots',
+    );
+    expect(snapshotCall).toBeDefined();
+    const extraFilter: string = snapshotCall![0].ExtraFilter;
+    expect(extraFilter).toMatch(/^PeriodStart = '\d{4}-\d{2}-\d{2}' AND PeriodEnd = '\d{4}-\d{2}-\d{2}'$/);
+    expect(extraFilter).not.toContain('PeriodStartDate');
+    expect(extraFilter).not.toContain('PeriodEndDate');
+    fixture.destroy();
+  });
+
   it('renders a ReciprocityIndex-descending ranked table with readiness badges', async () => {
     mockViews(
       [snapshotFor(lowProfile, 1.2), snapshotFor(highProfile, 3.5)],
@@ -194,6 +216,35 @@ describe('ReferralsReciprocityScorecardComponent (Wave 3 Slice 4, AC-37/AC-39)',
     expect(recomputeSpy).toHaveBeenCalledWith(mockCurrentUser, undefined, expect.objectContaining({ Start: expect.any(Date), End: expect.any(Date) }));
     expect(cmp.IsRecomputing).toBe(false);
     expect(cmp.RecomputeSummary).toContain('Recomputed 5');
+    fixture.destroy();
+  });
+
+  it('AC-39: disables the Recompute button and sets IsRecomputing while the call is in flight', async () => {
+    mockViews([snapshotFor(highProfile, 2.0)], [highProfile]);
+    let resolveRecompute: (value: { ProcessedCount: number; Period: { Start: Date; End: Date } }) => void = () => {};
+    const pending = new Promise<{ ProcessedCount: number; Period: { Start: Date; End: Date } }>((resolve) => {
+      resolveRecompute = resolve;
+    });
+    vi.spyOn(ReciprocityScorecardService, 'RecomputeSnapshots').mockReturnValue(pending);
+
+    TestBed.configureTestingModule({
+      imports: [ReferralsReciprocityScorecardComponent],
+      providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(ReferralsReciprocityScorecardComponent);
+    const cmp = fixture.componentInstance;
+    await cmp.ngOnInit();
+
+    const recomputePromise = cmp.Recompute();
+    fixture.detectChanges();
+    expect(cmp.IsRecomputing).toBe(true);
+    const host: HTMLElement = fixture.nativeElement;
+    const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('Recomputing'));
+    expect(button?.hasAttribute('disabled')).toBe(true);
+
+    resolveRecompute({ ProcessedCount: 1, Period: { Start: new Date(), End: new Date() } });
+    await recomputePromise;
+    expect(cmp.IsRecomputing).toBe(false);
     fixture.destroy();
   });
 });

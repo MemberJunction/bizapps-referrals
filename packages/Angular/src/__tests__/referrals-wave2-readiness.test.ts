@@ -143,7 +143,13 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     }
   });
 
-  it('enforces zero handwritten .Get()/.Set() calls in authored packages and zero un-typed casts across packages', () => {
+  // This test file's own path is excluded from each scan below (not the whole
+  // __tests__ directory) because its source literally contains the regex
+  // patterns being searched for (e.g. the string '.(Get|Set)(' and '<any>'
+  // appear in this file's own source as scan patterns, not as violations).
+  const SELF_TEST_FILE = 'referrals-wave2-readiness.test.ts';
+
+  it('enforces zero handwritten .Get()/.Set() calls in authored packages (including tests) and zero un-typed casts across packages', () => {
     // Generated entity classes in packages/Entities/src/generated/ wrap BaseEntity.Get/Set;
     // all handwritten packages must use strongly-typed entity property accessors only.
     const handwrittenDirs = [
@@ -154,7 +160,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       'packages/Server/src',
     ];
     for (const rel of handwrittenDirs) {
-      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.includes('__tests__'));
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.endsWith(SELF_TEST_FILE));
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content, `Forbidden .Get()/.Set() in ${file}`).not.toMatch(/\.(Get|Set)\(\s*['"]/);
@@ -165,7 +171,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     const forbiddenRegex = new RegExp(`\\b${forbiddenWord}\\b`);
     const allPkgDirs = [...handwrittenDirs, 'packages/IntegrationTests/src'];
     for (const rel of allPkgDirs) {
-      const files = walkFiles(path.join(repoRoot, rel), ['.ts']);
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.endsWith(SELF_TEST_FILE));
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content, `Forbidden ${forbiddenWord} type/cast in ${file}`).not.toMatch(forbiddenRegex);
@@ -173,7 +179,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     }
   });
 
-  it('AC-2: enforces zero `: any` / `as any` / `<any>` type annotations or casts across all handwritten packages', () => {
+  it('AC-2: enforces zero `: any` / `as any` / `<any>` type annotations or casts across all handwritten packages, including __tests__', () => {
     const handwrittenDirs = [
       'packages/Core/src',
       'packages/Actions/src',
@@ -190,7 +196,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
 
     for (const rel of handwrittenDirs) {
       const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter(
-        (f) => !f.includes('generated') && !f.includes('__tests__'),
+        (f) => !f.includes('generated') && !f.endsWith(SELF_TEST_FILE),
       );
       for (const file of files) {
         const content = stripComments(fs.readFileSync(file, 'utf8'));
