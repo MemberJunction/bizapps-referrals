@@ -111,19 +111,21 @@ export class EvaluateEscalationsOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ): Promise<{ WarningsRaised: number; UrgentRaised: number; Skipped: number }> {
     const startMs = Date.now();
-    const asOf = input?.AsOfIso ? new Date(input.AsOfIso) : new Date();
-    const result = await SlaEscalationService.EvaluateEscalations(
-      asOf,
-      user,
-      requireProvider(resolveProvider(provider, context)),
-      input?.NotifierKey ?? 'None',
-    );
-    recordTelemetry('EvaluateEscalations', startMs, user, {
-      warningsRaised: result.WarningsRaised,
-      urgentRaised: result.UrgentRaised,
-      skipped: result.Skipped,
-    });
-    return result;
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      const asOf = input?.AsOfIso ? new Date(input.AsOfIso) : new Date();
+      return await SlaEscalationService.EvaluateEscalations(
+        asOf,
+        user,
+        requireProvider(resolveProvider(provider, context)),
+        input?.NotifierKey ?? 'None',
+      );
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('EvaluateEscalations', startMs, user, { outcome });
+    }
   }
 }
 
@@ -131,27 +133,26 @@ export class EvaluateEscalationsOperation extends BaseRemotableOperation<
 export class EvaluateEscalationsAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
-    const asOfIso = getStringParam(params, 'AsOfIso');
-    const asOf = asOfIso ? new Date(asOfIso) : new Date();
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const asOfIso = getStringParam(params, 'AsOfIso');
+      const asOf = asOfIso ? new Date(asOfIso) : new Date();
       const result = await SlaEscalationService.EvaluateEscalations(
         asOf,
         params.ContextUser,
         requireProvider(resolveActionProvider()),
         getStringParam(params, 'NotifierKey') ?? 'None',
       );
-      recordTelemetry('EvaluateEscalations', startMs, params.ContextUser, {
-        warningsRaised: result.WarningsRaised,
-        urgentRaised: result.UrgentRaised,
-        skipped: result.Skipped,
-      });
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
     } catch (error) {
+      outcome = 'error';
       return {
         Success: false,
         ResultCode: error instanceof Error ? error.name : 'EVALUATE_ESCALATIONS_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('EvaluateEscalations', startMs, params.ContextUser, { outcome });
     }
   }
 }
@@ -176,17 +177,24 @@ export class AcknowledgeEscalationOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ): Promise<{ ReferralEscalationID: string; Status: string }> {
     const startMs = Date.now();
-    if (!input.ReferralEscalationID) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      if (!input.ReferralEscalationID) {
+        throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+      }
+      const result = await SlaEscalationService.AcknowledgeEscalation(
+        AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
+        user,
+        requireProvider(resolveProvider(provider, context)),
+        input.Notes,
+      );
+      return { ReferralEscalationID: result.ReferralEscalationID, Status: result.Status };
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('AcknowledgeEscalation', startMs, user, { outcome });
     }
-    const result = await SlaEscalationService.AcknowledgeEscalation(
-      AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
-      user,
-      requireProvider(resolveProvider(provider, context)),
-      input.Notes,
-    );
-    recordTelemetry('AcknowledgeEscalation', startMs, user, { referralEscalationId: result.ReferralEscalationID });
-    return { ReferralEscalationID: result.ReferralEscalationID, Status: result.Status };
   }
 }
 
@@ -194,11 +202,13 @@ export class AcknowledgeEscalationOperation extends BaseRemotableOperation<
 export class AcknowledgeEscalationAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
-    const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
-    if (!referralEscalationId) {
-      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
-    }
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
+      if (!referralEscalationId) {
+        outcome = 'error';
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
+      }
       const validId = AssertValidUUID(referralEscalationId, 'ReferralEscalationID');
       const result = await SlaEscalationService.AcknowledgeEscalation(
         validId,
@@ -206,9 +216,9 @@ export class AcknowledgeEscalationAction extends BaseAction {
         requireProvider(resolveActionProvider()),
         getStringParam(params, 'Notes'),
       );
-      recordTelemetry('AcknowledgeEscalation', startMs, params.ContextUser, { referralEscalationId: result.ReferralEscalationID });
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
     } catch (error) {
+      outcome = 'error';
       if (error instanceof InvalidUUIDError) {
         return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
       }
@@ -217,6 +227,8 @@ export class AcknowledgeEscalationAction extends BaseAction {
         ResultCode: error instanceof Error ? error.name : 'ACKNOWLEDGE_ESCALATION_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('AcknowledgeEscalation', startMs, params.ContextUser, { outcome });
     }
   }
 }
@@ -241,17 +253,23 @@ export class ResolveEscalationOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ): Promise<{ ReferralEscalationID: string; Status: string; RequestEscalationLevelReset: boolean }> {
     const startMs = Date.now();
-    if (!input.ReferralEscalationID) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      if (!input.ReferralEscalationID) {
+        throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+      }
+      return await SlaEscalationService.ResolveEscalation(
+        AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
+        user,
+        requireProvider(resolveProvider(provider, context)),
+        input.Notes,
+      );
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('ResolveEscalation', startMs, user, { outcome });
     }
-    const result = await SlaEscalationService.ResolveEscalation(
-      AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
-      user,
-      requireProvider(resolveProvider(provider, context)),
-      input.Notes,
-    );
-    recordTelemetry('ResolveEscalation', startMs, user, { referralEscalationId: result.ReferralEscalationID });
-    return result;
   }
 }
 
@@ -259,11 +277,13 @@ export class ResolveEscalationOperation extends BaseRemotableOperation<
 export class ResolveEscalationAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
-    const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
-    if (!referralEscalationId) {
-      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
-    }
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
+      if (!referralEscalationId) {
+        outcome = 'error';
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
+      }
       const validId = AssertValidUUID(referralEscalationId, 'ReferralEscalationID');
       const result = await SlaEscalationService.ResolveEscalation(
         validId,
@@ -271,9 +291,9 @@ export class ResolveEscalationAction extends BaseAction {
         requireProvider(resolveActionProvider()),
         getStringParam(params, 'Notes'),
       );
-      recordTelemetry('ResolveEscalation', startMs, params.ContextUser, { referralEscalationId: result.ReferralEscalationID });
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
     } catch (error) {
+      outcome = 'error';
       if (error instanceof InvalidUUIDError) {
         return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
       }
@@ -282,6 +302,8 @@ export class ResolveEscalationAction extends BaseAction {
         ResultCode: error instanceof Error ? error.name : 'RESOLVE_ESCALATION_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('ResolveEscalation', startMs, params.ContextUser, { outcome });
     }
   }
 }
@@ -306,17 +328,23 @@ export class DismissEscalationOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ): Promise<{ ReferralEscalationID: string; Status: string; RequestEscalationLevelReset: boolean }> {
     const startMs = Date.now();
-    if (!input.ReferralEscalationID) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      if (!input.ReferralEscalationID) {
+        throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+      }
+      return await SlaEscalationService.DismissEscalation(
+        AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
+        user,
+        requireProvider(resolveProvider(provider, context)),
+        input.Notes,
+      );
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('DismissEscalation', startMs, user, { outcome });
     }
-    const result = await SlaEscalationService.DismissEscalation(
-      AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
-      user,
-      requireProvider(resolveProvider(provider, context)),
-      input.Notes,
-    );
-    recordTelemetry('DismissEscalation', startMs, user, { referralEscalationId: result.ReferralEscalationID });
-    return result;
   }
 }
 
@@ -324,11 +352,13 @@ export class DismissEscalationOperation extends BaseRemotableOperation<
 export class DismissEscalationAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
-    const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
-    if (!referralEscalationId) {
-      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
-    }
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
+      if (!referralEscalationId) {
+        outcome = 'error';
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
+      }
       const validId = AssertValidUUID(referralEscalationId, 'ReferralEscalationID');
       const result = await SlaEscalationService.DismissEscalation(
         validId,
@@ -336,9 +366,9 @@ export class DismissEscalationAction extends BaseAction {
         requireProvider(resolveActionProvider()),
         getStringParam(params, 'Notes'),
       );
-      recordTelemetry('DismissEscalation', startMs, params.ContextUser, { referralEscalationId: result.ReferralEscalationID });
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
     } catch (error) {
+      outcome = 'error';
       if (error instanceof InvalidUUIDError) {
         return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
       }
@@ -347,6 +377,8 @@ export class DismissEscalationAction extends BaseAction {
         ResultCode: error instanceof Error ? error.name : 'DISMISS_ESCALATION_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('DismissEscalation', startMs, params.ContextUser, { outcome });
     }
   }
 }
@@ -372,17 +404,23 @@ export class ReopenExhaustedReferralOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ) {
     const startMs = Date.now();
-    if (!input.ReferralRequestID) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ReferralRequestID is required.');
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      if (!input.ReferralRequestID) {
+        throw new RemoteOperationError('INVALID_INPUT', 'ReferralRequestID is required.');
+      }
+      return await CascadeRoutingService.ReopenExhaustedRequest(
+        AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID'),
+        user,
+        { ExpandToAncestorPracticeArea: input.ExpandToAncestorPracticeArea },
+        resolveProvider(provider, context),
+      );
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('ReopenExhaustedReferral', startMs, user, { outcome });
     }
-    const result = await CascadeRoutingService.ReopenExhaustedRequest(
-      AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID'),
-      user,
-      { ExpandToAncestorPracticeArea: input.ExpandToAncestorPracticeArea },
-      resolveProvider(provider, context),
-    );
-    recordTelemetry('ReopenExhaustedReferral', startMs, user, { reopened: result.Reopened });
-    return result;
   }
 }
 
@@ -390,11 +428,13 @@ export class ReopenExhaustedReferralOperation extends BaseRemotableOperation<
 export class ReopenExhaustedReferralAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
-    const referralRequestId = getStringParam(params, 'ReferralRequestID');
-    if (!referralRequestId) {
-      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralRequestID is required.' };
-    }
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const referralRequestId = getStringParam(params, 'ReferralRequestID');
+      if (!referralRequestId) {
+        outcome = 'error';
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralRequestID is required.' };
+      }
       const validId = AssertValidUUID(referralRequestId, 'ReferralRequestID');
       const result = await CascadeRoutingService.ReopenExhaustedRequest(
         validId,
@@ -402,9 +442,9 @@ export class ReopenExhaustedReferralAction extends BaseAction {
         { ExpandToAncestorPracticeArea: getBooleanParam(params, 'ExpandToAncestorPracticeArea') },
         resolveActionProvider(),
       );
-      recordTelemetry('ReopenExhaustedReferral', startMs, params.ContextUser, { reopened: result.Reopened });
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
     } catch (error) {
+      outcome = 'error';
       if (error instanceof InvalidUUIDError) {
         return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
       }
@@ -413,6 +453,8 @@ export class ReopenExhaustedReferralAction extends BaseAction {
         ResultCode: error instanceof Error ? error.name : 'REOPEN_EXHAUSTED_REFERRAL_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('ReopenExhaustedReferral', startMs, params.ContextUser, { outcome });
     }
   }
 }

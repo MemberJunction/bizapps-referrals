@@ -47,14 +47,11 @@ export interface SetAvailabilityWindowInput {
   ProfessionalAvailabilityWindowID?: string;
   ProfessionalProfileID: string;
   WindowType: ProfessionalAvailabilityWindowEntity['WindowType'];
-  DayOfWeek?: number | null;
-  StartTimeMinutes?: number | null;
-  EndTimeMinutes?: number | null;
-  StartDate?: string | null;
-  EndDate?: string | null;
-  IsAvailable?: boolean;
-  TimeZone?: string;
-  Notes?: string | null;
+  StartsAt: string;
+  EndsAt: string;
+  CapacityOverride?: number | null;
+  Reason?: string | null;
+  IsActive?: boolean;
 }
 
 export interface SetAvailabilityWindowOutput {
@@ -260,22 +257,19 @@ export class SetAvailabilityWindowOperation extends BaseRemotableOperation<
     user: UserInfo,
     context: RemoteOpServerContext,
   ): Promise<SetAvailabilityWindowOutput> {
-    if (!input.ProfessionalProfileID || !input.WindowType) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ProfessionalProfileID and WindowType are required.');
+    if (!input.ProfessionalProfileID || !input.WindowType || !input.StartsAt || !input.EndsAt) {
+      throw new RemoteOperationError('INVALID_INPUT', 'ProfessionalProfileID, WindowType, StartsAt, and EndsAt are required.');
     }
     const window = await CapacityReadinessService.SetAvailabilityWindow(
       {
         ProfessionalAvailabilityWindowID: input.ProfessionalAvailabilityWindowID,
         ProfessionalProfileID: input.ProfessionalProfileID,
         WindowType: input.WindowType,
-        DayOfWeek: input.DayOfWeek,
-        StartTimeMinutes: input.StartTimeMinutes,
-        EndTimeMinutes: input.EndTimeMinutes,
-        StartDate: input.StartDate ? new Date(input.StartDate) : null,
-        EndDate: input.EndDate ? new Date(input.EndDate) : null,
-        IsAvailable: input.IsAvailable,
-        TimeZone: input.TimeZone,
-        Notes: input.Notes,
+        StartsAt: new Date(input.StartsAt),
+        EndsAt: new Date(input.EndsAt),
+        CapacityOverride: input.CapacityOverride,
+        Reason: input.Reason,
+        IsActive: input.IsActive,
       },
       user,
       resolveProvider(provider, context),
@@ -293,30 +287,27 @@ export class SetAvailabilityWindowAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const professionalProfileId = getStringParam(params, 'ProfessionalProfileID');
     const windowType = getStringParam(params, 'WindowType') as ProfessionalAvailabilityWindowEntity['WindowType'] | undefined;
-    if (!professionalProfileId || !windowType) {
+    const startsAtRaw = getStringParam(params, 'StartsAt');
+    const endsAtRaw = getStringParam(params, 'EndsAt');
+    if (!professionalProfileId || !windowType || !startsAtRaw || !endsAtRaw) {
       return {
         Success: false,
         ResultCode: 'INVALID_PARAMETERS',
-        Message: 'ProfessionalProfileID and WindowType are required.',
+        Message: 'ProfessionalProfileID, WindowType, StartsAt, and EndsAt are required.',
       };
     }
 
     try {
-      const startDateRaw = getStringParam(params, 'StartDate');
-      const endDateRaw = getStringParam(params, 'EndDate');
       const window = await CapacityReadinessService.SetAvailabilityWindow(
         {
           ProfessionalAvailabilityWindowID: getStringParam(params, 'ProfessionalAvailabilityWindowID'),
           ProfessionalProfileID: professionalProfileId,
           WindowType: windowType,
-          DayOfWeek: getNumberParam(params, 'DayOfWeek'),
-          StartTimeMinutes: getNumberParam(params, 'StartTimeMinutes'),
-          EndTimeMinutes: getNumberParam(params, 'EndTimeMinutes'),
-          StartDate: startDateRaw ? new Date(startDateRaw) : null,
-          EndDate: endDateRaw ? new Date(endDateRaw) : null,
-          IsAvailable: getBooleanParam(params, 'IsAvailable'),
-          TimeZone: getStringParam(params, 'TimeZone'),
-          Notes: getStringParam(params, 'Notes'),
+          StartsAt: new Date(startsAtRaw),
+          EndsAt: new Date(endsAtRaw),
+          CapacityOverride: getNumberParam(params, 'CapacityOverride'),
+          Reason: getStringParam(params, 'Reason'),
+          IsActive: getBooleanParam(params, 'IsActive'),
         },
         params.ContextUser,
         resolveActionProvider(),

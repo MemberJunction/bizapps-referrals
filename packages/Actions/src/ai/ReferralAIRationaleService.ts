@@ -29,12 +29,11 @@ export const MATCH_RATIONALE_PROMPT_NAME = 'Referrals Match Rationale';
 export const ESCALATION_ADVISOR_PROMPT_NAME = 'Referrals Escalation Advisor';
 
 const RECOMMENDED_ACTIONS: ReadonlyArray<EscalationRecommendedAction> = [
-  'ExtendSLA',
-  'AdvanceCascade',
-  'ReassignTier',
+  'ReassignNextCandidate',
   'ExpandPracticeArea',
-  'ContactProfessional',
-  'CloseUnfulfilled',
+  'ExtendSLA',
+  'ContactSeeker',
+  'CloseAsExhausted',
 ];
 
 export interface RationaleRequestInput {
@@ -168,18 +167,18 @@ function deterministicRecommendedAction(escalation: ReferralEscalationEntity): E
     return 'ExpandPracticeArea';
   }
   if (escalation.EscalationLevel >= 3) {
-    return 'ReassignTier';
+    return 'CloseAsExhausted';
   }
   if (escalation.TriggerType === 'UrgentUnassigned') {
-    return 'ReassignTier';
+    return 'ReassignNextCandidate';
   }
   if (escalation.TriggerType === 'SLABreach') {
-    return 'AdvanceCascade';
+    return 'ReassignNextCandidate';
   }
-  if (escalation.TriggerType === 'ConflictDeadlock' || escalation.TriggerType === 'ManualOverride') {
-    return 'ContactProfessional';
+  if (escalation.TriggerType === 'AIRecommended' || escalation.TriggerType === 'Manual') {
+    return 'ContactSeeker';
   }
-  return 'ContactProfessional';
+  return 'ExtendSLA';
 }
 
 function parseEscalationRationale(json: string): EscalationRationale | null {
@@ -426,7 +425,7 @@ export class ReferralAIRationaleService {
     contextUser: UserInfo,
     provider: IMetadataProvider & IRunViewProvider,
   ): Promise<Record<string, PromptDataValue>> {
-    const elapsedHours = Math.round(((Date.now() - new Date(escalation.TriggeredAt).getTime()) / (60 * 60 * 1000)) * 10) / 10;
+    const elapsedHours = Math.round(((Date.now() - new Date(escalation.RaisedAt).getTime()) / (60 * 60 * 1000)) * 10) / 10;
     const base: Record<string, PromptDataValue> = {
       escalationLevel: escalation.EscalationLevel,
       triggerType: escalation.TriggerType,
@@ -555,7 +554,10 @@ export class ReferralAIRationaleService {
 
     escalation.RecommendedAction = recommendedAction;
     escalation.AIRationaleJSON = JSON.stringify(rationale);
-    await escalation.Save();
+    const saved = await escalation.Save();
+    if (!saved) {
+      throw new PersistenceError(`Failed to save RecommendedAction/AIRationaleJSON for ReferralEscalation '${validId}'.`);
+    }
 
     return { ReferralEscalationID: validId, RecommendedAction: recommendedAction, Skipped: false, ...rationale };
   }
