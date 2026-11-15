@@ -413,7 +413,7 @@ describe('@mj-biz-apps/referrals-integration-tests Wave 3 Slice 2 closed-loop li
     const inProgressRes = await CascadeRoutingService.MarkInProgress(reopenRes.ActiveAssignmentID!, pro4User, provider);
     expect(inProgressRes.AssignmentStatus).toBe('InProgress');
     const completeRes = await CascadeRoutingService.CompleteReferral(
-      { ReferralAssignmentID: reopenRes.ActiveAssignmentID!, OutcomeStatus: 'Completed' },
+      { ReferralAssignmentID: reopenRes.ActiveAssignmentID!, OutcomeStatus: 'Resolved' },
       pro4User,
       provider,
     );
