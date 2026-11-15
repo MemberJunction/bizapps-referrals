@@ -3,6 +3,7 @@ import {
   ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalProfileEntity,
+  ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { AssertValidUUID, AuthorizationError, IsAssociationAdmin, PersistenceError } from './validation.js';
@@ -210,7 +211,7 @@ export class CapacityReadinessService {
   public static ComputeSLADeadline(
     offeredAt: Date,
     tier: Pick<ReferralTierEntity, 'SLAResponseHours' | 'UrgentSLAMultiplier'>,
-    urgency: 'Low' | 'Standard' | 'High' | 'Urgent' = 'Standard',
+    urgency: ReferralRequestEntity['UrgencyLevel'] = 'Standard',
   ): Date {
     const baseHours = tier.SLAResponseHours > 0 ? tier.SLAResponseHours : 24;
     const multiplier = tier.UrgentSLAMultiplier > 0 ? tier.UrgentSLAMultiplier : 1;

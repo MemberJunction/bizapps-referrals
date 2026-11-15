@@ -9,6 +9,7 @@ import {
 import {
   ConflictCheckPartyEntity,
   PracticeAreaEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
@@ -743,9 +744,30 @@ export class CascadeRoutingService {
           );
         }
 
-        if (pro.ActiveReferralCount >= pro.MaxConcurrentReferrals) {
+        // CR-22: re-verify effective availability at accept-time - an OnLeave/Paused
+        // window added, or a ReducedCapacity override reached, since the offer was made
+        // must still block acceptance even though the coarse AvailabilityStatus passed above.
+        const acceptWindowsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+            ExtraFilter: `ProfessionalProfileID = '${pro.ID}' AND IsActive = 1`,
+            ResultType: 'entity_object',
+          },
+          contextUser,
+        );
+        const acceptAvailability = CapacityReadinessService.ResolveEffectiveAvailability(
+          pro,
+          acceptWindowsRes.Success ? acceptWindowsRes.Results : [],
+        );
+        if (acceptAvailability.IsBlocked) {
           throw new InvalidLifecycleStateError(
-            `Professional '${pro.ID}' is at max concurrent referral capacity (${pro.ActiveReferralCount}/${pro.MaxConcurrentReferrals}).`,
+            `Professional '${pro.ID}' cannot accept this referral: ${acceptAvailability.BlockReason ?? 'blocked by an active availability window.'}`,
+          );
+        }
+
+        if (pro.ActiveReferralCount >= acceptAvailability.EffectiveMaxConcurrent) {
+          throw new InvalidLifecycleStateError(
+            `Professional '${pro.ID}' is at max concurrent referral capacity (${pro.ActiveReferralCount}/${acceptAvailability.EffectiveMaxConcurrent}).`,
           );
         }
 
@@ -853,7 +875,7 @@ export class CascadeRoutingService {
         );
         await atomicIncrementProCapacity(txProvider, pro, contextUser);
 
-        if (hasSqlSupport(txProvider) && 'RunView' in txProvider) {
+        if ('RunView' in txProvider) {
           const newAverage = await recompute90DayAverageResponseHours(
             txProvider as TransactionalProvider & IRunViewProvider,
             pro.ID,
@@ -940,7 +962,7 @@ export class CascadeRoutingService {
         await saveOrThrow(assignment, 'Declined ReferralAssignment metadata');
       }
 
-      if (hasSqlSupport(txProvider) && 'RunView' in txProvider) {
+      if ('RunView' in txProvider) {
         const newAverage = await recompute90DayAverageResponseHours(
           txProvider as TransactionalProvider & IRunViewProvider,
           pro.ID,
@@ -1076,6 +1098,11 @@ export class CascadeRoutingService {
             ExtraFilter: `ProfessionalProfileID = '${validProId}' AND JurisdictionID = '${validJurisdictionId}'`,
             ResultType: 'entity_object',
           },
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+            ExtraFilter: `ProfessionalProfileID = '${validProId}' AND IsActive = 1`,
+            ResultType: 'entity_object',
+          },
         ],
         contextUser,
       );
@@ -1086,6 +1113,12 @@ export class CascadeRoutingService {
       const jurisdictionLink = linkBatch[1]?.Success
         ? (linkBatch[1].Results[0] as ProfessionalJurisdictionEntity | undefined)
         : undefined;
+      // CR-22: re-verify effective availability at cascade-advance time - a window added
+      // or a ReducedCapacity override reached since the original match must still block
+      // promotion to 'Offered'.
+      const availabilityWindows = linkBatch[2]?.Success
+        ? (linkBatch[2].Results as Parameters<typeof CapacityReadinessService.ResolveEffectiveAvailability>[1])
+        : [];
 
       const conflict = proLoaded
         ? ConflictScreeningService.ScreenCandidate(pro, requestParties, activeMatterParties)
@@ -1094,12 +1127,16 @@ export class CascadeRoutingService {
       const standingOk =
         jurisdictionLink != null &&
         (jurisdictionLink.StandingStatus === 'GoodStanding' || jurisdictionLink.StandingStatus === 'ProHacVice');
+      const effectiveAvailability = proLoaded
+        ? CapacityReadinessService.ResolveEffectiveAvailability(pro, availabilityWindows)
+        : { IsBlocked: true, BlockReason: 'Profile not found.', EffectiveMaxConcurrent: 0 };
       const profileOk =
         proLoaded &&
         pro.IsActive &&
         pro.VerificationStatus === 'Verified' &&
         (pro.AvailabilityStatus === 'Available' || pro.AvailabilityStatus === 'Limited') &&
-        pro.ActiveReferralCount < pro.MaxConcurrentReferrals &&
+        !effectiveAvailability.IsBlocked &&
+        pro.ActiveReferralCount < effectiveAvailability.EffectiveMaxConcurrent &&
         (!request.RequiresProBono || pro.AcceptsProBono);
 
       if (!profileOk || !practiceLink || !standingOk || conflict.HasConflict) {
@@ -1491,9 +1528,21 @@ export class CascadeRoutingService {
         await assignment.Save();
       });
 
+      // CR-04: capture the pro's counters before mutating them so a compensation can
+      // restore them exactly if a later step in this transaction (e.g. the final
+      // ReferralRequest save) fails.
+      const prevActiveCount = pro.ActiveReferralCount;
+      const prevCompletedCount = pro.TotalCompletedCount;
+      const prevAverageResponseHours = pro.AverageResponseHours;
       await atomicDecrementProCapacityOnCompletion(txProvider, pro, contextUser);
+      compensation?.registerCompensation(async () => {
+        pro.ActiveReferralCount = prevActiveCount;
+        pro.TotalCompletedCount = prevCompletedCount;
+        pro.AverageResponseHours = prevAverageResponseHours;
+        await pro.Save();
+      });
 
-      if (hasSqlSupport(txProvider)) {
+      if ('RunView' in txProvider) {
         const newAverage = await recompute90DayAverageResponseHours(
           txProvider as TransactionalProvider & IRunViewProvider,
           pro.ID,

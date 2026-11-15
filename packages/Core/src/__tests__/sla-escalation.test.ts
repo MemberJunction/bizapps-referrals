@@ -6,7 +6,7 @@ import type {
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
-import { AuthorizationError, InvalidLifecycleStateError, SlaEscalationService } from '../index.js';
+import { AuthorizationError, BizAppsTasksEscalationNotifier, InvalidLifecycleStateError, SlaEscalationService } from '../index.js';
 
 const TIER_ID = '10000000-0000-4000-8000-000000000001';
 const REQ_1_ID = '20000000-0000-4000-8000-000000000001';
@@ -405,6 +405,39 @@ describe('SlaEscalationService', () => {
     expect(store.escalations.size).toBe(1);
   });
 
+  it('AC-19 exact fixture: 8h tier, 75% warning -> 0 raised at T0+5h59m, 1 raised (+SLAWarningSentAt) at T0+6h, 0 raised on repeat', async () => {
+    const offeredAt = new Date('2026-01-01T00:00:00.000Z');
+    const slaDeadlineAt = new Date(offeredAt.getTime() + 8 * 60 * 60 * 1000);
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier({ SLAResponseHours: 8, EscalationWarningPercent: 75 })]]),
+      requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID)]]),
+      assignments: new Map([
+        [
+          ASSIGN_1_ID.toLowerCase(),
+          makeAssignment(ASSIGN_1_ID, REQ_1_ID, { OfferedAt: offeredAt, SLADeadlineAt: slaDeadlineAt }),
+        ],
+      ]),
+      escalations: new Map(),
+    };
+    const dp = new MockEscalationProvider(store);
+    const user = makeUser(['Coordinator']);
+
+    const beforeThreshold = new Date(offeredAt.getTime() + 5 * 60 * 60 * 1000 + 59 * 60 * 1000);
+    const resultBefore = await SlaEscalationService.EvaluateEscalations(beforeThreshold, user, dp);
+    expect(resultBefore.WarningsRaised).toBe(0);
+    expect(store.escalations.size).toBe(0);
+
+    const atThreshold = new Date(offeredAt.getTime() + 6 * 60 * 60 * 1000);
+    const resultAt = await SlaEscalationService.EvaluateEscalations(atThreshold, user, dp);
+    expect(resultAt.WarningsRaised).toBe(1);
+    expect(store.escalations.size).toBe(1);
+    expect(store.assignments.get(ASSIGN_1_ID.toLowerCase())?.SLAWarningSentAt).not.toBeNull();
+
+    const repeatResult = await SlaEscalationService.EvaluateEscalations(atThreshold, user, dp);
+    expect(repeatResult.WarningsRaised).toBe(0);
+    expect(store.escalations.size).toBe(1);
+  });
+
   it('EvaluateEscalations never raises UrgentUnassigned for a Standard-urgency request, however long it has been unassigned', async () => {
     const store: MockStore = {
       tiers: new Map([[TIER_ID.toLowerCase(), makeTier({ SLAResponseHours: 4, UrgentSLAMultiplier: 1 })]]),
@@ -450,5 +483,73 @@ describe('SlaEscalationService', () => {
     expect(result.Status).toBe('Dismissed');
     expect(result.RequestEscalationLevelReset).toBe(false);
     expect(store.requests.get(REQ_1_ID.toLowerCase())?.EscalationLevel).toBe(2);
+  });
+});
+
+describe('BizAppsTasksEscalationNotifier (AC-24)', () => {
+  const escalation = makeEscalation({
+    ID: '70000000-0000-4000-8000-000000000001',
+    EscalationLevel: 2,
+    TriggerType: 'SLABreach',
+    Notes: null,
+  });
+  const request = makeRequest(REQ_1_ID, { RequestNumber: 'REF-TEST-001' } as Record<string, FieldValue>);
+  const user = makeUser(['Coordinator']);
+
+  it('is Skipped with LinkedTaskID null when MJ_BizApps_Tasks: Tasks is absent from provider.Entities', async () => {
+    const provider = { Entities: [] } as object as IMetadataProvider;
+    const notifier = new BizAppsTasksEscalationNotifier();
+    const result = await notifier.Notify(escalation, { request, contextUser: user, provider });
+    expect(result.Success).toBe(false);
+    expect(result.Skipped).toBe(true);
+    expect(result.LinkedTaskID).toBeNull();
+  });
+
+  it('creates exactly 1 Task and saves LinkedTaskID when MJ_BizApps_Tasks: Tasks is present and ExecuteSQL succeeds', async () => {
+    type SqlParam = string | number | boolean | Date | null | undefined;
+    const executeSqlCalls: Array<{ sql: string; params?: SqlParam[] }> = [];
+    const provider = {
+      Entities: [
+        { Name: 'MJ_BizApps_Tasks: Tasks', SchemaName: 'mj_tasks', BaseTable: 'Task', Fields: [{ Name: 'Name' }, { Name: 'TypeID' }] },
+      ],
+      RunView: async (params: RunViewParams) => {
+        if (params.EntityName === 'MJ_BizApps_Tasks: Task Types') {
+          return { Success: true, Results: [{ ID: '80000000-0000-4000-8000-000000000001' }] };
+        }
+        return { Success: true, Results: [] };
+      },
+      ExecuteSQL: async (sql: string, params?: SqlParam[]) => {
+        executeSqlCalls.push({ sql, params });
+        return [{ ID: '90000000-0000-4000-8000-000000000001' }];
+      },
+    } as object as IMetadataProvider & IRunViewProvider;
+    const notifier = new BizAppsTasksEscalationNotifier();
+    const result = await notifier.Notify(escalation, { request, contextUser: user, provider });
+    expect(result.Success).toBe(true);
+    expect(result.LinkedTaskID).toBe('90000000-0000-4000-8000-000000000001');
+    expect(executeSqlCalls.length).toBe(1);
+  });
+
+  it('returns Success:false (never throws) when ExecuteSQL throws, and the escalation itself is unaffected', async () => {
+    const provider = {
+      Entities: [
+        { Name: 'MJ_BizApps_Tasks: Tasks', SchemaName: 'mj_tasks', BaseTable: 'Task', Fields: [{ Name: 'Name' }, { Name: 'TypeID' }] },
+      ],
+      RunView: async (params: RunViewParams) => {
+        if (params.EntityName === 'MJ_BizApps_Tasks: Task Types') {
+          return { Success: true, Results: [{ ID: '80000000-0000-4000-8000-000000000001' }] };
+        }
+        return { Success: true, Results: [] };
+      },
+      ExecuteSQL: async () => {
+        throw new Error('Simulated DB failure creating Task.');
+      },
+    } as object as IMetadataProvider & IRunViewProvider;
+    const notifier = new BizAppsTasksEscalationNotifier();
+    const result = await notifier.Notify(escalation, { request, contextUser: user, provider });
+    expect(result.Success).toBe(false);
+    expect(result.LinkedTaskID).toBeNull();
+    // The notifier failing never mutates the escalation/request it was notifying about.
+    expect(escalation.EscalationLevel).toBe(2);
   });
 });

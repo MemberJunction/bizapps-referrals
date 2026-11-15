@@ -4,10 +4,9 @@ import type { EscalationRecommendedAction } from '../types.js';
 
 /** Where an AI/rules rationale came from: a live AI advisor call, or the deterministic fallback. */
 export const AI_RATIONALE_SOURCES = ['AI', 'Deterministic'] as const;
-export type AIRationaleSource = (typeof AI_RATIONALE_SOURCES)[number];
 
 /** Runtime validator for a `Source` value read back from persisted `AIRationaleJSON`. */
-export function isValidAIRationaleSource(value: string): value is AIRationaleSource {
+export function isValidAIRationaleSource(value: string): boolean {
   return (AI_RATIONALE_SOURCES as readonly string[]).includes(value);
 }
 

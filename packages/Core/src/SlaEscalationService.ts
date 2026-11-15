@@ -280,11 +280,9 @@ export class SlaEscalationService {
           const warningThresholdMs = offeredMs + (deadlineMs - offeredMs) * (tier.EscalationWarningPercent / 100);
 
           if (asOf.getTime() >= warningThresholdMs) {
-            assignment.SLAWarningSentAt = asOf;
-            const saved = await assignment.Save();
-            if (!saved) {
-              throw new PersistenceError(`Failed to stamp SLAWarningSentAt on ReferralAssignment '${assignment.ID}'.`);
-            }
+            // CR-27: raise the escalation BEFORE stamping SLAWarningSentAt, so a failed
+            // RaiseEscalation (e.g. a transient DedupKey conflict) never leaves the
+            // assignment marked as warned without a corresponding escalation row.
             try {
               const warningResult = await SlaEscalationService.RaiseEscalation(
                 {
@@ -302,6 +300,11 @@ export class SlaEscalationService {
               );
               if (warningResult.Raised) {
                 warningsRaised++;
+              }
+              assignment.SLAWarningSentAt = asOf;
+              const saved = await assignment.Save();
+              if (!saved) {
+                throw new PersistenceError(`Failed to stamp SLAWarningSentAt on ReferralAssignment '${assignment.ID}'.`);
               }
             } catch {
               skipped++;
@@ -435,15 +438,49 @@ export class SlaEscalationService {
     escalation.RaisedAt = new Date();
     escalation.DedupKey = input.DedupKey;
     escalation.NotifierKey = notifierKey;
-    const escalationSaved = await escalation.Save();
+    let escalationSaved: boolean;
+    try {
+      escalationSaved = await escalation.Save();
+    } catch (err) {
+      // CR-13: a concurrent caller may have raced us and inserted the same DedupKey
+      // between our existence check and this Save(), tripping the UNIQUE constraint.
+      // Re-query by DedupKey and return the winner's row idempotently instead of
+      // propagating a spurious failure for what is, from the caller's perspective, a
+      // successful (already-raised) outcome.
+      const conflictRes = await rv.RunView<ReferralEscalationEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
+          ExtraFilter: `DedupKey = '${input.DedupKey.replace(/'/g, "''")}'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (conflictRes.Success && conflictRes.Results.length > 0) {
+        return { Raised: false, ReferralEscalationID: conflictRes.Results[0].ID };
+      }
+      throw err;
+    }
     if (!escalationSaved) {
+      const conflictRes = await rv.RunView<ReferralEscalationEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
+          ExtraFilter: `DedupKey = '${input.DedupKey.replace(/'/g, "''")}'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (conflictRes.Success && conflictRes.Results.length > 0) {
+        return { Raised: false, ReferralEscalationID: conflictRes.Results[0].ID };
+      }
       throw new PersistenceError(`Failed to save ReferralEscalation for ReferralRequest '${validRequestId}'.`);
     }
 
+    // CR-14: recompute the request's EscalationLevel as the max across BOTH Open and
+    // Acknowledged escalations (an Acknowledged escalation must still hold the level up).
     const openLevelsRes = await rv.RunView<ReferralEscalationEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
-        ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Open'`,
+        ExtraFilter: `ReferralRequestID = '${validRequestId}' AND (Status = 'Open' OR Status = 'Acknowledged')`,
         ResultType: 'entity_object',
       },
       contextUser,
@@ -538,12 +575,13 @@ export class SlaEscalationService {
     }
 
     let requestEscalationLevelReset = false;
-    if (nextStatus === 'Resolved' || nextStatus === 'Dismissed') {
+    {
       const rv = new RunView(provider);
-      // Recompute ReferralRequest.EscalationLevel as the max level across whatever Open/
-      // Acknowledged escalations remain for this request (0 when none remain), rather than
-      // only resetting to 0 when the Open set is empty - an Acknowledged escalation at a
-      // higher level must still hold the request's EscalationLevel up.
+      // CR-14: recompute ReferralRequest.EscalationLevel as the max level across whatever
+      // Open/Acknowledged escalations remain for this request (0 when none remain) on
+      // EVERY transition (Acknowledge/Resolve/Dismiss), not only Resolved/Dismissed - an
+      // Acknowledged escalation at a higher level must still hold the request's
+      // EscalationLevel up, and the level must stay consistent even when Acknowledging.
       const remainingActiveRes = await rv.RunView<ReferralEscalationEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
@@ -557,7 +595,10 @@ export class SlaEscalationService {
         const request = await provider.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', contextUser);
         if (await request.Load(escalation.ReferralRequestID)) {
           request.EscalationLevel = recomputedLevel;
-          await request.Save();
+          const reqSaved = await request.Save();
+          if (!reqSaved) {
+            throw new PersistenceError(`Failed to recompute ReferralRequest.EscalationLevel for '${escalation.ReferralRequestID}'.`);
+          }
           requestEscalationLevelReset = recomputedLevel === 0;
         }
       }
