@@ -788,5 +788,251 @@
         }
       ]
     }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.EvaluateEscalations",
+      "Description": "Evaluates all Offered assignments and Urgent requests for SLA-warning and urgent-unassigned escalation conditions.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.EvaluateEscalations",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000C"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "AsOfIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 timestamp to evaluate as-of (defaults to now)."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "NotifierKey",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "DefaultValue": "None",
+            "Description": "Escalation notifier to invoke: None or BizAppsTasks."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.AcknowledgeEscalation",
+      "Description": "Coordinator/admin acknowledgement of an Open referral escalation.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.AcknowledgeEscalation",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000D"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralEscalationID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Open ReferralEscalation to acknowledge."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Notes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text acknowledgement notes."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.ResolveEscalation",
+      "Description": "Coordinator/admin resolution of an Open or Acknowledged referral escalation.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.ResolveEscalation",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000E"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralEscalationID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Open or Acknowledged ReferralEscalation to resolve."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Notes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text resolution notes."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.ReopenExhaustedReferral",
+      "Description": "Admin-only reopen of an Exhausted referral: re-runs matching excluding previously assigned professionals, optionally expanding to the parent PracticeArea.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.ReopenExhaustedReferral",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000F"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralRequestID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Exhausted ReferralRequest to reopen."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ExpandToAncestorPracticeArea",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "When true, expands matching to the parent PracticeArea if one exists."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.RecomputeReciprocity",
+      "Description": "Recomputes and upserts ReciprocitySnapshot rows for every active professional over a period (defaults to the current UTC calendar quarter), and updates ProfessionalProfile readiness/reciprocity fields.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.RecomputeReciprocity",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000010"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PeriodStartIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 period start (defaults to the current UTC calendar quarter)."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PeriodEndIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 period end (defaults to the current UTC calendar quarter)."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.GetReciprocityScorecard",
+      "Description": "Computes a live reciprocity scorecard (Sent/Received/Accepted/Resolved/SLABreachCount/AcceptanceRate/MedianResponseHours/ReciprocityIndex/AttributedFeeTotal) for a professional over a period.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.GetReciprocityScorecard",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000011"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ProfessionalProfileID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ProfessionalProfile to compute the scorecard for."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PeriodStartIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 period start (defaults to the current UTC calendar quarter)."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PeriodEndIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 period end (defaults to the current UTC calendar quarter)."
+          }
+        }
+      ]
+    }
   }
 ]

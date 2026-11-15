@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../../../..');
 const metadataPath = resolve(repoRoot, 'metadata/actions/.referrals-actions.json');
-const sourceFiles = [resolve(__dirname, '../index.ts'), resolve(__dirname, '../lifecycle-actions.ts')];
+const sourceFiles = [
+  resolve(__dirname, '../index.ts'),
+  resolve(__dirname, '../lifecycle-actions.ts'),
+  resolve(__dirname, '../escalation-actions.ts'),
+  resolve(__dirname, '../reciprocity-actions.ts'),
+];
 
 interface ActionMetadataRecord {
   fields: { Name: string; DriverClass: string };
@@ -84,5 +89,14 @@ describe('Referrals Action metadata parity', () => {
     expect(declared.has('Referrals.MarkReferralInProgress')).toBe(true);
     expect(declared.has('Referrals.CompleteReferral')).toBe(true);
     expect(declared.has('Referrals.SetAvailabilityWindow')).toBe(true);
+  });
+
+  it('registers the 6 Wave 3 Slice 2 escalation/reciprocity actions in metadata', () => {
+    expect(declared.has('Referrals.EvaluateEscalations')).toBe(true);
+    expect(declared.has('Referrals.AcknowledgeEscalation')).toBe(true);
+    expect(declared.has('Referrals.ResolveEscalation')).toBe(true);
+    expect(declared.has('Referrals.ReopenExhaustedReferral')).toBe(true);
+    expect(declared.has('Referrals.RecomputeReciprocity')).toBe(true);
+    expect(declared.has('Referrals.GetReciprocityScorecard')).toBe(true);
   });
 });
