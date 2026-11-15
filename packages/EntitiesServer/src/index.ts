@@ -190,14 +190,75 @@ export class ReferralOutcomeServerEntity extends ReferralOutcomeEntity {
   }
 }
 
+interface CachedWindow {
+  ID: string;
+  WindowType: string;
+  StartsAt: Date;
+  EndsAt: Date;
+  IsActive: boolean;
+}
+
 @RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Availability Windows')
 export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvailabilityWindowEntity {
   /**
-   * Validates the synchronous (non-DB-dependent) invariants: `EndsAt` strictly after
-   * `StartsAt`, and a `ReducedCapacity` window requires a non-null, non-negative
-   * `CapacityOverride`. The overlap check (CR-14) additionally requires a DB round-trip
-   * and therefore cannot run inside a synchronous `Validate()`; it is enforced in `Save()`
-   * below, which runs on every create/update path before any write occurs.
+   * CR-10: an in-process cache of a professional's active availability windows, keyed by
+   * `ProfessionalProfileID.toLowerCase()`. `Save()` primes this cache via `RunView` for the
+   * current `ProfessionalProfileID` *before* calling `super.Save()` (which synchronously
+   * invokes `Validate()` as part of MJ's save lifecycle), so the synchronous `Validate()`
+   * below can detect overlapping siblings without itself performing I/O. The cache is a
+   * best-effort optimization, not a cross-process lock: it only reflects windows this
+   * process has loaded or saved, refreshed on every `Save()` call.
+   */
+  private static readonly windowCache = new Map<string, CachedWindow[]>();
+
+  private static cacheKeyFor(profileId: string): string {
+    return profileId.toLowerCase();
+  }
+
+  private async primeOverlapCache(): Promise<void> {
+    if (!this.ProfessionalProfileID) {
+      return;
+    }
+    const rawProvider: object | undefined = this.ProviderToUse;
+    const isMetadataAndRunView = (p: object | undefined): p is IMetadataProvider & IRunViewProvider =>
+      Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
+    if (!isMetadataAndRunView(rawProvider) || !this.ContextCurrentUser) {
+      return;
+    }
+    const rv = new RunView(rawProvider);
+    const siblingsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+        ExtraFilter: `ProfessionalProfileID = '${this.ProfessionalProfileID}' AND IsActive = 1`,
+        ResultType: 'entity_object',
+      },
+      this.ContextCurrentUser,
+    );
+    if (!siblingsRes.Success) {
+      return;
+    }
+    const cached: CachedWindow[] = siblingsRes.Results.filter((w) => w.StartsAt && w.EndsAt).map((w) => ({
+      ID: w.ID,
+      WindowType: w.WindowType,
+      StartsAt: new Date(w.StartsAt),
+      EndsAt: new Date(w.EndsAt),
+      IsActive: w.IsActive !== false,
+    }));
+    ProfessionalAvailabilityWindowServerEntity.windowCache.set(
+      ProfessionalAvailabilityWindowServerEntity.cacheKeyFor(this.ProfessionalProfileID),
+      cached,
+    );
+  }
+
+  /**
+   * Validates the synchronous invariants: `EndsAt` strictly after `StartsAt`, a
+   * `ReducedCapacity` window requires a non-null non-negative `CapacityOverride` (CR-14),
+   * and - via the pre-warmed `windowCache` (CR-10) - no overlapping active same-`WindowType`
+   * sibling for the same `ProfessionalProfileID` (`StartsAt < existing.EndsAt && EndsAt >
+   * existing.StartsAt`). The cache-based overlap check only fires when the cache has
+   * already been primed for this `ProfessionalProfileID` (by a prior `Save()` in-process);
+   * `Save()` below additionally re-verifies overlap directly via `RunView` as the
+   * authoritative, always-correct guard before any write occurs.
    */
   public override Validate(): ValidationResult {
     const result = super.Validate();
@@ -226,15 +287,49 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
       );
     }
 
+    if (this.IsActive !== false && this.StartsAt && this.EndsAt && this.ProfessionalProfileID) {
+      const cached = ProfessionalAvailabilityWindowServerEntity.windowCache.get(
+        ProfessionalAvailabilityWindowServerEntity.cacheKeyFor(this.ProfessionalProfileID),
+      );
+      if (cached) {
+        const newStart = new Date(this.StartsAt).getTime();
+        const newEnd = new Date(this.EndsAt).getTime();
+        const overlapping = cached.find(
+          (w) =>
+            w.IsActive !== false &&
+            w.WindowType === this.WindowType &&
+            w.ID !== this.ID &&
+            newStart < w.EndsAt.getTime() &&
+            newEnd > w.StartsAt.getTime(),
+        );
+        if (overlapping) {
+          result.Success = false;
+          result.Errors.push(
+            new ValidationErrorInfo(
+              'StartsAt',
+              `Overlaps an existing active '${this.WindowType}' window ('${overlapping.ID}') for this ProfessionalProfile.`,
+              this.StartsAt,
+              ValidationErrorType.Failure,
+            ),
+          );
+        }
+      }
+    }
+
     return result;
   }
 
   /**
-   * Rejects overlapping active windows of the same `WindowType` for the same
-   * `ProfessionalProfileID` (`StartsAt < existing.EndsAt && EndsAt > existing.StartsAt`)
-   * before delegating to the base `Save()`.
+   * Primes the overlap cache (so the synchronous `Validate()` above can see this
+   * professional's siblings), then authoritatively re-checks for an overlapping active
+   * window of the same `WindowType` directly via `RunView` and throws before any write if
+   * found, and finally enforces owner/coordinator/admin authorization on both the new and
+   * (on update) the previously-persisted `ProfessionalProfileID`, before delegating to the
+   * base `Save()`.
    */
   public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+    await this.primeOverlapCache();
+
     if (this.IsActive !== false && this.StartsAt && this.EndsAt && this.ProfessionalProfileID) {
       const rawProvider: object | undefined = this.ProviderToUse;
       const isMetadataAndRunView = (
@@ -243,6 +338,29 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
         Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
       if (isMetadataAndRunView(rawProvider) && this.ContextCurrentUser) {
         const rv = new RunView(rawProvider);
+
+        // CR-07: enforce owner/coordinator/admin authorization on the window's
+        // ProfessionalProfileID. On an update, also re-verify against the persisted
+        // (pre-edit) ProfessionalProfileID so a non-admin cannot reparent someone else's
+        // window onto their own profile (or vice versa) by editing the foreign key.
+        const idField = this.Fields.find((f) => f.Name === 'ProfessionalProfileID');
+        const persistedProfileId = (idField?.OldValue as string | undefined) ?? this.ProfessionalProfileID;
+        const isAdmin = this.ContextCurrentUser && IsCoordinatorOrAdmin(this.ContextCurrentUser);
+        if (!isAdmin) {
+          const ownedProfile = await rawProvider.GetEntityObject<ProfessionalProfileEntity>(
+            'MJ_BizApps_Referrals: Professional Profiles',
+            this.ContextCurrentUser,
+          );
+          const checkIds = Array.from(new Set([this.ProfessionalProfileID, persistedProfileId].filter((v): v is string => Boolean(v))));
+          for (const checkId of checkIds) {
+            if (!(await ownedProfile.Load(checkId)) || ownedProfile.UserID !== this.ContextCurrentUser.ID) {
+              throw new AuthorizationError(
+                `User '${this.ContextCurrentUser.ID}' is not authorized to save a ProfessionalAvailabilityWindow for ProfessionalProfile '${checkId}' (owner or Coordinator/Administrator required).`,
+              );
+            }
+          }
+        }
+
         const siblingsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
@@ -268,7 +386,31 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
         }
       }
     }
-    return super.Save(options);
+    const saved = await super.Save(options);
+    if (saved) {
+      // Keep the cache fresh: the prime step above ran before this row existed/changed, so
+      // without this update a subsequent sibling's synchronous Validate() in this same
+      // process would miss this window until another Save() happens to re-prime it.
+      this.upsertSelfInCache();
+    }
+    return saved;
+  }
+
+  private upsertSelfInCache(): void {
+    if (!this.ProfessionalProfileID || !this.StartsAt || !this.EndsAt) {
+      return;
+    }
+    const key = ProfessionalAvailabilityWindowServerEntity.cacheKeyFor(this.ProfessionalProfileID);
+    const existing = ProfessionalAvailabilityWindowServerEntity.windowCache.get(key) ?? [];
+    const withoutSelf = existing.filter((w) => w.ID !== this.ID);
+    withoutSelf.push({
+      ID: this.ID,
+      WindowType: this.WindowType,
+      StartsAt: new Date(this.StartsAt),
+      EndsAt: new Date(this.EndsAt),
+      IsActive: this.IsActive !== false,
+    });
+    ProfessionalAvailabilityWindowServerEntity.windowCache.set(key, withoutSelf);
   }
 }
 
