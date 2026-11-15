@@ -137,7 +137,7 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 | `SweepExpiredReferralSLAsAction` / `SweepExpiredReferralSLAsOperation` | Marks expired `Offered` assignments as `TimedOut` and cascades to the next ranked candidate |
 | `MarkReferralInProgressAction` / `CompleteReferralAction` | Transactional, authorization-checked, idempotent lifecycle completion; the latter creates a `ReferralOutcome` |
 | `SetAvailabilityWindowAction` | Creates/updates a `ProfessionalAvailabilityWindow` (Recurring / DateRange / Blackout) |
-| `EvaluateEscalationsAction` / `AcknowledgeEscalationAction` / `ResolveEscalationAction` | SLA-warning/urgent-unassigned escalation evaluation and coordinator/admin-gated lifecycle transitions |
+| `EvaluateEscalationsAction` / `AcknowledgeEscalationAction` / `ResolveEscalationAction` / `DismissEscalationAction` | SLA-warning/urgent-unassigned escalation evaluation and coordinator/admin-gated lifecycle transitions |
 | `ReopenExhaustedReferralAction` | Admin-only reopen of an `Exhausted` request, excluding previously-assigned professionals |
 | `RecomputeReciprocityAction` / `GetReciprocityScorecardAction` | Batch recompute and on-demand read of per-professional reciprocity scorecards |
 | `ExplainMatchAction` | AI (or deterministic fallback) match rationale, persisted onto each candidate's `ReferralAssignment.AIRationaleJSON` |
@@ -151,10 +151,13 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 
 - **`ReferralsSeekerIntakeComponent`** (*Seeker Intake*): Natural-language matter intake bar, practice/jurisdiction/urgency filters, trust & SLA KPI strip, and ranked professional match cards with verified credential badges and match rationale.
 - **`ReferralsProInboxComponent`** (*Pro Lead Inbox*): Incoming referral queue with live SLA countdown timers, `ConflictCheckParty` screening list, one-click `Accept` / `Flag Conflict` / `Decline` actions, and capacity controls.
-- **`ReferralsOpsTelemetryComponent`** (*Ops Telemetry*): Association executive KPI strip, `Active Referral Dispatch Telemetry` table with cascade controls, and `Supply-Demand Gap Matrix`.
+- **`ReferralsOpsTelemetryComponent`** (*Ops Telemetry*): Association executive KPI strip (including an Escalations tile linking to the Escalation Console), `Active Referral Dispatch Telemetry` table with cascade controls, and a memoized `Supply-Demand Gap Matrix`.
+- **`ReferralsEscalationConsoleComponent`** (*Escalations*): Open escalations grouped by level with a live SLA countdown, Acknowledge/Resolve/Dismiss, admin-only Reopen with parent-practice-area expansion, and an "Ask AI Advisor" panel.
+- **`ReferralsReciprocityScorecardComponent`** (*Reciprocity*): Quarter-selectable, `ReciprocityIndex`-ranked professional scorecard table with a Recompute action.
 - **Custom Entity Forms (`BaseFormPanel`)**:
   - `ReferralRequestHeroPanel` — intake status, conflict screening summary, and `Candidate Cascade Ladder`
   - `ProfessionalProfileHeroPanel` — bar/license verification audit, capacity & routing policy, and historical acceptance/rating metrics
+  - `ReferralEscalationHeroPanel` / `ReferralOutcomeHeroPanel` / `ProfessionalAvailabilityWindowHeroPanel` — hero summaries for the Wave 3 escalation/outcome/availability entities
 
 ---
 
@@ -200,6 +203,17 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **New Actions**: `Referrals.ExplainMatch`, `Referrals.RecommendEscalationAction`.
 - **Prompts & Agents**: `Referrals Match Rationale` and `Referrals Escalation Advisor` prompts; new Loop agent **Referrals Escalation Advisor** linked to `EvaluateEscalations`, `RecommendEscalationAction`, `ExplainMatch`, `GetReciprocityScorecard`, and `AcknowledgeEscalation`; Wave 3 lifecycle/reopen actions (`SubmitReferralIntake`, `MarkReferralInProgress`, `CompleteReferral`, `SetAvailabilityWindow`, `ReopenExhaustedReferral`) linked to the existing **Referrals Triage & Concierge** agent.
 - **Dependencies**: `@memberjunction/ai-prompts`, `@memberjunction/ai-core-plus`, `@memberjunction/ai-engine-base` pinned to `6.2.1` in `packages/Actions/package.json` only.
+
+---
+
+## Wave 3 Slice 4: Escalation Console, Reciprocity Scorecard & Closed-Loop UI
+
+- **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: Two new resources bring the Referrals app to 7 `DefaultNavItems` — `ReferralsEscalationConsoleComponent` (*Escalations*) and `ReferralsReciprocityScorecardComponent` (*Reciprocity*). The Escalation Console groups open escalations by `EscalationLevel` with a live SLA countdown (time-to-breach when a linked assignment deadline exists, elapsed-since-triggered otherwise), KPI tiles, Acknowledge/Resolve (disabled until notes are entered)/Dismiss, admin-only Reopen with an "Expand to parent practice area" toggle, and an "Ask AI Advisor" action surfacing `RecommendedAction` with an AI/Rules `Source` label. The Reciprocity Scorecard offers a `UserInfoEngine`-persisted quarter selector and a `ReciprocityIndex`-descending ranked table with a Recompute action.
+- **New Action**: `Referrals.DismissEscalation` (`BaseRemotableOperation` + `BaseAction`, mirroring `AcknowledgeEscalation`/`ResolveEscalation`) gives the Escalation Console's Dismiss action a server-side counterpart.
+- **Pro Inbox enhancements**: Mark In Progress, a "Complete & Report Outcome" panel (`CascadeRoutingService.CompleteReferral` now accepts an optional `FeeAmount`), and an Availability manager with date-range validation.
+- **Seeker Intake enhancements**: an urgency selector driving an SLA preview, per-candidate readiness badges, a client-side "Explain this match" panel, and a feedback-assignment list scoped to the current seeker's email with resolved professional `DisplayName`s.
+- **3 new hero panels** and bug fixes to `UserReferralsOverviewPanel` / `PersonReferralsOverviewPanel` navigation and `RequestCount`.
+- **mjButton/design-token migration**: every Angular component in `packages/Angular/src/lib/**` now uses `MJButtonDirective`, zero inline styles, zero raw color literals, and zero bare `<a>` tags.
 
 ---
 
