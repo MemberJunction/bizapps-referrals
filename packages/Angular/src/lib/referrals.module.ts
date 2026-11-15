@@ -33,12 +33,16 @@ import {
   ConflictCheckPartyFormComponent,
   JurisdictionFormComponent,
   PracticeAreaFormComponent,
+  ProfessionalAvailabilityWindowFormComponent,
   ProfessionalCredentialFormComponent,
   ProfessionalJurisdictionFormComponent,
   ProfessionalPracticeAreaFormComponent,
   ProfessionalProfileFormComponent,
+  ReciprocitySnapshotFormComponent,
   ReferralAssignmentFormComponent,
+  ReferralEscalationFormComponent,
   ReferralFeedbackFormComponent,
+  ReferralOutcomeFormComponent,
   ReferralRequestFormComponent,
   ReferralTierFormComponent,
 } from './forms/referrals-entity-forms.js';
@@ -137,4 +141,8 @@ export function LoadBizAppsReferralsClient(): void {
   void ProfessionalPracticeAreaFormComponent;
   void ProfessionalJurisdictionFormComponent;
   void ReferralFeedbackFormComponent;
+  void ReferralEscalationFormComponent;
+  void ReferralOutcomeFormComponent;
+  void ProfessionalAvailabilityWindowFormComponent;
+  void ReciprocitySnapshotFormComponent;
 }
