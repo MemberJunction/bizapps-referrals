@@ -1,6 +1,7 @@
 import { IRunViewProvider, RunView, UserInfo } from '@memberjunction/core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
@@ -8,6 +9,7 @@ import {
   ReferralAssignmentEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
+import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ActiveMatterPartyRecord, ConflictScreeningService } from './ConflictScreeningService.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import { MatchCandidateScore, MatchCriteria, ScoreBreakdown } from './types.js';
@@ -49,14 +51,21 @@ export class MatchingEngine {
     conflictParties: ReadonlyArray<Pick<ConflictCheckPartyEntity, 'PartyName' | 'PartyRole' | 'OrganizationName' | 'NormalizedName'>>;
     activeMatterParties: ReadonlyArray<ActiveMatterPartyRecord>;
     credentials?: ReadonlyArray<Pick<ProfessionalCredentialEntity, 'ProfessionalProfileID' | 'JurisdictionID' | 'VerificationStatus' | 'ExpiresAt' | 'IsPrimary'>>;
+    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'StartsAt' | 'EndsAt' | 'IsActive' | 'CapacityOverride'>>;
+    asOfDate?: Date;
   }): MatchCandidateScore {
-    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials } = params;
+    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials, availabilityWindows, asOfDate } = params;
 
     const allParties = [
       ...conflictParties,
       ...(criteria.ConflictParties ?? []),
     ];
     const conflictResult = ConflictScreeningService.ScreenCandidate(profile, allParties, activeMatterParties);
+
+    const effectiveAvailability =
+      availabilityWindows !== undefined && availabilityWindows.length > 0
+        ? CapacityReadinessService.ResolveEffectiveAvailability(profile, availabilityWindows, asOfDate ?? new Date())
+        : undefined;
 
     let disqualificationReason: string | null = null;
     if (!profile.IsActive) {
@@ -65,7 +74,9 @@ export class MatchingEngine {
       disqualificationReason = `Verification status is ${profile.VerificationStatus}.`;
     } else if (profile.AvailabilityStatus === 'Unavailable' || profile.AvailabilityStatus === 'OnLeave') {
       disqualificationReason = `Availability status is ${profile.AvailabilityStatus}.`;
-    } else if (profile.ActiveReferralCount >= profile.MaxConcurrentReferrals) {
+    } else if (effectiveAvailability?.IsBlocked) {
+      disqualificationReason = effectiveAvailability.BlockReason ?? 'Professional is outside their configured availability window.';
+    } else if (profile.ActiveReferralCount >= (effectiveAvailability?.EffectiveMaxConcurrent ?? profile.MaxConcurrentReferrals)) {
       disqualificationReason = 'Professional is at maximum concurrent referral capacity.';
     } else if (!practiceLink) {
       disqualificationReason = 'Professional does not cover the requested practice area.';
@@ -203,9 +214,19 @@ export class MatchingEngine {
       }
     }
 
+    let reciprocityBoost: number | undefined;
+    if (criteria.ApplyReciprocityBoost) {
+      const reciprocityIndex = profile.ReciprocityIndex ?? 1;
+      reciprocityBoost = Math.max(0, Math.min(5, (reciprocityIndex - 1) * 5));
+      reciprocityBoost = Math.round(reciprocityBoost * 100) / 100;
+    }
+
     const totalScore = Math.min(
       100,
-      Math.round((practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus + semanticScore) * 100) / 100,
+      Math.round(
+        (practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus + semanticScore + (reciprocityBoost ?? 0)) *
+          100,
+      ) / 100,
     );
 
     const breakdown: ScoreBreakdown = {
@@ -216,6 +237,7 @@ export class MatchingEngine {
       RatingScore: ratingScore,
       LanguageBonus: languageBonus,
       SemanticScore: semanticScore,
+      ...(reciprocityBoost !== undefined ? { ReciprocityBoost: reciprocityBoost } : {}),
       TotalScore: totalScore,
     };
 
@@ -243,6 +265,9 @@ export class MatchingEngine {
     }
     if (languageBonus > 0 && criteria.PreferredLanguage) {
       explainableReasons.push(`Speaks preferred language (${criteria.PreferredLanguage})`);
+    }
+    if (reciprocityBoost !== undefined && reciprocityBoost > 0) {
+      explainableReasons.push(`Reciprocity: refers more than they accept (+${reciprocityBoost} pts)`);
     }
     const headroom = profile.MaxConcurrentReferrals - profile.ActiveReferralCount;
     explainableReasons.push(
@@ -424,6 +449,25 @@ export class MatchingEngine {
       }
     }
 
+    const windowsByPro = new Map<string, ProfessionalAvailabilityWindowEntity[]>();
+    if (profiles.length > 0) {
+      const windowRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (windowRes.Success) {
+        for (const w of windowRes.Results) {
+          const key = w.ProfessionalProfileID.toLowerCase();
+          const list = windowsByPro.get(key) ?? [];
+          list.push(w);
+          windowsByPro.set(key, list);
+        }
+      }
+    }
+
     const scored = profiles.map((profile) =>
       MatchingEngine.ScoreCandidate({
         profile,
@@ -433,6 +477,7 @@ export class MatchingEngine {
         conflictParties: requestConflictParties,
         activeMatterParties,
         credentials: credentialQueryFailed ? [] : credsByPro.get(profile.ID.toLowerCase()) ?? [],
+        availabilityWindows: windowsByPro.get(profile.ID.toLowerCase()) ?? [],
       }),
     );
 

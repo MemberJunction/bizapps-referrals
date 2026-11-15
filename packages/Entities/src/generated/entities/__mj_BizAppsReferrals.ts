@@ -446,6 +446,18 @@ export const mjBizAppsReferralsProfessionalProfileSchema = z.object({
         * * Display Name: Active
         * * SQL Data Type: bit
         * * Default Value: 1`),
+    ReadinessScore: z.number().nullable().describe(`
+        * * Field Name: ReadinessScore
+        * * Display Name: Readiness Score
+        * * SQL Data Type: decimal(5, 2)`),
+    ReciprocityIndex: z.number().nullable().describe(`
+        * * Field Name: ReciprocityIndex
+        * * Display Name: Reciprocity Index
+        * * SQL Data Type: decimal(6, 3)`),
+    ReadinessComputedAt: z.date().nullable().describe(`
+        * * Field Name: ReadinessComputedAt
+        * * Display Name: Readiness Computed At
+        * * SQL Data Type: datetimeoffset`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -520,17 +532,19 @@ export const mjBizAppsReferralsReferralAssignmentSchema = z.object({
         * * Field Name: ConflictReason
         * * Display Name: Conflict Reason
         * * SQL Data Type: nvarchar(MAX)`),
-    Status: z.union([z.literal('Accepted'), z.literal('ConflictRejected'), z.literal('Declined'), z.literal('Expired'), z.literal('Offered'), z.literal('Queued'), z.literal('Withdrawn')]).describe(`
+    Status: z.union([z.literal('Accepted'), z.literal('Completed'), z.literal('ConflictRejected'), z.literal('Declined'), z.literal('Expired'), z.literal('InProgress'), z.literal('Offered'), z.literal('Queued'), z.literal('Withdrawn')]).describe(`
         * * Field Name: Status
         * * Display Name: Status
         * * SQL Data Type: nvarchar(30)
         * * Default Value: Queued
     * * Value List Type: List
-    * * Possible Values 
+    * * Possible Values
     *   * Accepted
+    *   * Completed
     *   * ConflictRejected
     *   * Declined
     *   * Expired
+    *   * InProgress
     *   * Offered
     *   * Queued
     *   * Withdrawn`),
@@ -554,6 +568,22 @@ export const mjBizAppsReferralsReferralAssignmentSchema = z.object({
         * * Field Name: DeclineReason
         * * Display Name: Decline Reason
         * * SQL Data Type: nvarchar(255)`),
+    SLAWarningSentAt: z.date().nullable().describe(`
+        * * Field Name: SLAWarningSentAt
+        * * Display Name: SLA Warning Sent At
+        * * SQL Data Type: datetimeoffset`),
+    ResponseHours: z.number().nullable().describe(`
+        * * Field Name: ResponseHours
+        * * Display Name: Response Hours
+        * * SQL Data Type: decimal(6, 2)`),
+    CompletedAt: z.date().nullable().describe(`
+        * * Field Name: CompletedAt
+        * * Display Name: Completed At
+        * * SQL Data Type: datetimeoffset`),
+    AIRationaleJSON: z.string().nullable().describe(`
+        * * Field Name: AIRationaleJSON
+        * * Display Name: AI Rationale JSON
+        * * SQL Data Type: nvarchar(MAX)`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -761,6 +791,32 @@ export const mjBizAppsReferralsReferralRequestSchema = z.object({
         * * Field Name: CompletedAt
         * * Display Name: Completed At
         * * SQL Data Type: datetimeoffset`),
+    SourceChannel: z.union([z.literal('Concierge'), z.literal('FinderWidget'), z.literal('OperatorManual'), z.literal('ProReferral'), z.literal('SeekerIntake')]).describe(`
+        * * Field Name: SourceChannel
+        * * Display Name: Source Channel
+        * * SQL Data Type: nvarchar(30)
+        * * Default Value: SeekerIntake
+    * * Value List Type: List
+    * * Possible Values
+    *   * Concierge
+    *   * FinderWidget
+    *   * OperatorManual
+    *   * ProReferral
+    *   * SeekerIntake`),
+    ReferringProfessionalID: z.string().nullable().describe(`
+        * * Field Name: ReferringProfessionalID
+        * * Display Name: Referring Professional
+        * * SQL Data Type: uniqueidentifier
+        * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
+    EscalationLevel: z.number().describe(`
+        * * Field Name: EscalationLevel
+        * * Display Name: Escalation Level
+        * * SQL Data Type: int
+        * * Default Value: 0`),
+    LastEscalatedAt: z.date().nullable().describe(`
+        * * Field Name: LastEscalatedAt
+        * * Display Name: Last Escalated At
+        * * SQL Data Type: datetimeoffset`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -837,6 +893,25 @@ export const mjBizAppsReferralsReferralTierSchema = z.object({
         * * Display Name: Active
         * * SQL Data Type: bit
         * * Default Value: 1`),
+    EscalationWarningPercent: z.number().describe(`
+        * * Field Name: EscalationWarningPercent
+        * * Display Name: Escalation Warning Percent
+        * * SQL Data Type: int
+        * * Default Value: 75`),
+    MaxEscalationLevel: z.number().describe(`
+        * * Field Name: MaxEscalationLevel
+        * * Display Name: Max Escalation Level
+        * * SQL Data Type: int
+        * * Default Value: 2`),
+    UrgentSLAMultiplier: z.number().describe(`
+        * * Field Name: UrgentSLAMultiplier
+        * * Display Name: Urgent SLA Multiplier
+        * * SQL Data Type: decimal(4, 2)
+        * * Default Value: 0.50`),
+    EscalationActionType: z.string().nullable().describe(`
+        * * Field Name: EscalationActionType
+        * * Display Name: Escalation Action Type
+        * * SQL Data Type: nvarchar(30)`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -2139,6 +2214,42 @@ export class mjBizAppsReferralsProfessionalProfileEntity extends BaseEntity<mjBi
     }
 
     /**
+    * * Field Name: ReadinessScore
+    * * Display Name: Readiness Score
+    * * SQL Data Type: decimal(5, 2)
+    */
+    get ReadinessScore(): number | null {
+        return this.Get('ReadinessScore');
+    }
+    set ReadinessScore(value: number | null) {
+        this.Set('ReadinessScore', value);
+    }
+
+    /**
+    * * Field Name: ReciprocityIndex
+    * * Display Name: Reciprocity Index
+    * * SQL Data Type: decimal(6, 3)
+    */
+    get ReciprocityIndex(): number | null {
+        return this.Get('ReciprocityIndex');
+    }
+    set ReciprocityIndex(value: number | null) {
+        this.Set('ReciprocityIndex', value);
+    }
+
+    /**
+    * * Field Name: ReadinessComputedAt
+    * * Display Name: Readiness Computed At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ReadinessComputedAt(): Date | null {
+        return this.Get('ReadinessComputedAt');
+    }
+    set ReadinessComputedAt(value: Date | null) {
+        this.Set('ReadinessComputedAt', value);
+    }
+
+    /**
     * * Field Name: __mj_CreatedAt
     * * Display Name: Created At
     * * SQL Data Type: datetimeoffset
@@ -2372,10 +2483,10 @@ export class mjBizAppsReferralsReferralAssignmentEntity extends BaseEntity<mjBiz
     *   * Queued
     *   * Withdrawn
     */
-    get Status(): 'Accepted' | 'ConflictRejected' | 'Declined' | 'Expired' | 'Offered' | 'Queued' | 'Withdrawn' {
+    get Status(): 'Accepted' | 'Completed' | 'ConflictRejected' | 'Declined' | 'Expired' | 'InProgress' | 'Offered' | 'Queued' | 'Withdrawn' {
         return this.Get('Status');
     }
-    set Status(value: 'Accepted' | 'ConflictRejected' | 'Declined' | 'Expired' | 'Offered' | 'Queued' | 'Withdrawn') {
+    set Status(value: 'Accepted' | 'Completed' | 'ConflictRejected' | 'Declined' | 'Expired' | 'InProgress' | 'Offered' | 'Queued' | 'Withdrawn') {
         this.Set('Status', value);
     }
 
@@ -2437,6 +2548,54 @@ export class mjBizAppsReferralsReferralAssignmentEntity extends BaseEntity<mjBiz
     }
     set DeclineReason(value: string | null) {
         this.Set('DeclineReason', value);
+    }
+
+    /**
+    * * Field Name: SLAWarningSentAt
+    * * Display Name: SLA Warning Sent At
+    * * SQL Data Type: datetimeoffset
+    */
+    get SLAWarningSentAt(): Date | null {
+        return this.Get('SLAWarningSentAt');
+    }
+    set SLAWarningSentAt(value: Date | null) {
+        this.Set('SLAWarningSentAt', value);
+    }
+
+    /**
+    * * Field Name: ResponseHours
+    * * Display Name: Response Hours
+    * * SQL Data Type: decimal(6, 2)
+    */
+    get ResponseHours(): number | null {
+        return this.Get('ResponseHours');
+    }
+    set ResponseHours(value: number | null) {
+        this.Set('ResponseHours', value);
+    }
+
+    /**
+    * * Field Name: CompletedAt
+    * * Display Name: Completed At
+    * * SQL Data Type: datetimeoffset
+    */
+    get CompletedAt(): Date | null {
+        return this.Get('CompletedAt');
+    }
+    set CompletedAt(value: Date | null) {
+        this.Set('CompletedAt', value);
+    }
+
+    /**
+    * * Field Name: AIRationaleJSON
+    * * Display Name: AI Rationale JSON
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get AIRationaleJSON(): string | null {
+        return this.Get('AIRationaleJSON');
+    }
+    set AIRationaleJSON(value: string | null) {
+        this.Set('AIRationaleJSON', value);
     }
 
     /**
@@ -2995,6 +3154,64 @@ export class mjBizAppsReferralsReferralRequestEntity extends BaseEntity<mjBizApp
     }
 
     /**
+    * * Field Name: SourceChannel
+    * * Display Name: Source Channel
+    * * SQL Data Type: nvarchar(30)
+    * * Default Value: SeekerIntake
+    * * Value List Type: List
+    * * Possible Values
+    *   * Concierge
+    *   * FinderWidget
+    *   * OperatorManual
+    *   * ProReferral
+    *   * SeekerIntake
+    */
+    get SourceChannel(): 'Concierge' | 'FinderWidget' | 'OperatorManual' | 'ProReferral' | 'SeekerIntake' {
+        return this.Get('SourceChannel');
+    }
+    set SourceChannel(value: 'Concierge' | 'FinderWidget' | 'OperatorManual' | 'ProReferral' | 'SeekerIntake') {
+        this.Set('SourceChannel', value);
+    }
+
+    /**
+    * * Field Name: ReferringProfessionalID
+    * * Display Name: Referring Professional
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)
+    */
+    get ReferringProfessionalID(): string | null {
+        return this.Get('ReferringProfessionalID');
+    }
+    set ReferringProfessionalID(value: string | null) {
+        this.Set('ReferringProfessionalID', value);
+    }
+
+    /**
+    * * Field Name: EscalationLevel
+    * * Display Name: Escalation Level
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get EscalationLevel(): number {
+        return this.Get('EscalationLevel');
+    }
+    set EscalationLevel(value: number) {
+        this.Set('EscalationLevel', value);
+    }
+
+    /**
+    * * Field Name: LastEscalatedAt
+    * * Display Name: Last Escalated At
+    * * SQL Data Type: datetimeoffset
+    */
+    get LastEscalatedAt(): Date | null {
+        return this.Get('LastEscalatedAt');
+    }
+    set LastEscalatedAt(value: Date | null) {
+        this.Set('LastEscalatedAt', value);
+    }
+
+    /**
     * * Field Name: __mj_CreatedAt
     * * Display Name: Created At
     * * SQL Data Type: datetimeoffset
@@ -3245,6 +3462,57 @@ export class mjBizAppsReferralsReferralTierEntity extends BaseEntity<mjBizAppsRe
     }
     set IsActive(value: boolean) {
         this.Set('IsActive', value);
+    }
+
+    /**
+    * * Field Name: EscalationWarningPercent
+    * * Display Name: Escalation Warning Percent
+    * * SQL Data Type: int
+    * * Default Value: 75
+    */
+    get EscalationWarningPercent(): number {
+        return this.Get('EscalationWarningPercent');
+    }
+    set EscalationWarningPercent(value: number) {
+        this.Set('EscalationWarningPercent', value);
+    }
+
+    /**
+    * * Field Name: MaxEscalationLevel
+    * * Display Name: Max Escalation Level
+    * * SQL Data Type: int
+    * * Default Value: 2
+    */
+    get MaxEscalationLevel(): number {
+        return this.Get('MaxEscalationLevel');
+    }
+    set MaxEscalationLevel(value: number) {
+        this.Set('MaxEscalationLevel', value);
+    }
+
+    /**
+    * * Field Name: UrgentSLAMultiplier
+    * * Display Name: Urgent SLA Multiplier
+    * * SQL Data Type: decimal(4, 2)
+    * * Default Value: 0.50
+    */
+    get UrgentSLAMultiplier(): number {
+        return this.Get('UrgentSLAMultiplier');
+    }
+    set UrgentSLAMultiplier(value: number) {
+        this.Set('UrgentSLAMultiplier', value);
+    }
+
+    /**
+    * * Field Name: EscalationActionType
+    * * Display Name: Escalation Action Type
+    * * SQL Data Type: nvarchar(30)
+    */
+    get EscalationActionType(): string | null {
+        return this.Get('EscalationActionType');
+    }
+    set EscalationActionType(value: string | null) {
+        this.Set('EscalationActionType', value);
     }
 
     /**
@@ -3627,3 +3895,1271 @@ export class mjBizAppsReferralsProfessionalCredentialEntity extends BaseEntity<m
         return this.Get('VerifiedByPerson');
     }
 }
+
+
+/**
+ * zod schema definition for the entity MJ_BizApps_Referrals: Referral Escalations
+ */
+export const mjBizAppsReferralsReferralEscalationSchema = z.object({
+    ID: z.string().describe(`
+        * * Field Name: ID
+        * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()`),
+    ReferralRequestID: z.string().describe(`
+        * * Field Name: ReferralRequestID
+        * * Display Name: Referral Request
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Requests (vwReferralRequests.ID)`),
+    ReferralAssignmentID: z.string().nullable().describe(`
+        * * Field Name: ReferralAssignmentID
+        * * Display Name: Referral Assignment
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Assignments (vwReferralAssignments.ID)`),
+    EscalationLevel: z.number().describe(`
+        * * Field Name: EscalationLevel
+        * * Display Name: Escalation Level
+    * * SQL Data Type: int
+    * * Default Value: 1`),
+    TriggerType: z.union([z.literal('AIRecommended'), z.literal('CascadeExhausted'), z.literal('Manual'), z.literal('SLABreach'), z.literal('SLAWarning'), z.literal('UrgentUnassigned')]).describe(`
+        * * Field Name: TriggerType
+        * * Display Name: Trigger Type
+    * * SQL Data Type: nvarchar(30)
+    * * Default Value: SLAWarning
+    * * Value List Type: List
+    * * Possible Values
+    *   * AIRecommended
+    *   * CascadeExhausted
+    *   * Manual
+    *   * SLABreach
+    *   * SLAWarning
+    *   * UrgentUnassigned`),
+    Status: z.union([z.literal('Acknowledged'), z.literal('Dismissed'), z.literal('Open'), z.literal('Resolved')]).describe(`
+        * * Field Name: Status
+        * * Display Name: Status
+    * * SQL Data Type: nvarchar(40)
+    * * Default Value: Open
+    * * Value List Type: List
+    * * Possible Values
+    *   * Acknowledged
+    *   * Dismissed
+    *   * Open
+    *   * Resolved`),
+    DedupKey: z.string().describe(`
+        * * Field Name: DedupKey
+        * * Display Name: Dedup Key
+    * * SQL Data Type: nvarchar(200)`),
+    RecommendedAction: z.union([z.literal('CloseAsExhausted'), z.literal('ContactSeeker'), z.literal('ExpandPracticeArea'), z.literal('ExtendSLA'), z.literal('ReassignNextCandidate')]).nullable().describe(`
+        * * Field Name: RecommendedAction
+        * * Display Name: Recommended Action
+    * * SQL Data Type: nvarchar(40)
+    * * Value List Type: List
+    * * Possible Values
+    *   * CloseAsExhausted
+    *   * ContactSeeker
+    *   * ExpandPracticeArea
+    *   * ExtendSLA
+    *   * ReassignNextCandidate`),
+    NotifierKey: z.string().nullable().describe(`
+        * * Field Name: NotifierKey
+        * * Display Name: Notifier Key
+    * * SQL Data Type: nvarchar(50)`),
+    Notes: z.string().nullable().describe(`
+        * * Field Name: Notes
+        * * Display Name: Notes
+    * * SQL Data Type: nvarchar(MAX)`),
+    RaisedAt: z.date().describe(`
+        * * Field Name: RaisedAt
+        * * Display Name: Raised At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()`),
+    AcknowledgedAt: z.date().nullable().describe(`
+        * * Field Name: AcknowledgedAt
+        * * Display Name: Acknowledged At
+    * * SQL Data Type: datetimeoffset`),
+    ResolvedAt: z.date().nullable().describe(`
+        * * Field Name: ResolvedAt
+        * * Display Name: Resolved At
+    * * SQL Data Type: datetimeoffset`),
+    LinkedTaskID: z.string().nullable().describe(`
+        * * Field Name: LinkedTaskID
+        * * Display Name: Linked Task
+    * * SQL Data Type: uniqueidentifier`),
+    AcknowledgedByPersonID: z.string().nullable().describe(`
+        * * Field Name: AcknowledgedByPersonID
+        * * Display Name: Acknowledged By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    ResolvedByPersonID: z.string().nullable().describe(`
+        * * Field Name: ResolvedByPersonID
+        * * Display Name: Resolved By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    ResolutionNotes: z.string().nullable().describe(`
+        * * Field Name: ResolutionNotes
+        * * Display Name: Resolution Notes
+    * * SQL Data Type: nvarchar(MAX)`),
+    AIRationaleJSON: z.string().nullable().describe(`
+        * * Field Name: AIRationaleJSON
+        * * Display Name: AIRationale JSON
+    * * SQL Data Type: nvarchar(MAX)`),
+    __mj_CreatedAt: z.date().describe(`
+        * * Field Name: __mj_CreatedAt
+        * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+    __mj_UpdatedAt: z.date().describe(`
+        * * Field Name: __mj_UpdatedAt
+        * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+});
+
+export type mjBizAppsReferralsReferralEscalationEntityType = z.infer<typeof mjBizAppsReferralsReferralEscalationSchema>;
+
+/**
+ * zod schema definition for the entity MJ_BizApps_Referrals: Referral Outcomes
+ */
+export const mjBizAppsReferralsReferralOutcomeSchema = z.object({
+    ID: z.string().describe(`
+        * * Field Name: ID
+        * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()`),
+    ReferralRequestID: z.string().describe(`
+        * * Field Name: ReferralRequestID
+        * * Display Name: Referral Request
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Requests (vwReferralRequests.ID)`),
+    ReferralAssignmentID: z.string().describe(`
+        * * Field Name: ReferralAssignmentID
+        * * Display Name: Referral Assignment
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Assignments (vwReferralAssignments.ID)`),
+    ProfessionalProfileID: z.string().describe(`
+        * * Field Name: ProfessionalProfileID
+        * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
+    OutcomeStatus: z.union([z.literal('Engaged'), z.literal('Lost'), z.literal('NoEngagement'), z.literal('Resolved'), z.literal('Withdrawn')]).describe(`
+        * * Field Name: OutcomeStatus
+        * * Display Name: Outcome Status
+    * * SQL Data Type: nvarchar(60)
+    * * Default Value: Resolved
+    * * Value List Type: List
+    * * Possible Values
+    *   * Engaged
+    *   * Lost
+    *   * NoEngagement
+    *   * Resolved
+    *   * Withdrawn`),
+    EngagedAt: z.date().nullable().describe(`
+        * * Field Name: EngagedAt
+        * * Display Name: Engaged At
+    * * SQL Data Type: datetimeoffset`),
+    ClosedAt: z.date().nullable().describe(`
+        * * Field Name: ClosedAt
+        * * Display Name: Closed At
+    * * SQL Data Type: datetimeoffset`),
+    EstimatedFeeAmount: z.number().nullable().describe(`
+        * * Field Name: EstimatedFeeAmount
+        * * Display Name: Estimated Fee Amount
+    * * SQL Data Type: decimal(12, 2)`),
+    ReportedFeeAmount: z.number().nullable().describe(`
+        * * Field Name: ReportedFeeAmount
+        * * Display Name: Reported Fee Amount
+    * * SQL Data Type: decimal(12, 2)`),
+    CurrencyCode: z.string().describe(`
+        * * Field Name: CurrencyCode
+        * * Display Name: Currency Code
+    * * SQL Data Type: nvarchar(3)
+    * * Default Value: USD`),
+    ReportedByType: z.union([z.literal('Operator'), z.literal('Professional'), z.literal('Seeker')]).nullable().describe(`
+        * * Field Name: ReportedByType
+        * * Display Name: Reported By Type
+    * * SQL Data Type: nvarchar(20)
+    * * Value List Type: List
+    * * Possible Values
+    *   * Operator
+    *   * Professional
+    *   * Seeker`),
+    ReportedAt: z.date().describe(`
+        * * Field Name: ReportedAt
+        * * Display Name: Reported At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()`),
+    AttributionNotes: z.string().nullable().describe(`
+        * * Field Name: AttributionNotes
+        * * Display Name: Attribution Notes
+    * * SQL Data Type: nvarchar(MAX)`),
+    __mj_CreatedAt: z.date().describe(`
+        * * Field Name: __mj_CreatedAt
+        * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+    __mj_UpdatedAt: z.date().describe(`
+        * * Field Name: __mj_UpdatedAt
+        * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+});
+
+export type mjBizAppsReferralsReferralOutcomeEntityType = z.infer<typeof mjBizAppsReferralsReferralOutcomeSchema>;
+
+/**
+ * zod schema definition for the entity MJ_BizApps_Referrals: Professional Availability Windows
+ */
+export const mjBizAppsReferralsProfessionalAvailabilityWindowSchema = z.object({
+    ID: z.string().describe(`
+        * * Field Name: ID
+        * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()`),
+    ProfessionalProfileID: z.string().describe(`
+        * * Field Name: ProfessionalProfileID
+        * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
+    WindowType: z.union([z.literal('OnLeave'), z.literal('Paused'), z.literal('ReducedCapacity')]).describe(`
+        * * Field Name: WindowType
+        * * Display Name: Window Type
+    * * SQL Data Type: nvarchar(40)
+    * * Default Value: Paused
+    * * Value List Type: List
+    * * Possible Values
+    *   * OnLeave
+    *   * Paused
+    *   * ReducedCapacity`),
+    StartsAt: z.date().describe(`
+        * * Field Name: StartsAt
+        * * Display Name: Starts At
+    * * SQL Data Type: datetimeoffset`),
+    EndsAt: z.date().describe(`
+        * * Field Name: EndsAt
+        * * Display Name: Ends At
+    * * SQL Data Type: datetimeoffset`),
+    CapacityOverride: z.number().nullable().describe(`
+        * * Field Name: CapacityOverride
+        * * Display Name: Capacity Override
+    * * SQL Data Type: int`),
+    Reason: z.string().nullable().describe(`
+        * * Field Name: Reason
+        * * Display Name: Reason
+    * * SQL Data Type: nvarchar(500)`),
+    IsActive: z.boolean().describe(`
+        * * Field Name: IsActive
+        * * Display Name: Is Active
+    * * SQL Data Type: bit
+    * * Default Value: 1`),
+    __mj_CreatedAt: z.date().describe(`
+        * * Field Name: __mj_CreatedAt
+        * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+    __mj_UpdatedAt: z.date().describe(`
+        * * Field Name: __mj_UpdatedAt
+        * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+});
+
+export type mjBizAppsReferralsProfessionalAvailabilityWindowEntityType = z.infer<typeof mjBizAppsReferralsProfessionalAvailabilityWindowSchema>;
+
+/**
+ * zod schema definition for the entity MJ_BizApps_Referrals: Reciprocity Snapshots
+ */
+export const mjBizAppsReferralsReciprocitySnapshotSchema = z.object({
+    ID: z.string().describe(`
+        * * Field Name: ID
+        * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()`),
+    ProfessionalProfileID: z.string().describe(`
+        * * Field Name: ProfessionalProfileID
+        * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
+    ComputedAt: z.date().describe(`
+        * * Field Name: ComputedAt
+        * * Display Name: Computed At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()`),
+    PeriodStart: z.date().describe(`
+        * * Field Name: PeriodStart
+        * * Display Name: Period Start
+    * * SQL Data Type: date`),
+    PeriodEnd: z.date().describe(`
+        * * Field Name: PeriodEnd
+        * * Display Name: Period End
+    * * SQL Data Type: date`),
+    ReferralsSent: z.number().describe(`
+        * * Field Name: ReferralsSent
+        * * Display Name: Referrals Sent
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    ReferralsReceived: z.number().describe(`
+        * * Field Name: ReferralsReceived
+        * * Display Name: Referrals Received
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    ReferralsAccepted: z.number().describe(`
+        * * Field Name: ReferralsAccepted
+        * * Display Name: Referrals Accepted
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    ReferralsResolved: z.number().describe(`
+        * * Field Name: ReferralsResolved
+        * * Display Name: Referrals Resolved
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    SLABreachCount: z.number().describe(`
+        * * Field Name: SLABreachCount
+        * * Display Name: SLA Breach Count
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    AcceptanceRate: z.number().describe(`
+        * * Field Name: AcceptanceRate
+        * * Display Name: Acceptance Rate
+    * * SQL Data Type: decimal(5, 4)
+    * * Default Value: 0`),
+    MedianResponseHours: z.number().nullable().describe(`
+        * * Field Name: MedianResponseHours
+        * * Display Name: Median Response Hours
+    * * SQL Data Type: decimal(8, 2)`),
+    ReciprocityIndex: z.number().describe(`
+        * * Field Name: ReciprocityIndex
+        * * Display Name: Reciprocity Index
+    * * SQL Data Type: decimal(6, 3)
+    * * Default Value: 0`),
+    AttributedFeeTotal: z.number().describe(`
+        * * Field Name: AttributedFeeTotal
+        * * Display Name: Attributed Fee Total
+    * * SQL Data Type: decimal(14, 2)
+    * * Default Value: 0`),
+    __mj_CreatedAt: z.date().describe(`
+        * * Field Name: __mj_CreatedAt
+        * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+    __mj_UpdatedAt: z.date().describe(`
+        * * Field Name: __mj_UpdatedAt
+        * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()`),
+});
+
+export type mjBizAppsReferralsReciprocitySnapshotEntityType = z.infer<typeof mjBizAppsReferralsReciprocitySnapshotSchema>;
+
+/**
+ * MJ_BizApps_Referrals: Referral Escalations - strongly typed entity sub-class
+ * * Schema: __mj_BizAppsReferrals
+ * * Base Table: ReferralEscalation
+ * * Base View: vwReferralEscalations
+ * * @description SLA warning/breach escalation events raised against a ReferralRequest or ReferralAssignment.
+ * * Primary Key: ID
+ * @extends {BaseEntity}
+ * @class
+ * @public
+ */
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Referral Escalations')
+export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBizAppsReferralsReferralEscalationEntityType> {
+    /**
+    * Loads the MJ_BizApps_Referrals: Referral Escalations record from the database
+    * @param ID: string - primary key value to load the MJ_BizApps_Referrals: Referral Escalations record.
+    * @param EntityRelationshipsToLoad - (optional) the relationships to load
+    * @returns {Promise<boolean>} - true if successful, false otherwise
+    * @public
+    * @async
+    * @memberof mjBizAppsReferralsReferralEscalationEntity
+    * @method
+    * @override
+    */
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]) : Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
+    /**
+    * * Field Name: ID
+    * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()
+    */
+    get ID(): string {
+        return this.Get('ID');
+    }
+    set ID(value: string) {
+        this.Set('ID', value);
+    }
+
+    /**
+    * * Field Name: ReferralRequestID
+    * * Display Name: Referral Request
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Requests (vwReferralRequests.ID)
+    */
+    get ReferralRequestID(): string {
+        return this.Get('ReferralRequestID');
+    }
+    set ReferralRequestID(value: string) {
+        this.Set('ReferralRequestID', value);
+    }
+
+    /**
+    * * Field Name: ReferralAssignmentID
+    * * Display Name: Referral Assignment
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Assignments (vwReferralAssignments.ID)
+    */
+    get ReferralAssignmentID(): string | null {
+        return this.Get('ReferralAssignmentID');
+    }
+    set ReferralAssignmentID(value: string | null) {
+        this.Set('ReferralAssignmentID', value);
+    }
+
+    /**
+    * * Field Name: EscalationLevel
+    * * Display Name: Escalation Level
+    * * SQL Data Type: int
+    * * Default Value: 1
+    */
+    get EscalationLevel(): number {
+        return this.Get('EscalationLevel');
+    }
+    set EscalationLevel(value: number) {
+        this.Set('EscalationLevel', value);
+    }
+
+    /**
+    * * Field Name: TriggerType
+    * * Display Name: Trigger Type
+    * * SQL Data Type: nvarchar(30)
+    * * Default Value: SLAWarning
+    * * Value List Type: List
+    * * Possible Values
+    *   * AIRecommended
+    *   * CascadeExhausted
+    *   * Manual
+    *   * SLABreach
+    *   * SLAWarning
+    *   * UrgentUnassigned
+    */
+    get TriggerType(): 'AIRecommended' | 'CascadeExhausted' | 'Manual' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned' {
+        return this.Get('TriggerType');
+    }
+    set TriggerType(value: 'AIRecommended' | 'CascadeExhausted' | 'Manual' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned') {
+        this.Set('TriggerType', value);
+    }
+
+    /**
+    * * Field Name: Status
+    * * Display Name: Status
+    * * SQL Data Type: nvarchar(40)
+    * * Default Value: Open
+    * * Value List Type: List
+    * * Possible Values
+    *   * Acknowledged
+    *   * Dismissed
+    *   * Open
+    *   * Resolved
+    */
+    get Status(): 'Acknowledged' | 'Dismissed' | 'Open' | 'Resolved' {
+        return this.Get('Status');
+    }
+    set Status(value: 'Acknowledged' | 'Dismissed' | 'Open' | 'Resolved') {
+        this.Set('Status', value);
+    }
+
+    /**
+    * * Field Name: DedupKey
+    * * Display Name: Dedup Key
+    * * SQL Data Type: nvarchar(200)
+    */
+    get DedupKey(): string {
+        return this.Get('DedupKey');
+    }
+    set DedupKey(value: string) {
+        this.Set('DedupKey', value);
+    }
+
+    /**
+    * * Field Name: RecommendedAction
+    * * Display Name: Recommended Action
+    * * SQL Data Type: nvarchar(40)
+    * * Value List Type: List
+    * * Possible Values
+    *   * CloseAsExhausted
+    *   * ContactSeeker
+    *   * ExpandPracticeArea
+    *   * ExtendSLA
+    *   * ReassignNextCandidate
+    */
+    get RecommendedAction(): 'CloseAsExhausted' | 'ContactSeeker' | 'ExpandPracticeArea' | 'ExtendSLA' | 'ReassignNextCandidate' | null {
+        return this.Get('RecommendedAction');
+    }
+    set RecommendedAction(value: 'CloseAsExhausted' | 'ContactSeeker' | 'ExpandPracticeArea' | 'ExtendSLA' | 'ReassignNextCandidate' | null) {
+        this.Set('RecommendedAction', value);
+    }
+
+    /**
+    * * Field Name: NotifierKey
+    * * Display Name: Notifier Key
+    * * SQL Data Type: nvarchar(50)
+    */
+    get NotifierKey(): string | null {
+        return this.Get('NotifierKey');
+    }
+    set NotifierKey(value: string | null) {
+        this.Set('NotifierKey', value);
+    }
+
+    /**
+    * * Field Name: Notes
+    * * Display Name: Notes
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get Notes(): string | null {
+        return this.Get('Notes');
+    }
+    set Notes(value: string | null) {
+        this.Set('Notes', value);
+    }
+
+    /**
+    * * Field Name: RaisedAt
+    * * Display Name: Raised At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()
+    */
+    get RaisedAt(): Date {
+        return this.Get('RaisedAt');
+    }
+    set RaisedAt(value: Date) {
+        this.Set('RaisedAt', value);
+    }
+
+    /**
+    * * Field Name: AcknowledgedAt
+    * * Display Name: Acknowledged At
+    * * SQL Data Type: datetimeoffset
+    */
+    get AcknowledgedAt(): Date | null {
+        return this.Get('AcknowledgedAt');
+    }
+    set AcknowledgedAt(value: Date | null) {
+        this.Set('AcknowledgedAt', value);
+    }
+
+    /**
+    * * Field Name: ResolvedAt
+    * * Display Name: Resolved At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ResolvedAt(): Date | null {
+        return this.Get('ResolvedAt');
+    }
+    set ResolvedAt(value: Date | null) {
+        this.Set('ResolvedAt', value);
+    }
+
+    /**
+    * * Field Name: LinkedTaskID
+    * * Display Name: Linked Task
+    * * SQL Data Type: uniqueidentifier
+    */
+    get LinkedTaskID(): string | null {
+        return this.Get('LinkedTaskID');
+    }
+    set LinkedTaskID(value: string | null) {
+        this.Set('LinkedTaskID', value);
+    }
+
+    /**
+    * * Field Name: AcknowledgedByPersonID
+    * * Display Name: Acknowledged By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)
+    */
+    get AcknowledgedByPersonID(): string | null {
+        return this.Get('AcknowledgedByPersonID');
+    }
+    set AcknowledgedByPersonID(value: string | null) {
+        this.Set('AcknowledgedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: ResolvedByPersonID
+    * * Display Name: Resolved By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)
+    */
+    get ResolvedByPersonID(): string | null {
+        return this.Get('ResolvedByPersonID');
+    }
+    set ResolvedByPersonID(value: string | null) {
+        this.Set('ResolvedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: ResolutionNotes
+    * * Display Name: Resolution Notes
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get ResolutionNotes(): string | null {
+        return this.Get('ResolutionNotes');
+    }
+    set ResolutionNotes(value: string | null) {
+        this.Set('ResolutionNotes', value);
+    }
+
+    /**
+    * * Field Name: AIRationaleJSON
+    * * Display Name: AIRationale JSON
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get AIRationaleJSON(): string | null {
+        return this.Get('AIRationaleJSON');
+    }
+    set AIRationaleJSON(value: string | null) {
+        this.Set('AIRationaleJSON', value);
+    }
+
+    /**
+    * * Field Name: __mj_CreatedAt
+    * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_CreatedAt(): Date {
+        return this.Get('__mj_CreatedAt');
+    }
+
+    /**
+    * * Field Name: __mj_UpdatedAt
+    * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_UpdatedAt(): Date {
+        return this.Get('__mj_UpdatedAt');
+    }
+}
+
+
+/**
+ * MJ_BizApps_Referrals: Referral Outcomes - strongly typed entity sub-class
+ * * Schema: __mj_BizAppsReferrals
+ * * Base Table: ReferralOutcome
+ * * Base View: vwReferralOutcomes
+ * * @description Terminal outcome recorded when a ReferralAssignment is marked complete.
+ * * Primary Key: ID
+ * @extends {BaseEntity}
+ * @class
+ * @public
+ */
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Referral Outcomes')
+export class mjBizAppsReferralsReferralOutcomeEntity extends BaseEntity<mjBizAppsReferralsReferralOutcomeEntityType> {
+    /**
+    * Loads the MJ_BizApps_Referrals: Referral Outcomes record from the database
+    * @param ID: string - primary key value to load the MJ_BizApps_Referrals: Referral Outcomes record.
+    * @param EntityRelationshipsToLoad - (optional) the relationships to load
+    * @returns {Promise<boolean>} - true if successful, false otherwise
+    * @public
+    * @async
+    * @memberof mjBizAppsReferralsReferralOutcomeEntity
+    * @method
+    * @override
+    */
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]) : Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
+    /**
+    * * Field Name: ID
+    * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()
+    */
+    get ID(): string {
+        return this.Get('ID');
+    }
+    set ID(value: string) {
+        this.Set('ID', value);
+    }
+
+    /**
+    * * Field Name: ReferralRequestID
+    * * Display Name: Referral Request
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Requests (vwReferralRequests.ID)
+    */
+    get ReferralRequestID(): string {
+        return this.Get('ReferralRequestID');
+    }
+    set ReferralRequestID(value: string) {
+        this.Set('ReferralRequestID', value);
+    }
+
+    /**
+    * * Field Name: ReferralAssignmentID
+    * * Display Name: Referral Assignment
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Referral Assignments (vwReferralAssignments.ID)
+    */
+    get ReferralAssignmentID(): string {
+        return this.Get('ReferralAssignmentID');
+    }
+    set ReferralAssignmentID(value: string) {
+        this.Set('ReferralAssignmentID', value);
+    }
+
+    /**
+    * * Field Name: ProfessionalProfileID
+    * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)
+    */
+    get ProfessionalProfileID(): string {
+        return this.Get('ProfessionalProfileID');
+    }
+    set ProfessionalProfileID(value: string) {
+        this.Set('ProfessionalProfileID', value);
+    }
+
+    /**
+    * * Field Name: OutcomeStatus
+    * * Display Name: Outcome Status
+    * * SQL Data Type: nvarchar(60)
+    * * Default Value: Resolved
+    * * Value List Type: List
+    * * Possible Values
+    *   * Engaged
+    *   * Lost
+    *   * NoEngagement
+    *   * Resolved
+    *   * Withdrawn
+    */
+    get OutcomeStatus(): 'Engaged' | 'Lost' | 'NoEngagement' | 'Resolved' | 'Withdrawn' {
+        return this.Get('OutcomeStatus');
+    }
+    set OutcomeStatus(value: 'Engaged' | 'Lost' | 'NoEngagement' | 'Resolved' | 'Withdrawn') {
+        this.Set('OutcomeStatus', value);
+    }
+
+    /**
+    * * Field Name: EngagedAt
+    * * Display Name: Engaged At
+    * * SQL Data Type: datetimeoffset
+    */
+    get EngagedAt(): Date | null {
+        return this.Get('EngagedAt');
+    }
+    set EngagedAt(value: Date | null) {
+        this.Set('EngagedAt', value);
+    }
+
+    /**
+    * * Field Name: ClosedAt
+    * * Display Name: Closed At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ClosedAt(): Date | null {
+        return this.Get('ClosedAt');
+    }
+    set ClosedAt(value: Date | null) {
+        this.Set('ClosedAt', value);
+    }
+
+    /**
+    * * Field Name: EstimatedFeeAmount
+    * * Display Name: Estimated Fee Amount
+    * * SQL Data Type: decimal(12, 2)
+    */
+    get EstimatedFeeAmount(): number | null {
+        return this.Get('EstimatedFeeAmount');
+    }
+    set EstimatedFeeAmount(value: number | null) {
+        this.Set('EstimatedFeeAmount', value);
+    }
+
+    /**
+    * * Field Name: ReportedFeeAmount
+    * * Display Name: Reported Fee Amount
+    * * SQL Data Type: decimal(12, 2)
+    */
+    get ReportedFeeAmount(): number | null {
+        return this.Get('ReportedFeeAmount');
+    }
+    set ReportedFeeAmount(value: number | null) {
+        this.Set('ReportedFeeAmount', value);
+    }
+
+    /**
+    * * Field Name: CurrencyCode
+    * * Display Name: Currency Code
+    * * SQL Data Type: nvarchar(3)
+    * * Default Value: USD
+    */
+    get CurrencyCode(): string {
+        return this.Get('CurrencyCode');
+    }
+    set CurrencyCode(value: string) {
+        this.Set('CurrencyCode', value);
+    }
+
+    /**
+    * * Field Name: ReportedByType
+    * * Display Name: Reported By Type
+    * * SQL Data Type: nvarchar(20)
+    * * Value List Type: List
+    * * Possible Values
+    *   * Operator
+    *   * Professional
+    *   * Seeker
+    */
+    get ReportedByType(): 'Operator' | 'Professional' | 'Seeker' | null {
+        return this.Get('ReportedByType');
+    }
+    set ReportedByType(value: 'Operator' | 'Professional' | 'Seeker' | null) {
+        this.Set('ReportedByType', value);
+    }
+
+    /**
+    * * Field Name: ReportedAt
+    * * Display Name: Reported At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()
+    */
+    get ReportedAt(): Date {
+        return this.Get('ReportedAt');
+    }
+    set ReportedAt(value: Date) {
+        this.Set('ReportedAt', value);
+    }
+
+    /**
+    * * Field Name: AttributionNotes
+    * * Display Name: Attribution Notes
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get AttributionNotes(): string | null {
+        return this.Get('AttributionNotes');
+    }
+    set AttributionNotes(value: string | null) {
+        this.Set('AttributionNotes', value);
+    }
+
+    /**
+    * * Field Name: __mj_CreatedAt
+    * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_CreatedAt(): Date {
+        return this.Get('__mj_CreatedAt');
+    }
+
+    /**
+    * * Field Name: __mj_UpdatedAt
+    * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_UpdatedAt(): Date {
+        return this.Get('__mj_UpdatedAt');
+    }
+}
+
+
+/**
+ * MJ_BizApps_Referrals: Professional Availability Windows - strongly typed entity sub-class
+ * * Schema: __mj_BizAppsReferrals
+ * * Base Table: ProfessionalAvailabilityWindow
+ * * Base View: vwProfessionalAvailabilityWindows
+ * * @description Recurring, date-range, or blackout availability windows for a ProfessionalProfile.
+ * * Primary Key: ID
+ * @extends {BaseEntity}
+ * @class
+ * @public
+ */
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Availability Windows')
+export class mjBizAppsReferralsProfessionalAvailabilityWindowEntity extends BaseEntity<mjBizAppsReferralsProfessionalAvailabilityWindowEntityType> {
+    /**
+    * Loads the MJ_BizApps_Referrals: Professional Availability Windows record from the database
+    * @param ID: string - primary key value to load the MJ_BizApps_Referrals: Professional Availability Windows record.
+    * @param EntityRelationshipsToLoad - (optional) the relationships to load
+    * @returns {Promise<boolean>} - true if successful, false otherwise
+    * @public
+    * @async
+    * @memberof mjBizAppsReferralsProfessionalAvailabilityWindowEntity
+    * @method
+    * @override
+    */
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]) : Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
+    /**
+    * * Field Name: ID
+    * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()
+    */
+    get ID(): string {
+        return this.Get('ID');
+    }
+    set ID(value: string) {
+        this.Set('ID', value);
+    }
+
+    /**
+    * * Field Name: ProfessionalProfileID
+    * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)
+    */
+    get ProfessionalProfileID(): string {
+        return this.Get('ProfessionalProfileID');
+    }
+    set ProfessionalProfileID(value: string) {
+        this.Set('ProfessionalProfileID', value);
+    }
+
+    /**
+    * * Field Name: WindowType
+    * * Display Name: Window Type
+    * * SQL Data Type: nvarchar(40)
+    * * Default Value: Paused
+    * * Value List Type: List
+    * * Possible Values
+    *   * OnLeave
+    *   * Paused
+    *   * ReducedCapacity
+    */
+    get WindowType(): 'OnLeave' | 'Paused' | 'ReducedCapacity' {
+        return this.Get('WindowType');
+    }
+    set WindowType(value: 'OnLeave' | 'Paused' | 'ReducedCapacity') {
+        this.Set('WindowType', value);
+    }
+
+    /**
+    * * Field Name: StartsAt
+    * * Display Name: Starts At
+    * * SQL Data Type: datetimeoffset
+    */
+    get StartsAt(): Date {
+        return this.Get('StartsAt');
+    }
+    set StartsAt(value: Date) {
+        this.Set('StartsAt', value);
+    }
+
+    /**
+    * * Field Name: EndsAt
+    * * Display Name: Ends At
+    * * SQL Data Type: datetimeoffset
+    */
+    get EndsAt(): Date {
+        return this.Get('EndsAt');
+    }
+    set EndsAt(value: Date) {
+        this.Set('EndsAt', value);
+    }
+
+    /**
+    * * Field Name: CapacityOverride
+    * * Display Name: Capacity Override
+    * * SQL Data Type: int
+    */
+    get CapacityOverride(): number | null {
+        return this.Get('CapacityOverride');
+    }
+    set CapacityOverride(value: number | null) {
+        this.Set('CapacityOverride', value);
+    }
+
+    /**
+    * * Field Name: Reason
+    * * Display Name: Reason
+    * * SQL Data Type: nvarchar(500)
+    */
+    get Reason(): string | null {
+        return this.Get('Reason');
+    }
+    set Reason(value: string | null) {
+        this.Set('Reason', value);
+    }
+
+    /**
+    * * Field Name: IsActive
+    * * Display Name: Is Active
+    * * SQL Data Type: bit
+    * * Default Value: 1
+    */
+    get IsActive(): boolean {
+        return this.Get('IsActive');
+    }
+    set IsActive(value: boolean) {
+        this.Set('IsActive', value);
+    }
+
+    /**
+    * * Field Name: __mj_CreatedAt
+    * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_CreatedAt(): Date {
+        return this.Get('__mj_CreatedAt');
+    }
+
+    /**
+    * * Field Name: __mj_UpdatedAt
+    * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_UpdatedAt(): Date {
+        return this.Get('__mj_UpdatedAt');
+    }
+}
+
+
+/**
+ * MJ_BizApps_Referrals: Reciprocity Snapshots - strongly typed entity sub-class
+ * * Schema: __mj_BizAppsReferrals
+ * * Base Table: ReciprocitySnapshot
+ * * Base View: vwReciprocitySnapshots
+ * * @description Periodic snapshot of a ProfessionalProfile referral give/receive balance used to compute ReciprocityIndex.
+ * * Primary Key: ID
+ * @extends {BaseEntity}
+ * @class
+ * @public
+ */
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Reciprocity Snapshots')
+export class mjBizAppsReferralsReciprocitySnapshotEntity extends BaseEntity<mjBizAppsReferralsReciprocitySnapshotEntityType> {
+    /**
+    * Loads the MJ_BizApps_Referrals: Reciprocity Snapshots record from the database
+    * @param ID: string - primary key value to load the MJ_BizApps_Referrals: Reciprocity Snapshots record.
+    * @param EntityRelationshipsToLoad - (optional) the relationships to load
+    * @returns {Promise<boolean>} - true if successful, false otherwise
+    * @public
+    * @async
+    * @memberof mjBizAppsReferralsReciprocitySnapshotEntity
+    * @method
+    * @override
+    */
+    public async Load(ID: string, EntityRelationshipsToLoad?: string[]) : Promise<boolean> {
+        const compositeKey: CompositeKey = new CompositeKey();
+        compositeKey.KeyValuePairs.push({ FieldName: 'ID', Value: ID });
+        return await super.InnerLoad(compositeKey, EntityRelationshipsToLoad);
+    }
+
+    /**
+    * * Field Name: ID
+    * * Display Name: ID
+    * * SQL Data Type: uniqueidentifier
+    * * Default Value: newsequentialid()
+    */
+    get ID(): string {
+        return this.Get('ID');
+    }
+    set ID(value: string) {
+        this.Set('ID', value);
+    }
+
+    /**
+    * * Field Name: ProfessionalProfileID
+    * * Display Name: Professional Profile
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)
+    */
+    get ProfessionalProfileID(): string {
+        return this.Get('ProfessionalProfileID');
+    }
+    set ProfessionalProfileID(value: string) {
+        this.Set('ProfessionalProfileID', value);
+    }
+
+    /**
+    * * Field Name: ComputedAt
+    * * Display Name: Computed At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: sysdatetimeoffset()
+    */
+    get ComputedAt(): Date {
+        return this.Get('ComputedAt');
+    }
+    set ComputedAt(value: Date) {
+        this.Set('ComputedAt', value);
+    }
+
+    /**
+    * * Field Name: PeriodStart
+    * * Display Name: Period Start
+    * * SQL Data Type: date
+    */
+    get PeriodStart(): Date {
+        return this.Get('PeriodStart');
+    }
+    set PeriodStart(value: Date) {
+        this.Set('PeriodStart', value);
+    }
+
+    /**
+    * * Field Name: PeriodEnd
+    * * Display Name: Period End
+    * * SQL Data Type: date
+    */
+    get PeriodEnd(): Date {
+        return this.Get('PeriodEnd');
+    }
+    set PeriodEnd(value: Date) {
+        this.Set('PeriodEnd', value);
+    }
+
+    /**
+    * * Field Name: ReferralsSent
+    * * Display Name: Referrals Sent
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get ReferralsSent(): number {
+        return this.Get('ReferralsSent');
+    }
+    set ReferralsSent(value: number) {
+        this.Set('ReferralsSent', value);
+    }
+
+    /**
+    * * Field Name: ReferralsReceived
+    * * Display Name: Referrals Received
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get ReferralsReceived(): number {
+        return this.Get('ReferralsReceived');
+    }
+    set ReferralsReceived(value: number) {
+        this.Set('ReferralsReceived', value);
+    }
+
+    /**
+    * * Field Name: ReferralsAccepted
+    * * Display Name: Referrals Accepted
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get ReferralsAccepted(): number {
+        return this.Get('ReferralsAccepted');
+    }
+    set ReferralsAccepted(value: number) {
+        this.Set('ReferralsAccepted', value);
+    }
+
+    /**
+    * * Field Name: ReferralsResolved
+    * * Display Name: Referrals Resolved
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get ReferralsResolved(): number {
+        return this.Get('ReferralsResolved');
+    }
+    set ReferralsResolved(value: number) {
+        this.Set('ReferralsResolved', value);
+    }
+
+    /**
+    * * Field Name: SLABreachCount
+    * * Display Name: SLA Breach Count
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get SLABreachCount(): number {
+        return this.Get('SLABreachCount');
+    }
+    set SLABreachCount(value: number) {
+        this.Set('SLABreachCount', value);
+    }
+
+    /**
+    * * Field Name: AcceptanceRate
+    * * Display Name: Acceptance Rate
+    * * SQL Data Type: decimal(5, 4)
+    * * Default Value: 0
+    */
+    get AcceptanceRate(): number {
+        return this.Get('AcceptanceRate');
+    }
+    set AcceptanceRate(value: number) {
+        this.Set('AcceptanceRate', value);
+    }
+
+    /**
+    * * Field Name: MedianResponseHours
+    * * Display Name: Median Response Hours
+    * * SQL Data Type: decimal(8, 2)
+    */
+    get MedianResponseHours(): number | null {
+        return this.Get('MedianResponseHours');
+    }
+    set MedianResponseHours(value: number | null) {
+        this.Set('MedianResponseHours', value);
+    }
+
+    /**
+    * * Field Name: ReciprocityIndex
+    * * Display Name: Reciprocity Index
+    * * SQL Data Type: decimal(6, 3)
+    * * Default Value: 0
+    */
+    get ReciprocityIndex(): number {
+        return this.Get('ReciprocityIndex');
+    }
+    set ReciprocityIndex(value: number) {
+        this.Set('ReciprocityIndex', value);
+    }
+
+    /**
+    * * Field Name: AttributedFeeTotal
+    * * Display Name: Attributed Fee Total
+    * * SQL Data Type: decimal(14, 2)
+    * * Default Value: 0
+    */
+    get AttributedFeeTotal(): number {
+        return this.Get('AttributedFeeTotal');
+    }
+    set AttributedFeeTotal(value: number) {
+        this.Set('AttributedFeeTotal', value);
+    }
+
+    /**
+    * * Field Name: __mj_CreatedAt
+    * * Display Name: Created At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_CreatedAt(): Date {
+        return this.Get('__mj_CreatedAt');
+    }
+
+    /**
+    * * Field Name: __mj_UpdatedAt
+    * * Display Name: Updated At
+    * * SQL Data Type: datetimeoffset
+    * * Default Value: getutcdate()
+    */
+    get __mj_UpdatedAt(): Date {
+        return this.Get('__mj_UpdatedAt');
+    }
+}
+
+

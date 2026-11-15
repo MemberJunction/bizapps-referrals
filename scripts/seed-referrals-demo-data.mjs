@@ -1,6 +1,8 @@
 /**
  * Idempotent runner for `scripts/seed-referrals-demo-data.sql`.
  * Reads DB_* connection settings from environment or `../MJ/.env`.
+ * Pass `--wave3` to additionally seed `scripts/seed-referrals-wave3-data.sql`
+ * (SLA escalation, outcomes, availability windows, and reciprocity snapshots).
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -10,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 const sqlFile = path.join(__dirname, 'seed-referrals-demo-data.sql');
+const wave3SqlFile = path.join(__dirname, 'seed-referrals-wave3-data.sql');
+const includeWave3 = process.argv.includes('--wave3');
 
 function loadEnvFromMj() {
   const candidates = [
@@ -53,3 +57,13 @@ const out = execFileSync(
   { encoding: 'utf8', env: { ...process.env, SQLCMDPASSWORD: cfg.pass } },
 );
 console.log(out);
+
+if (includeWave3) {
+  console.log(`Seeding Referrals Wave 3 demo data (SLA escalation, outcomes, readiness) into ${cfg.db}...`);
+  const wave3Out = execFileSync(
+    'sqlcmd',
+    ['-S', `${cfg.host},${cfg.port}`, '-U', cfg.user, '-d', cfg.db, '-C', '-i', wave3SqlFile],
+    { encoding: 'utf8', env: { ...process.env, SQLCMDPASSWORD: cfg.pass } },
+  );
+  console.log(wave3Out);
+}

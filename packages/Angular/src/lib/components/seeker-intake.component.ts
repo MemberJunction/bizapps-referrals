@@ -6,11 +6,13 @@ import { ResourceData } from '@memberjunction/core-entities';
 import { RegisterClass } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJButtonDirective,
   MJPageBodyComponent,
   MJPageHeaderComponent,
   MJPageLayoutComponent,
 } from '@memberjunction/ng-ui-components';
 import {
+  CapacityReadinessService,
   CascadeRoutingService,
   FeedbackOutcomeStatus,
   MatchCandidateScore,
@@ -23,6 +25,7 @@ import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
@@ -49,15 +52,16 @@ export interface ConflictCheckPartyDraft {
     MJPageLayoutComponent,
     MJPageHeaderComponent,
     MJPageBodyComponent,
+    MJButtonDirective,
   ],
   template: `
     <mj-page-layout>
       <mj-page-header Title="Find a Verified Professional" Icon="fa-solid fa-scale-balanced">
         <div class="header-actions" actions>
-          <button type="button" class="btn-outline" (click)="ToggleDrawer()">
+          <button type="button" mjButton Variant="outline" (click)="ToggleDrawer()">
             {{ Prefs.DrawerOpen ? 'Hide Filters' : 'Directory Filters' }}
           </button>
-          <button type="button" class="btn-primary" (click)="RunMatchPreview()" [disabled]="IsMatching">
+          <button type="button" mjButton Variant="primary" (click)="RunMatchPreview()" [disabled]="IsMatching">
             {{ IsMatching ? 'Matching...' : 'Preview Matches' }}
           </button>
         </div>
@@ -85,7 +89,7 @@ export interface ConflictCheckPartyDraft {
                     [(ngModel)]="RawIntakeNotes"
                     placeholder="Paste notes e.g. Name: Alex Morgan | Email: alex@co.com | Matter: M&A Dispute | Adverse: Rival Corp LLP"
                   ></textarea>
-                  <button type="button" class="btn-outline parse-btn" (click)="ParseStructuredIntake()">
+                  <button type="button" mjButton Variant="outline" Size="sm" class="parse-btn" (click)="ParseStructuredIntake()">
                     Parse Notes
                   </button>
                 </div>
@@ -99,7 +103,12 @@ export interface ConflictCheckPartyDraft {
               </label>
               <label class="field">
                 <span>Email Address *</span>
-                <input type="email" [(ngModel)]="SeekerEmail" placeholder="alex@company.com" />
+                <input
+                  type="email"
+                  [(ngModel)]="SeekerEmail"
+                  (ngModelChange)="OnSeekerEmailChange()"
+                  placeholder="alex@company.com"
+                />
               </label>
               <label class="field">
                 <span>Practice Area *</span>
@@ -128,10 +137,23 @@ export interface ConflictCheckPartyDraft {
                 </select>
               </label>
               <label class="field">
+                <span>Urgency</span>
+                <select [(ngModel)]="UrgencyLevel">
+                  <option value="Low">Low</option>
+                  <option value="Standard">Standard</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </label>
+              <label class="field">
                 <span>Matter Title *</span>
                 <input type="text" [(ngModel)]="MatterTitle" placeholder="Series A Counsel & Delaware Conversion" />
               </label>
             </div>
+
+            @if (SlaPreviewText) {
+              <p class="sla-preview" aria-live="polite">{{ SlaPreviewText }}</p>
+            }
 
             <label class="field full-width">
               <span>Matter Summary *</span>
@@ -153,14 +175,23 @@ export interface ConflictCheckPartyDraft {
                   <option value="Witness">Witness</option>
                 </select>
                 <input type="text" [(ngModel)]="NewPartyOrg" placeholder="Organization / Firm (optional)" />
-                <button type="button" class="btn-outline" (click)="AddConflictParty()">Add Party</button>
+                <button type="button" mjButton Variant="outline" Size="sm" (click)="AddConflictParty()">Add Party</button>
               </div>
               @if (ConflictParties.length > 0) {
                 <ul class="conflict-list">
                   @for (party of ConflictParties; track $index) {
                     <li class="conflict-item">
                       <span><strong>{{ party.PartyName }}</strong> ({{ party.PartyRole }}) @if (party.OrganizationName) { — {{ party.OrganizationName }} }</span>
-                      <button type="button" class="btn-link" (click)="RemoveConflictParty($index)">Remove</button>
+                      <button
+                        type="button"
+                        mjButton
+                        Variant="flat"
+                        Size="sm"
+                        [AriaLabel]="'Remove conflict party ' + party.PartyName"
+                        (click)="RemoveConflictParty($index)"
+                      >
+                        Remove
+                      </button>
                     </li>
                   }
                 </ul>
@@ -172,7 +203,7 @@ export interface ConflictCheckPartyDraft {
                 <input type="checkbox" [(ngModel)]="Prefs.RequiresProBono" (ngModelChange)="OnPreferenceChange()" />
                 <span>Require Pro Bono eligibility</span>
               </label>
-              <button type="button" class="btn-primary" (click)="SubmitRequest()" [disabled]="IsSubmitting">
+              <button type="button" mjButton Variant="primary" (click)="SubmitRequest()" [disabled]="IsSubmitting">
                 {{ IsSubmitting ? 'Submitting...' : 'Submit Referral Request' }}
               </button>
             </div>
@@ -185,7 +216,7 @@ export interface ConflictCheckPartyDraft {
                     <span>Accepted / Completed Assignment</span>
                     <select [(ngModel)]="SelectedFeedbackAssignmentID">
                       @for (a of FeedbackAssignments; track a.ID) {
-                        <option [value]="a.ID">{{ a.ProfessionalProfileID }} ({{ a.Status }})</option>
+                        <option [value]="a.ID">{{ AssignmentProfessionalNames[a.ID] || 'Professional' }} ({{ a.Status }})</option>
                       }
                     </select>
                   </label>
@@ -219,7 +250,8 @@ export interface ConflictCheckPartyDraft {
                 <div class="form-actions">
                   <button
                     type="button"
-                    class="btn-secondary"
+                    mjButton
+                    Variant="secondary"
                     [disabled]="IsSubmittingFeedback"
                     (click)="SubmitSeekerFeedback()"
                   >
@@ -240,12 +272,54 @@ export interface ConflictCheckPartyDraft {
                     <span class="score-pill">{{ c.Score | number:'1.0-0' }} pts</span>
                   </div>
                   <div class="candidate-meta">{{ c.FirmName || 'Independent Practice' }}</div>
+                  @if (CandidateReadinessMap[c.ProfessionalProfileID] != null) {
+                    <span
+                      class="readiness-badge"
+                      [attr.aria-label]="'Readiness score ' + CandidateReadinessMap[c.ProfessionalProfileID]"
+                    >
+                      Readiness {{ CandidateReadinessMap[c.ProfessionalProfileID] | number:'1.0-0' }}
+                    </span>
+                  }
                   @if (c.Eligible) {
                     <div class="candidate-status ok">Conflict Cleared • {{ c.AvailabilityStatus }}</div>
                   } @else {
                     <div class="candidate-status warn">{{ c.DisqualificationReason }}</div>
                   }
-                  <button type="button" class="btn-link" (click)="OpenProfessionalRecord(c.ProfessionalProfileID)">
+                  @if (c.ExplainableMatchReasons?.length || c.MatchSummary) {
+                    <button
+                      type="button"
+                      mjButton
+                      Variant="flat"
+                      Size="sm"
+                      [AriaLabel]="'Explain match for ' + c.DisplayName"
+                      (click)="ToggleExplainMatch(c.ProfessionalProfileID)"
+                    >
+                      {{ ExpandedExplainID === c.ProfessionalProfileID ? 'Hide Explanation' : 'Explain this match' }}
+                    </button>
+                    @if (ExpandedExplainID === c.ProfessionalProfileID) {
+                      <div class="explain-match-box">
+                        <span class="explain-source">Source: Deterministic</span>
+                        @if (c.MatchSummary) {
+                          <p class="explain-summary">{{ c.MatchSummary }}</p>
+                        }
+                        @if (c.ExplainableMatchReasons?.length) {
+                          <ul class="explain-reasons">
+                            @for (reason of c.ExplainableMatchReasons; track reason) {
+                              <li>{{ reason }}</li>
+                            }
+                          </ul>
+                        }
+                      </div>
+                    }
+                  }
+                  <button
+                    type="button"
+                    mjButton
+                    Variant="flat"
+                    Size="sm"
+                    [AriaLabel]="'View profile for ' + c.DisplayName"
+                    (click)="OpenProfessionalRecord(c.ProfessionalProfileID)"
+                  >
                     View Profile ↗
                   </button>
                 </div>
@@ -338,31 +412,13 @@ export interface ConflictCheckPartyDraft {
     }
     .intake-footer { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
     .checkbox-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--mj-text-secondary); }
-    .btn-primary {
-      background: var(--mj-brand-primary);
-      color: var(--mj-text-inverse);
-      border: none;
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.55rem 1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-outline {
-      background: var(--mj-bg-surface);
-      color: var(--mj-text-primary);
-      border: 1px solid var(--mj-border-default);
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.5rem 0.9rem;
-      cursor: pointer;
-    }
-    .btn-link {
-      background: transparent;
-      border: none;
-      color: var(--mj-brand-primary);
-      padding: 0;
+    .sla-preview {
+      margin: -0.3rem 0 0.9rem 0;
       font-size: 0.8rem;
-      cursor: pointer;
-      margin-top: 0.35rem;
+      color: var(--mj-status-info-text);
+      background: var(--mj-status-info-bg);
+      border-radius: var(--mj-radius-sm, 6px);
+      padding: 0.45rem 0.65rem;
     }
     .status-banner {
       padding: 0.65rem 0.85rem;
@@ -401,6 +457,26 @@ export interface ConflictCheckPartyDraft {
     .candidate-status { font-size: 0.78rem; margin-top: 0.35rem; }
     .candidate-status.ok { color: var(--mj-status-success-text); }
     .candidate-status.warn { color: var(--mj-status-warning-text); }
+    .readiness-badge {
+      display: inline-block;
+      margin-top: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--mj-status-success-text);
+      background: var(--mj-status-success-bg);
+      border-radius: 999px;
+      padding: 0.1rem 0.5rem;
+    }
+    .explain-match-box {
+      margin-top: 0.5rem;
+      padding: 0.6rem 0.7rem;
+      border-radius: var(--mj-radius-sm, 6px);
+      background: var(--mj-bg-surface-card, var(--mj-bg-surface));
+      border: 1px solid var(--mj-border-default);
+    }
+    .explain-source { font-size: 0.7rem; font-weight: 700; color: var(--mj-text-secondary); text-transform: uppercase; }
+    .explain-summary { margin: 0.35rem 0; font-size: 0.82rem; color: var(--mj-text-primary); }
+    .explain-reasons { margin: 0.35rem 0 0 1rem; padding: 0; font-size: 0.8rem; color: var(--mj-text-secondary); }
     .empty-hint { color: var(--mj-text-secondary); font-size: 0.85rem; }
   `],
 })
@@ -422,6 +498,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   public SeekerName = '';
   public SeekerEmail = '';
   public SelectedTierID = '';
+  public UrgencyLevel: ReferralRequestEntity['UrgencyLevel'] = 'Standard';
   public MatterTitle = '';
   public MatterSummary = '';
   public RawIntakeNotes = '';
@@ -432,6 +509,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   public IsMatching = false;
   public IsSubmitting = false;
   public FeedbackAssignments: ReferralAssignmentEntity[] = [];
+  public AssignmentProfessionalNames: Record<string, string> = {};
   public SelectedFeedbackAssignmentID = '';
   public SeekerFeedbackRating = 5;
   public SeekerFeedbackOutcome: FeedbackOutcomeStatus = 'Engaged';
@@ -439,6 +517,19 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   public IsSubmittingFeedback = false;
   public StatusBanner = '';
   public StatusTone: 'info' | 'success' | 'error' = 'info';
+  public CandidateReadinessMap: Record<string, number> = {};
+  public ExpandedExplainID: string | null = null;
+
+  public get SlaPreviewText(): string {
+    const tier = this.ReferralTiers.find((t) => t.ID === this.SelectedTierID);
+    if (!tier) {
+      return '';
+    }
+    const now = new Date();
+    const deadline = CapacityReadinessService.ComputeSLADeadline(now, tier, this.UrgencyLevel);
+    const effectiveHours = Math.round(((deadline.getTime() - now.getTime()) / (60 * 60 * 1000)) * 10) / 10;
+    return `Expected first response within ~${effectiveHours}h`;
+  }
 
   async ngOnInit(): Promise<void> {
     super.ngOnInit();
@@ -461,12 +552,6 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
         { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: 'IsActive = 1', OrderBy: 'DisplayRank ASC', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: 'IsActive = 1', OrderBy: 'Name ASC', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Referral Tiers', ExtraFilter: 'IsActive = 1', OrderBy: 'SLAResponseHours DESC', ResultType: 'entity_object' },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-          ExtraFilter: "Status = 'Accepted'",
-          OrderBy: '__mj_UpdatedAt DESC',
-          ResultType: 'entity_object',
-        },
       ],
       md.CurrentUser,
     );
@@ -478,10 +563,65 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
         this.SelectedTierID = this.ReferralTiers[0].ID;
       }
     }
-    if (results[3]?.Success) {
-      this.FeedbackAssignments = results[3].Results as ReferralAssignmentEntity[];
-      if (!this.SelectedFeedbackAssignmentID && this.FeedbackAssignments.length > 0) {
-        this.SelectedFeedbackAssignmentID = this.FeedbackAssignments[0].ID;
+    await this.LoadSeekerFeedbackAssignments();
+  }
+
+  public async LoadSeekerFeedbackAssignments(): Promise<void> {
+    this.FeedbackAssignments = [];
+    this.AssignmentProfessionalNames = {};
+    const seekerEmail = this.SeekerEmail.trim();
+    if (!seekerEmail) {
+      return;
+    }
+    const rv = new RunView();
+    const md = new Metadata();
+    const seekerRequests = await rv.RunView<ReferralRequestEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+        ExtraFilter: `SeekerEmail = '${seekerEmail.replace(/'/g, "''")}'`,
+        ResultType: 'entity_object',
+      },
+      md.CurrentUser,
+    );
+    const requestIds = seekerRequests.Success ? seekerRequests.Results.map((r) => `'${r.ID}'`) : [];
+    if (requestIds.length === 0) {
+      return;
+    }
+    const assignmentsResult = await rv.RunView<ReferralAssignmentEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+        ExtraFilter: `Status = 'Accepted' AND ReferralRequestID IN (${requestIds.join(', ')})`,
+        OrderBy: '__mj_UpdatedAt DESC',
+        ResultType: 'entity_object',
+      },
+      md.CurrentUser,
+    );
+    if (!assignmentsResult.Success) {
+      return;
+    }
+    this.FeedbackAssignments = assignmentsResult.Results;
+    if (!this.SelectedFeedbackAssignmentID && this.FeedbackAssignments.length > 0) {
+      this.SelectedFeedbackAssignmentID = this.FeedbackAssignments[0].ID;
+    }
+    const professionalIds = [...new Set(this.FeedbackAssignments.map((a) => `'${a.ProfessionalProfileID}'`))];
+    if (professionalIds.length === 0) {
+      return;
+    }
+    const professionalsResult = await rv.RunView<ProfessionalProfileEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
+        ExtraFilter: `ID IN (${professionalIds.join(', ')})`,
+        ResultType: 'entity_object',
+      },
+      md.CurrentUser,
+    );
+    if (professionalsResult.Success) {
+      const nameByProfileId: Record<string, string> = {};
+      for (const pro of professionalsResult.Results) {
+        nameByProfileId[pro.ID] = pro.DisplayName;
+      }
+      for (const a of this.FeedbackAssignments) {
+        this.AssignmentProfessionalNames[a.ID] = nameByProfileId[a.ProfessionalProfileID] ?? 'Professional';
       }
     }
   }
@@ -494,6 +634,16 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
 
   public async OnPreferenceChange(): Promise<void> {
     await ReferralsUiStateHelper.SaveSeekerPreferences(this.Prefs);
+  }
+
+  public async OnSeekerEmailChange(): Promise<void> {
+    await this.LoadSeekerFeedbackAssignments();
+    this.cdr.markForCheck();
+  }
+
+  public ToggleExplainMatch(professionalProfileId: string): void {
+    this.ExpandedExplainID = this.ExpandedExplainID === professionalProfileId ? null : professionalProfileId;
+    this.cdr.markForCheck();
   }
 
   public async RunMatchPreview(): Promise<void> {
@@ -521,9 +671,32 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
         },
         md.CurrentUser,
       );
+      await this.LoadCandidateReadinessScores(md);
     } finally {
       this.IsMatching = false;
       this.cdr.markForCheck();
+    }
+  }
+
+  public async LoadCandidateReadinessScores(md: Metadata): Promise<void> {
+    this.CandidateReadinessMap = {};
+    if (this.Candidates.length === 0) {
+      return;
+    }
+    const rv = new RunView();
+    const profileIds = [...new Set(this.Candidates.map((c) => `'${c.ProfessionalProfileID}'`))];
+    const result = await rv.RunView<ProfessionalProfileEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
+        ExtraFilter: `ID IN (${profileIds.join(', ')})`,
+        ResultType: 'entity_object',
+      },
+      md.CurrentUser,
+    );
+    if (result.Success) {
+      for (const pro of result.Results) {
+        this.CandidateReadinessMap[pro.ID] = pro.ReadinessScore ?? 0;
+      }
     }
   }
 
@@ -622,6 +795,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
             PracticeAreaID: this.Prefs.PracticeAreaID,
             JurisdictionID: this.Prefs.JurisdictionID,
             ReferralTierID: this.SelectedTierID,
+            UrgencyLevel: this.UrgencyLevel,
             MatterTitle: this.MatterTitle,
             MatterSummary: this.MatterSummary,
             RequiresProBono: this.Prefs.RequiresProBono,
@@ -648,6 +822,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       req.PracticeAreaID = this.Prefs.PracticeAreaID;
       req.JurisdictionID = this.Prefs.JurisdictionID;
       req.ReferralTierID = this.SelectedTierID;
+      req.UrgencyLevel = this.UrgencyLevel;
       req.MatterTitle = this.MatterTitle;
       req.MatterSummary = this.MatterSummary;
       req.RequiresProBono = this.Prefs.RequiresProBono;

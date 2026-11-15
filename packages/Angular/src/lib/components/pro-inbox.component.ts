@@ -6,6 +6,7 @@ import { ResourceData } from '@memberjunction/core-entities';
 import { RegisterClass } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJButtonDirective,
   MJPageBodyComponent,
   MJPageHeaderComponent,
   MJPageLayoutComponent,
@@ -13,15 +14,18 @@ import {
 import {
   AssertValidUUID,
   AssignmentResponseAction,
+  CapacityReadinessService,
   CascadeRoutingService,
   FeedbackOutcomeStatus,
   FeedbackSubmittedByType,
+  OutcomeStatus,
   ReferralCredentialService,
   ReferralTelemetry,
   UUIDsEqual,
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralFeedbackEntity,
@@ -40,6 +44,7 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
   imports: [
     CommonModule,
     FormsModule,
+    MJButtonDirective,
     MJPageLayoutComponent,
     MJPageHeaderComponent,
     MJPageBodyComponent,
@@ -50,6 +55,9 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
         <div class="toolbar" actions>
           @if (CurrentProfile) {
             <div class="capacity-controls">
+              <span class="status-pill" data-tone="readiness" [attr.aria-label]="'Readiness score ' + CurrentProfile.ReadinessScore">
+                Readiness: {{ CurrentProfile.ReadinessScore | number:'1.0-0' }}
+              </span>
               <label class="cap-label">
                 <span>Status</span>
                 <select [(ngModel)]="ProfileAvailability" aria-label="Availability Status">
@@ -69,27 +77,68 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                   aria-label="Max Concurrent Referrals"
                 />
               </label>
-              <button type="button" class="btn-outline" (click)="SaveProfileCapacity()" [disabled]="IsSavingCapacity">
+              <button type="button" mjButton Variant="outline" Size="sm" (click)="SaveProfileCapacity()" [disabled]="IsSavingCapacity">
                 {{ IsSavingCapacity ? 'Saving...' : 'Update Capacity' }}
+              </button>
+              <button type="button" mjButton Variant="outline" Size="sm" (click)="ToggleAvailabilityManager()" [AriaLabel]="'Manage availability windows'">
+                {{ ShowAvailabilityManager ? 'Hide Availability' : 'Manage Availability' }}
               </button>
             </div>
           }
-          <select [(ngModel)]="Prefs.StatusFilter" (ngModelChange)="OnFilterChange()">
+          <select [(ngModel)]="Prefs.StatusFilter" (ngModelChange)="OnFilterChange()" aria-label="Status Filter">
             <option value="Offered">Pending SLA Offers</option>
             <option value="Accepted">Accepted Matters</option>
             <option value="All">All Assignments</option>
           </select>
-          <button type="button" class="btn-outline" (click)="Refresh()">Refresh</button>
+          <button type="button" mjButton Variant="outline" Size="sm" (click)="Refresh()">Refresh</button>
         </div>
       </mj-page-header>
       <mj-page-body>
+        @if (ShowAvailabilityManager) {
+          <div class="availability-manager" aria-label="Availability Manager">
+            <h4>Manage Availability</h4>
+            <div class="availability-grid">
+              <label class="cap-label">
+                <span>Mode</span>
+                <select [(ngModel)]="AvailabilityMode" aria-label="Availability Mode">
+                  <option value="Paused">Pause (short break)</option>
+                  <option value="OnLeave">Take Leave</option>
+                  <option value="ReducedCapacity">Reduce Capacity</option>
+                </select>
+              </label>
+              <label class="cap-label">
+                <span>Starts</span>
+                <input type="date" [(ngModel)]="AvailabilityStartsAt" aria-label="Availability window start date" />
+              </label>
+              <label class="cap-label">
+                <span>Ends</span>
+                <input type="date" [(ngModel)]="AvailabilityEndsAt" aria-label="Availability window end date" />
+              </label>
+              @if (AvailabilityMode === 'ReducedCapacity') {
+                <label class="cap-label">
+                  <span>Capacity Override</span>
+                  <input type="number" min="0" [(ngModel)]="AvailabilityCapacityOverride" aria-label="Availability capacity override" />
+                </label>
+              }
+              <button type="button" mjButton Variant="primary" Size="sm" (click)="SaveAvailabilityWindow()" [disabled]="IsSavingAvailability">
+                {{ IsSavingAvailability ? 'Saving...' : 'Save Window' }}
+              </button>
+            </div>
+            @if (AvailabilityError) {
+              <div class="action-banner" data-tone="error">{{ AvailabilityError }}</div>
+            }
+          </div>
+        }
         <div class="split-workbench">
           <aside class="lead-list">
             @for (a of Assignments; track a.ID) {
               <button
                 type="button"
+                mjButton
+                Variant="flat"
                 class="lead-item"
                 [class.selected]="IsSelected(a)"
+                [AriaLabel]="'Cascade offer number ' + a.CascadeOrder + ', status ' + a.Status"
                 (click)="SelectAssignment(a)"
               >
                 <div class="lead-top">
@@ -118,7 +167,7 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                   </div>
                 </div>
                 @if (SelectedRequest) {
-                  <button type="button" class="btn-outline" (click)="OpenRequestRecord(SelectedRequest.ID)">
+                  <button type="button" mjButton Variant="outline" Size="sm" (click)="OpenRequestRecord(SelectedRequest.ID)">
                     Open Request ↗
                   </button>
                 }
@@ -148,9 +197,51 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                 <div class="response-box">
                   <textarea rows="2" [(ngModel)]="ResponseNotes" placeholder="Optional response notes or conflict detail..."></textarea>
                   <div class="response-actions">
-                    <button type="button" class="btn-accept" (click)="Respond('Accept')" [disabled]="IsActing">Accept Lead</button>
-                    <button type="button" class="btn-decline" (click)="Respond('Decline')" [disabled]="IsActing">Decline</button>
-                    <button type="button" class="btn-conflict" (click)="Respond('ConflictReject')" [disabled]="IsActing">Flag Conflict</button>
+                    <button type="button" mjButton Variant="success" Size="md" (click)="Respond('Accept')" [disabled]="IsActing">Accept Lead</button>
+                    <button type="button" mjButton Variant="warning" Size="md" (click)="Respond('Decline')" [disabled]="IsActing">Decline</button>
+                    <button type="button" mjButton Variant="danger" Size="md" (click)="Respond('ConflictReject')" [disabled]="IsActing">Flag Conflict</button>
+                  </div>
+                </div>
+              }
+
+              @if (active.Status === 'Accepted') {
+                <div class="response-box" aria-label="Mark In Progress">
+                  <div class="response-actions">
+                    <button type="button" mjButton Variant="primary" Size="md" (click)="MarkInProgress()" [disabled]="IsActing">
+                      {{ IsActing ? 'Updating...' : 'Mark In Progress' }}
+                    </button>
+                  </div>
+                </div>
+              }
+
+              @if (active.Status === 'Accepted' || active.Status === 'InProgress') {
+                <div class="feedback-panel" aria-label="Complete & Report Outcome">
+                  <h4>Complete &amp; Report Outcome</h4>
+                  <div class="feedback-grid">
+                    <label class="cap-label">
+                      <span>Outcome Status</span>
+                      <select [(ngModel)]="CompletionOutcomeStatus" aria-label="Completion Outcome Status">
+                        <option value="Engaged">Engaged</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Withdrawn">Withdrawn</option>
+                        <option value="NoEngagement">No Engagement</option>
+                        <option value="Lost">Lost</option>
+                      </select>
+                    </label>
+                    <label class="cap-label">
+                      <span>Fee ($)</span>
+                      <input type="number" min="0" step="0.01" [(ngModel)]="CompletionFeeAmount" aria-label="Fee Amount" />
+                    </label>
+                  </div>
+                  <textarea
+                    rows="2"
+                    [(ngModel)]="CompletionNotes"
+                    placeholder="Completion notes (resolution summary, next steps, etc.)..."
+                  ></textarea>
+                  <div class="response-actions">
+                    <button type="button" mjButton Variant="primary" Size="md" [disabled]="IsCompleting" (click)="CompleteAndReportOutcome()">
+                      {{ IsCompleting ? 'Completing...' : 'Complete & Report Outcome' }}
+                    </button>
                   </div>
                 </div>
               }
@@ -165,8 +256,12 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                         @for (star of [1, 2, 3, 4, 5]; track star) {
                           <button
                             type="button"
+                            mjButton
+                            Variant="flat"
+                            Size="sm"
                             class="star-btn"
                             [class.star-active]="star <= FeedbackRating"
+                            [AriaLabel]="'Rate ' + star + ' of 5 stars'"
                             (click)="FeedbackRating = star"
                           >
                             ★
@@ -201,7 +296,9 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                   <div class="response-actions">
                     <button
                       type="button"
-                      class="btn-accept"
+                      mjButton
+                      Variant="success"
+                      Size="md"
                       [disabled]="IsSubmittingFeedback"
                       (click)="SubmitFeedbackOutcome()"
                     >
@@ -227,6 +324,33 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
       border-radius: var(--mj-radius-sm, 6px);
       padding: 0.4rem 0.65rem;
     }
+    .status-pill[data-tone="readiness"] {
+      background: var(--mj-status-info-bg);
+      color: var(--mj-status-info-text);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.12rem 0.5rem;
+      border-radius: 999px;
+    }
+    .availability-manager {
+      margin: 1rem 1rem 0 1rem;
+      padding: 0.9rem;
+      background: var(--mj-bg-surface-card, var(--mj-bg-surface));
+      border: 1px solid var(--mj-border-default);
+      border-radius: var(--mj-radius-md, 8px);
+      color: var(--mj-text-primary);
+    }
+    .availability-manager h4 { margin: 0 0 0.6rem 0; font-size: 0.92rem; }
+    .availability-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .availability-grid input[type="date"] {
+      background: var(--mj-bg-surface);
+      color: var(--mj-text-primary);
+      border: 1px solid var(--mj-border-default);
+      border-radius: var(--mj-radius-sm, 6px);
+      padding: 0.28rem 0.45rem;
+      font-size: 0.8rem;
+    }
+    .action-banner[data-tone="error"] { background: var(--mj-status-error-bg); color: var(--mj-status-error-text); }
     .split-workbench {
       display: grid;
       grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
@@ -310,14 +434,6 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
       margin-bottom: 0.65rem;
     }
     .response-actions { display: flex; gap: 0.5rem; }
-    .btn-outline {
-      background: var(--mj-bg-surface);
-      color: var(--mj-text-primary);
-      border: 1px solid var(--mj-border-default);
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.4rem 0.75rem;
-      cursor: pointer;
-    }
     .feedback-panel {
       border-top: 1px solid var(--mj-border-default);
       padding-top: 0.9rem;
@@ -363,30 +479,6 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
       color: var(--mj-status-warning-text);
       border-color: var(--mj-status-warning-border);
     }
-    .btn-accept {
-      background: var(--mj-status-success-text);
-      color: var(--mj-text-inverse);
-      border: none;
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.5rem 0.9rem;
-      cursor: pointer;
-    }
-    .btn-decline {
-      background: var(--mj-status-warning-bg);
-      color: var(--mj-status-warning-text);
-      border: 1px solid var(--mj-border-default);
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.5rem 0.9rem;
-      cursor: pointer;
-    }
-    .btn-conflict {
-      background: var(--mj-status-error-bg);
-      color: var(--mj-status-error-text);
-      border: 1px solid var(--mj-border-default);
-      border-radius: var(--mj-radius-sm, 6px);
-      padding: 0.5rem 0.9rem;
-      cursor: pointer;
-    }
     .action-banner {
       padding: 0.55rem 0.75rem;
       border-radius: var(--mj-radius-sm, 6px);
@@ -421,6 +513,17 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
   public ActionMessage = '';
   public IsActing = false;
   public NowMs = Date.now();
+  public ShowAvailabilityManager = false;
+  public AvailabilityMode: ProfessionalAvailabilityWindowEntity['WindowType'] = 'Paused';
+  public AvailabilityStartsAt = '';
+  public AvailabilityEndsAt = '';
+  public AvailabilityCapacityOverride: number | null = null;
+  public IsSavingAvailability = false;
+  public AvailabilityError = '';
+  public CompletionOutcomeStatus: OutcomeStatus = 'Resolved';
+  public CompletionFeeAmount: number | null = null;
+  public CompletionNotes = '';
+  public IsCompleting = false;
 
   async ngOnInit(): Promise<void> {
     super.ngOnInit();
@@ -541,6 +644,103 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
         : this.CurrentProfile.LatestResult?.CompleteMessage ?? 'Failed to update profile capacity.';
     } finally {
       this.IsSavingCapacity = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  public ToggleAvailabilityManager(): void {
+    this.ShowAvailabilityManager = !this.ShowAvailabilityManager;
+    this.AvailabilityError = '';
+    this.cdr.markForCheck();
+  }
+
+  public async SaveAvailabilityWindow(): Promise<void> {
+    if (!this.CurrentProfile) return;
+    this.AvailabilityError = '';
+    if (!this.AvailabilityStartsAt || !this.AvailabilityEndsAt) {
+      this.AvailabilityError = 'Both a start and end date are required.';
+      this.cdr.markForCheck();
+      return;
+    }
+    const startsAt = new Date(this.AvailabilityStartsAt);
+    const endsAt = new Date(this.AvailabilityEndsAt);
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      this.AvailabilityError = 'End date must be after the start date.';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (this.AvailabilityMode === 'ReducedCapacity' && (this.AvailabilityCapacityOverride == null || this.AvailabilityCapacityOverride < 0)) {
+      this.AvailabilityError = 'A non-negative Capacity Override is required for Reduced Capacity windows.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.IsSavingAvailability = true;
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      await CapacityReadinessService.SetAvailabilityWindow(
+        {
+          ProfessionalProfileID: this.CurrentProfile.ID,
+          WindowType: this.AvailabilityMode,
+          StartsAt: startsAt,
+          EndsAt: endsAt,
+          CapacityOverride: this.AvailabilityMode === 'ReducedCapacity' ? this.AvailabilityCapacityOverride : null,
+          Reason: `${this.AvailabilityMode} window set from Pro Inbox.`,
+        },
+        md.CurrentUser,
+      );
+      this.ActionMessage = `Saved ${this.AvailabilityMode} window from ${this.AvailabilityStartsAt} to ${this.AvailabilityEndsAt}.`;
+      this.ShowAvailabilityManager = false;
+      this.AvailabilityStartsAt = '';
+      this.AvailabilityEndsAt = '';
+      this.AvailabilityCapacityOverride = null;
+    } catch (err) {
+      this.AvailabilityError = err instanceof Error ? err.message : 'Failed to save availability window.';
+    } finally {
+      this.IsSavingAvailability = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  public async MarkInProgress(): Promise<void> {
+    if (!this.SelectedAssignment) return;
+    this.IsActing = true;
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      const result = await CascadeRoutingService.MarkInProgress(this.SelectedAssignment.ID, md.CurrentUser);
+      this.ActionMessage = `Assignment is now ${result.AssignmentStatus}; request is now ${result.RequestStatus}.`;
+      await this.Refresh();
+    } finally {
+      this.IsActing = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  public async CompleteAndReportOutcome(): Promise<void> {
+    if (!this.SelectedAssignment) return;
+    this.IsCompleting = true;
+    this.ActionMessage = '';
+    this.cdr.markForCheck();
+    try {
+      const md = new Metadata();
+      const result = await CascadeRoutingService.CompleteReferral(
+        {
+          ReferralAssignmentID: this.SelectedAssignment.ID,
+          OutcomeStatus: this.CompletionOutcomeStatus,
+          CompletionNotes: this.CompletionNotes.trim() || undefined,
+          FeeAmount: this.CompletionFeeAmount,
+        },
+        md.CurrentUser,
+      );
+      this.ActionMessage = `Referral completed as ${this.CompletionOutcomeStatus}. Request is now ${result.RequestStatus}.`;
+      this.CompletionNotes = '';
+      this.CompletionFeeAmount = null;
+      await this.Refresh();
+    } catch (err) {
+      this.ActionMessage = err instanceof Error ? err.message : 'Failed to complete referral.';
+    } finally {
+      this.IsCompleting = false;
       this.cdr.markForCheck();
     }
   }

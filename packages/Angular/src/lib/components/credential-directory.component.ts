@@ -12,6 +12,7 @@ import { ResourceData } from '@memberjunction/core-entities';
 import { RegisterClass, UUIDsEqual } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJButtonDirective,
   MJPageBodyComponent,
   MJPageHeaderComponent,
   MJPageLayoutComponent,
@@ -50,6 +51,7 @@ export interface VerificationQueueItem {
   imports: [
     CommonModule,
     FormsModule,
+    MJButtonDirective,
     MJPageLayoutComponent,
     MJPageHeaderComponent,
     MJPageBodyComponent,
@@ -280,14 +282,15 @@ export interface VerificationQueueItem {
         <div class="header-actions" actions>
           <button
             type="button"
-            class="btn"
-            [class.btn-primary]="Prefs.ShowVerificationQueue"
+            mjButton
+            [Variant]="Prefs.ShowVerificationQueue ? 'primary' : 'outline'"
+            Size="sm"
             (click)="ToggleVerificationQueue()"
           >
             Verification Queue ({{ PendingQueue.length }})
           </button>
-          <button type="button" class="btn" (click)="ResetFilters()">Reset Filters</button>
-          <button type="button" class="btn btn-primary" (click)="LoadProfiles()">Refresh</button>
+          <button type="button" mjButton Variant="outline" Size="sm" (click)="ResetFilters()">Reset Filters</button>
+          <button type="button" mjButton Variant="primary" Size="sm" (click)="LoadProfiles()">Refresh</button>
         </div>
       </mj-page-header>
       <mj-page-body>
@@ -324,7 +327,9 @@ export interface VerificationQueueItem {
                   <div class="queue-actions">
                     <button
                       type="button"
-                      class="btn btn-primary"
+                      mjButton
+                      Variant="primary"
+                      Size="sm"
                       [disabled]="IsVerifying"
                       (click)="VerifyCredential(item.Credential, 'Verified')"
                     >
@@ -332,7 +337,9 @@ export interface VerificationQueueItem {
                     </button>
                     <button
                       type="button"
-                      class="btn btn-danger"
+                      mjButton
+                      Variant="danger"
+                      Size="sm"
                       [disabled]="IsVerifying"
                       (click)="VerifyCredential(item.Credential, 'Rejected')"
                     >
@@ -462,7 +469,7 @@ export interface VerificationQueueItem {
                   </div>
 
                   <div class="card-footer">
-                    <button type="button" class="btn" (click)="OpenProfile(card.Profile.ID)">View Profile</button>
+                    <button type="button" mjButton Variant="outline" Size="sm" (click)="OpenProfile(card.Profile.ID)">View Profile</button>
                   </div>
                 </div>
               </div>

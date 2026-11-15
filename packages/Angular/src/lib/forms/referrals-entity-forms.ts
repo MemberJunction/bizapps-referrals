@@ -5,12 +5,16 @@ import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
+  ReciprocitySnapshotEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralFeedbackEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -2192,6 +2196,268 @@ export class ProfessionalCredentialFormComponent extends BaseFormComponent {
   }
 }
 
+/**
+ * 12. Referral Escalations Left-Rail Form
+ */
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Escalations')
+@Component({
+  standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'mj-referrals-referral-escalation-form',
+  template: `
+    <mj-record-form-container [Record]="record" [FormComponent]="this"
+      (Navigate)="OnFormNavigate($event)"
+      (DeleteRequested)="OnDeleteRequested()"
+      (FavoriteToggled)="OnFavoriteToggled()"
+      (HistoryRequested)="OnHistoryRequested()"
+      (ListManagementRequested)="OnListManagementRequested()">
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="before-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+
+      <mj-collapsible-panel
+        SectionKey="escalationDetails"
+        SectionName="Escalation Details"
+        Icon="fa-solid fa-triangle-exclamation"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralRequestID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralAssignmentID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EscalationLevel" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="TriggerType" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="Status" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="RecommendedAction" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="Notes" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="escalationTimeline"
+        SectionName="Timeline"
+        Icon="fa-solid fa-clock"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="RaisedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="AcknowledgedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ResolvedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="systemMetadata"
+        SectionName="System Metadata"
+        Icon="fa-solid fa-gear"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ID" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_CreatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_UpdatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-related" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+    </mj-record-form-container>
+  `,
+})
+export class ReferralEscalationFormComponent extends BaseFormComponent {
+  public declare record: ReferralEscalationEntity;
+
+  override async ngOnInit(): Promise<void> {
+    await super.ngOnInit();
+    this.initSections([
+      { sectionKey: 'escalationDetails', sectionName: 'Escalation Details', isExpanded: true },
+      { sectionKey: 'escalationTimeline', sectionName: 'Timeline', isExpanded: true },
+      { sectionKey: 'systemMetadata', sectionName: 'System Metadata', isExpanded: false },
+    ]);
+  }
+}
+
+/**
+ * 13. Referral Outcomes Left-Rail Form
+ */
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Outcomes')
+@Component({
+  standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'mj-referrals-referral-outcome-form',
+  template: `
+    <mj-record-form-container [Record]="record" [FormComponent]="this"
+      (Navigate)="OnFormNavigate($event)"
+      (DeleteRequested)="OnDeleteRequested()"
+      (FavoriteToggled)="OnFavoriteToggled()"
+      (HistoryRequested)="OnHistoryRequested()"
+      (ListManagementRequested)="OnListManagementRequested()">
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="before-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+
+      <mj-collapsible-panel
+        SectionKey="outcomeDetails"
+        SectionName="Outcome Details"
+        Icon="fa-solid fa-flag-checkered"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralRequestID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralAssignmentID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="OutcomeStatus" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EngagedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ClosedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EstimatedFeeAmount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReportedFeeAmount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CurrencyCode" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReportedByType" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="AttributionNotes" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="systemMetadata"
+        SectionName="System Metadata"
+        Icon="fa-solid fa-gear"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ID" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_CreatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_UpdatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-related" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+    </mj-record-form-container>
+  `,
+})
+export class ReferralOutcomeFormComponent extends BaseFormComponent {
+  public declare record: ReferralOutcomeEntity;
+
+  override async ngOnInit(): Promise<void> {
+    await super.ngOnInit();
+    this.initSections([
+      { sectionKey: 'outcomeDetails', sectionName: 'Outcome Details', isExpanded: true },
+      { sectionKey: 'systemMetadata', sectionName: 'System Metadata', isExpanded: false },
+    ]);
+  }
+}
+
+/**
+ * 14. Professional Availability Windows Left-Rail Form
+ */
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Availability Windows')
+@Component({
+  standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'mj-referrals-professional-availability-window-form',
+  template: `
+    <mj-record-form-container [Record]="record" [FormComponent]="this"
+      (Navigate)="OnFormNavigate($event)"
+      (DeleteRequested)="OnDeleteRequested()"
+      (FavoriteToggled)="OnFavoriteToggled()"
+      (HistoryRequested)="OnHistoryRequested()"
+      (ListManagementRequested)="OnListManagementRequested()">
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="before-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+
+      <mj-collapsible-panel
+        SectionKey="windowDetails"
+        SectionName="Availability Window Details"
+        Icon="fa-solid fa-calendar-days"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="WindowType" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="StartsAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EndsAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CapacityOverride" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IsActive" Type="checkbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="Reason" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="systemMetadata"
+        SectionName="System Metadata"
+        Icon="fa-solid fa-gear"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ID" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_CreatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_UpdatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-related" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+    </mj-record-form-container>
+  `,
+})
+export class ProfessionalAvailabilityWindowFormComponent extends BaseFormComponent {
+  public declare record: ProfessionalAvailabilityWindowEntity;
+
+  override async ngOnInit(): Promise<void> {
+    await super.ngOnInit();
+    this.initSections([
+      { sectionKey: 'windowDetails', sectionName: 'Availability Window Details', isExpanded: true },
+      { sectionKey: 'systemMetadata', sectionName: 'System Metadata', isExpanded: false },
+    ]);
+  }
+}
+
+/**
+ * 15. Reciprocity Snapshots Left-Rail Form
+ */
+@RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Reciprocity Snapshots')
+@Component({
+  standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'mj-referrals-reciprocity-snapshot-form',
+  template: `
+    <mj-record-form-container [Record]="record" [FormComponent]="this"
+      (Navigate)="OnFormNavigate($event)"
+      (DeleteRequested)="OnDeleteRequested()"
+      (FavoriteToggled)="OnFavoriteToggled()"
+      (HistoryRequested)="OnHistoryRequested()"
+      (ListManagementRequested)="OnListManagementRequested()">
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="before-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+
+      <mj-collapsible-panel
+        SectionKey="snapshotDetails"
+        SectionName="Reciprocity Snapshot Details"
+        Icon="fa-solid fa-scale-balanced"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ComputedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodStart" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodEnd" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsSent" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsReceived" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsAccepted" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsResolved" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReciprocityIndex" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-collapsible-panel
+        SectionKey="systemMetadata"
+        SectionName="System Metadata"
+        Icon="fa-solid fa-gear"
+        [Form]="this"
+        [FormContext]="formContext">
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ID" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_CreatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="__mj_UpdatedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+      </mj-collapsible-panel>
+
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-fields" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+      <mj-form-panel-slot Entity="{{record.EntityInfo.Name}}" Slot="after-related" [Record]="record" [FormComponent]="this" [FormContext]="formContext"></mj-form-panel-slot>
+    </mj-record-form-container>
+  `,
+})
+export class ReciprocitySnapshotFormComponent extends BaseFormComponent {
+  public declare record: ReciprocitySnapshotEntity;
+
+  override async ngOnInit(): Promise<void> {
+    await super.ngOnInit();
+    this.initSections([
+      { sectionKey: 'snapshotDetails', sectionName: 'Reciprocity Snapshot Details', isExpanded: true },
+      { sectionKey: 'systemMetadata', sectionName: 'System Metadata', isExpanded: false },
+    ]);
+  }
+}
+
 export const REFERRALS_ENTITY_FORM_COMPONENTS = [
   ReferralRequestFormComponent,
   ProfessionalProfileFormComponent,
@@ -2204,4 +2470,8 @@ export const REFERRALS_ENTITY_FORM_COMPONENTS = [
   ProfessionalPracticeAreaFormComponent,
   ProfessionalJurisdictionFormComponent,
   ReferralFeedbackFormComponent,
+  ReferralEscalationFormComponent,
+  ReferralOutcomeFormComponent,
+  ProfessionalAvailabilityWindowFormComponent,
+  ReciprocitySnapshotFormComponent,
 ];

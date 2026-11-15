@@ -4,13 +4,15 @@ import { ReferralsWorldChecks } from '../checks/referrals-world.checks.js';
 
 describe('@mj-biz-apps/referrals-integration-tests world model bundles', () => {
   it('registers the referrals-world bundle in IntegrationCheckRegistry', () => {
-    expect(ReferralsWorldChecks.length).toBe(3);
+    expect(ReferralsWorldChecks.length).toBe(5);
 
     const registered = IntegrationCheckRegistry.Instance.GetBundle('referrals-world');
     expect(registered.map((c) => c.Id)).toEqual([
       'referrals-world.RW1',
       'referrals-world.RW2',
       'referrals-world.RW3',
+      'referrals-world.RW4',
+      'referrals-world.RW5',
     ]);
   });
 });

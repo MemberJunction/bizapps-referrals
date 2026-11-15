@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Metadata, RunView } from '@memberjunction/core';
+import { MJButtonDirective } from '@memberjunction/ng-ui-components';
 import {
   DomainVocabulary,
   MatchingEngine,
@@ -36,6 +37,7 @@ export interface FinderMatchItem {
   AvailabilityStatus: ProfessionalProfileEntity['AvailabilityStatus'];
   AverageResponseHours: number | null;
   AverageRating: number | null;
+  ReadinessScore: number;
   Score: number;
   ExplainableMatchReasons?: string[];
   MatchSummary?: string;
@@ -44,7 +46,7 @@ export interface FinderMatchItem {
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MJButtonDirective],
   selector: 'mj-referrals-finder',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
@@ -139,29 +141,41 @@ export interface FinderMatchItem {
       align-items: center;
       flex-wrap: wrap;
     }
-    .btn {
-      padding: 0.6rem 1.25rem;
+    .span-2 { grid-column: span 2; }
+    .probono-label { font-size: 0.8rem; color: var(--mj-text-muted); display: flex; align-items: center; gap: 0.35rem; }
+    .finder-action-full-width { width: 100%; margin-top: 0.65rem; }
+    .no-results { text-align: center; padding: 2rem; color: var(--mj-text-muted); }
+    .card-badges { display: flex; gap: 0.35rem; margin: 0.3rem 0; }
+    .readiness-badge {
+      display: inline-flex;
+      background: var(--mj-status-info-bg);
+      color: var(--mj-status-info-text);
+      border-radius: 999px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .modal-title { margin: 0; font-size: 1.2rem; color: var(--mj-text-primary); }
+    .icon-close-btn { font-size: 1.2rem; }
+    .modal-form { display: flex; flex-direction: column; gap: 0.75rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.75rem; }
+    .intake-error {
+      padding: 0.5rem;
+      background: var(--mj-status-error-bg);
+      border: 1px solid var(--mj-status-error-border);
+      color: var(--mj-status-error-text);
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+    .intake-success {
+      padding: 0.75rem;
+      background: var(--mj-status-success-bg);
+      border: 1px solid var(--mj-status-success-border);
+      color: var(--mj-status-success-text);
       border-radius: 6px;
       font-size: 0.88rem;
       font-weight: 600;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: all 0.15s ease-in-out;
-    }
-    .btn-primary {
-      background: var(--mj-finder-accent, var(--mj-brand-primary));
-      color: var(--mj-bg-surface);
-    }
-    .btn-primary:hover {
-      opacity: 0.92;
-    }
-    .btn-secondary {
-      background: var(--mj-bg-surface-sunken);
-      color: var(--mj-text-primary);
-      border-color: var(--mj-border-default);
-    }
-    .btn-secondary:hover {
-      background: var(--mj-border-default);
     }
     .results-grid {
       display: grid;
@@ -288,7 +302,7 @@ export interface FinderMatchItem {
             </select>
           </div>
 
-          <div class="form-group" style="grid-column: span 2;">
+          <div class="form-group span-2">
             <label>{{ Vocab.MatterLabel }} Keywords or Summary</label>
             <input
               type="text"
@@ -300,12 +314,12 @@ export interface FinderMatchItem {
         </div>
 
         <div class="search-actions">
-          <label style="font-size: 0.8rem; color: var(--mj-text-muted); display: flex; align-items: center; gap: 0.35rem;">
+          <label class="probono-label">
             <input type="checkbox" [(ngModel)]="RequiresProBono" />
             Accepts Pro Bono / Financial Need
           </label>
-          <button type="button" class="btn btn-secondary" (click)="ResetFilters()">Reset</button>
-          <button type="button" class="btn btn-primary" (click)="ExecuteSearch()" [disabled]="IsSearching">
+          <button type="button" mjButton Variant="outline" (click)="ResetFilters()">Reset</button>
+          <button type="button" mjButton Variant="primary" (click)="ExecuteSearch()" [disabled]="IsSearching">
             {{ IsSearching ? 'Searching...' : 'Find Matches' }}
           </button>
         </div>
@@ -321,6 +335,11 @@ export interface FinderMatchItem {
                       <div class="card-firm">{{ pro.FirmName || 'Independent Practice' }}</div>
                     </div>
                     <span class="score-badge">{{ Math.round(pro.Score) }}% Match</span>
+                  </div>
+                  <div class="card-badges">
+                    <span class="readiness-badge" [attr.aria-label]="'Readiness score ' + pro.ReadinessScore">
+                      Readiness {{ pro.ReadinessScore }}
+                    </span>
                   </div>
 
                   @if (pro.ExplainableMatchReasons?.length) {
@@ -340,8 +359,9 @@ export interface FinderMatchItem {
                   </div>
                   <button
                     type="button"
-                    class="btn btn-primary"
-                    style="width: 100%; margin-top: 0.65rem;"
+                    mjButton
+                    Variant="primary"
+                    class="finder-action-full-width"
                     (click)="SelectProfessional(pro)">
                     Request Referral
                   </button>
@@ -350,7 +370,7 @@ export interface FinderMatchItem {
             }
           </div>
         } @else if (HasSearched && !IsSearching) {
-          <div style="text-align: center; padding: 2rem; color: var(--mj-text-muted);">
+          <div class="no-results">
             <p>No verified {{ Vocab.ProfessionalPluralLabel }} matched your current criteria.</p>
           </div>
         }
@@ -360,14 +380,14 @@ export interface FinderMatchItem {
       @if (SelectedPro) {
         <div class="intake-modal-backdrop" (click)="CloseIntake()">
           <div class="intake-modal" (click)="$event.stopPropagation()">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-              <h3 style="margin: 0; font-size: 1.2rem; color: var(--mj-text-primary);">
+            <div class="modal-header">
+              <h3 class="modal-title">
                 Request Referral with {{ SelectedPro.DisplayName }}
               </h3>
-              <button type="button" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;" (click)="CloseIntake()">✕</button>
+              <button type="button" mjButton Variant="icon" class="icon-close-btn" AriaLabel="Close referral request dialog" (click)="CloseIntake()">✕</button>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="modal-form">
               <div class="form-group">
                 <label>Your Name *</label>
                 <input type="text" class="form-control" [(ngModel)]="IntakeSeekerName" placeholder="Full Name" />
@@ -401,19 +421,19 @@ export interface FinderMatchItem {
               }
 
               @if (IntakeErrorMessage) {
-                <div style="padding: 0.5rem; background: var(--mj-status-error-bg); border: 1px solid var(--mj-status-error-border); color: var(--mj-status-error-text); border-radius: 6px; font-size: 0.82rem;">
+                <div class="intake-error">
                   {{ IntakeErrorMessage }}
                 </div>
               }
 
               @if (IntakeSuccessMessage) {
-                <div style="padding: 0.75rem; background: var(--mj-status-success-bg); border: 1px solid var(--mj-status-success-border); color: var(--mj-status-success-text); border-radius: 6px; font-size: 0.88rem; font-weight: 600;">
+                <div class="intake-success">
                   {{ IntakeSuccessMessage }}
                 </div>
               } @else {
-                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.75rem;">
-                  <button type="button" class="btn btn-secondary" (click)="CloseIntake()">Cancel</button>
-                  <button type="button" class="btn btn-primary" (click)="SubmitIntake()" [disabled]="IsSubmittingIntake">
+                <div class="modal-actions">
+                  <button type="button" mjButton Variant="outline" (click)="CloseIntake()">Cancel</button>
+                  <button type="button" mjButton Variant="primary" (click)="SubmitIntake()" [disabled]="IsSubmittingIntake">
                     {{ IsSubmittingIntake ? 'Submitting...' : 'Confirm Request' }}
                   </button>
                 </div>
@@ -603,6 +623,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
             AvailabilityStatus: p.AvailabilityStatus,
             AverageResponseHours: p.AverageResponseHours,
             AverageRating: p.AverageRating,
+            ReadinessScore: p.ReadinessScore ?? 0,
             Score: scoreResult.Score,
             ExplainableMatchReasons: scoreResult.ExplainableMatchReasons,
             MatchSummary: scoreResult.MatchSummary,

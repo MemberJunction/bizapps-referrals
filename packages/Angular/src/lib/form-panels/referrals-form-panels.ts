@@ -5,17 +5,21 @@ import { UserInfoEngine } from '@memberjunction/core-entities';
 import { RegisterClassEx } from '@memberjunction/global';
 import { BaseFormPanel } from '@memberjunction/ng-base-forms';
 import { NavigationService } from '@memberjunction/ng-shared';
+import { MJButtonDirective } from '@memberjunction/ng-ui-components';
 import { AssertValidUUID, CascadeRoutingService } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
   JurisdictionEntity,
   PracticeAreaEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralFeedbackEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -78,20 +82,8 @@ const HERO_PANEL_STYLES = `
   }
   .metric-label { font-size: 0.72rem; color: var(--mj-text-secondary); }
   .metric-val { font-size: 0.92rem; font-weight: 700; color: var(--mj-text-primary); }
-  .btn-sm {
-    background: var(--mj-bg-surface);
-    color: var(--mj-text-primary);
-    border: 1px solid var(--mj-border-default);
-    border-radius: var(--mj-radius-sm, 6px);
-    padding: 0.35rem 0.7rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-  }
-  .btn-sm.primary {
-    background: var(--mj-brand-primary);
-    color: var(--mj-text-inverse);
-    border-color: var(--mj-brand-primary);
-  }
+  .metric-tile--wide { grid-column: span 3; }
+  .metric-val--comment { font-weight: 400; font-size: 0.85rem; }
 `;
 
 @RegisterClassEx(BaseFormPanel, {
@@ -106,7 +98,7 @@ const HERO_PANEL_STYLES = `
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-request-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -120,11 +112,11 @@ const HERO_PANEL_STYLES = `
           </div>
           <div class="hero-actions">
             <span class="status-pill" [attr.data-tone]="StatusTone(req.Status)">{{ req.Status }}</span>
-            <button type="button" class="btn-sm" (click)="ToggleExpanded()">
+            <button type="button" mjButton Variant="outline" Size="sm" (click)="ToggleExpanded()">
               {{ Expanded ? 'Compact' : 'Details' }}
             </button>
             @if (req.ID && (req.Status === 'Draft' || req.Status === 'Submitted')) {
-              <button type="button" class="btn-sm primary" (click)="TriggerCascade(req.ID)" [disabled]="IsRouting">
+              <button type="button" mjButton Variant="primary" Size="sm" (click)="TriggerCascade(req.ID)" [disabled]="IsRouting">
                 {{ IsRouting ? 'Routing...' : 'Run Cascade' }}
               </button>
             }
@@ -179,6 +171,11 @@ export class ReferralRequestHeroPanel extends BaseFormPanel implements OnInit {
   public async LoadAssignmentCount(): Promise<void> {
     const rec = this.TypedRecord;
     if (!rec?.ID) return;
+    try {
+      AssertValidUUID(rec.ID, 'ReferralRequestID');
+    } catch {
+      return;
+    }
     const rv = new RunView();
     const md = new Metadata();
     const res = await rv.RunView<ReferralAssignmentEntity>(
@@ -225,7 +222,7 @@ export class ReferralRequestHeroPanel extends BaseFormPanel implements OnInit {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-professional-profile-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -242,7 +239,7 @@ export class ReferralRequestHeroPanel extends BaseFormPanel implements OnInit {
               {{ pro.VerificationStatus }}
             </span>
             <span class="status-pill">{{ pro.AvailabilityStatus }}</span>
-            <button type="button" class="btn-sm" (click)="ToggleExpanded()">
+            <button type="button" mjButton Variant="outline" Size="sm" (click)="ToggleExpanded()">
               {{ Expanded ? 'Compact' : 'Metrics' }}
             </button>
           </div>
@@ -307,7 +304,7 @@ export class ProfessionalProfileHeroPanel extends BaseFormPanel implements OnIni
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-assignment-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -368,7 +365,7 @@ export class ReferralAssignmentHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-conflict-check-party-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -407,7 +404,7 @@ export class ConflictCheckPartyHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-practice-area-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -448,7 +445,7 @@ export class PracticeAreaHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-jurisdiction-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -488,7 +485,7 @@ export class JurisdictionHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-tier-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -529,7 +526,7 @@ export class ReferralTierHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-pro-practice-area-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -570,7 +567,7 @@ export class ProfessionalPracticeAreaHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-pro-jurisdiction-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -613,7 +610,7 @@ export class ProfessionalJurisdictionHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-feedback-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -633,9 +630,9 @@ export class ProfessionalJurisdictionHeroPanel extends BaseFormPanel {
         </div>
         @if (fb.Comments) {
           <div class="hero-metrics">
-            <div class="metric-tile" style="grid-column: span 3;">
+            <div class="metric-tile metric-tile--wide">
               <span class="metric-label">Comments</span>
-              <span class="metric-val" style="font-weight: 400; font-size: 0.85rem;">{{ fb.Comments }}</span>
+              <span class="metric-val metric-val--comment">{{ fb.Comments }}</span>
             </div>
           </div>
         }
@@ -646,6 +643,175 @@ export class ProfessionalJurisdictionHeroPanel extends BaseFormPanel {
 export class ReferralFeedbackHeroPanel extends BaseFormPanel {
   public get TypedRecord(): ReferralFeedbackEntity | null {
     return this.Record instanceof ReferralFeedbackEntity ? this.Record : null;
+  }
+}
+
+@RegisterClassEx(BaseFormPanel, {
+  key: 'referrals:referral-escalation-hero-panel',
+  skipNullKeyWarning: true,
+  metadata: {
+    entity: 'MJ_BizApps_Referrals: Referral Escalations',
+    slot: 'before-fields',
+    sortKey: 5,
+    contributionKey: 'referrals-escalation-hero',
+  },
+})
+@Component({
+  standalone: true,
+  imports: [CommonModule, MJButtonDirective],
+  selector: 'mj-referral-escalation-hero-panel',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [HERO_PANEL_STYLES],
+  template: `
+    @if (TypedRecord; as esc) {
+      <section class="mj-referrals-hero" aria-label="Referral Escalation Summary">
+        <div class="hero-header">
+          <div>
+            <h3 class="hero-title">Level {{ esc.EscalationLevel }} — {{ esc.TriggerType }}</h3>
+            <div class="hero-sub">Triggered: {{ esc.RaisedAt | date:'medium' }}</div>
+          </div>
+          <div class="hero-actions">
+            <span class="status-pill" [attr.data-tone]="StatusTone(esc.Status)">{{ esc.Status }}</span>
+            <span class="status-pill">Recommended: {{ esc.RecommendedAction }}</span>
+          </div>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric-tile">
+            <span class="metric-label">Acknowledged</span>
+            <span class="metric-val">{{ esc.AcknowledgedAt ? (esc.AcknowledgedAt | date:'short') : 'Not yet' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Resolved</span>
+            <span class="metric-val">{{ esc.ResolvedAt ? (esc.ResolvedAt | date:'short') : 'Open' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Linked Task</span>
+            <span class="metric-val">{{ esc.LinkedTaskID ? 'Created' : 'None' }}</span>
+          </div>
+        </div>
+      </section>
+    }
+  `,
+})
+export class ReferralEscalationHeroPanel extends BaseFormPanel {
+  public get TypedRecord(): ReferralEscalationEntity | null {
+    return this.Record instanceof ReferralEscalationEntity ? this.Record : null;
+  }
+  public StatusTone(status: string): 'info' | 'success' | 'warning' | 'error' {
+    if (status === 'Resolved') return 'success';
+    if (status === 'Dismissed') return 'info';
+    if (status === 'Acknowledged') return 'warning';
+    return 'error';
+  }
+}
+
+@RegisterClassEx(BaseFormPanel, {
+  key: 'referrals:referral-outcome-hero-panel',
+  skipNullKeyWarning: true,
+  metadata: {
+    entity: 'MJ_BizApps_Referrals: Referral Outcomes',
+    slot: 'before-fields',
+    sortKey: 5,
+    contributionKey: 'referrals-outcome-hero',
+  },
+})
+@Component({
+  standalone: true,
+  imports: [CommonModule, MJButtonDirective],
+  selector: 'mj-referral-outcome-hero-panel',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [HERO_PANEL_STYLES],
+  template: `
+    @if (TypedRecord; as outcome) {
+      <section class="mj-referrals-hero" aria-label="Referral Outcome Summary">
+        <div class="hero-header">
+          <div>
+            <h3 class="hero-title">Outcome: {{ outcome.OutcomeStatus }}</h3>
+            <div class="hero-sub">Closed: {{ outcome.ClosedAt ? (outcome.ClosedAt | date:'medium') : 'N/A' }}</div>
+          </div>
+          <div class="hero-actions">
+            <span class="status-pill" [attr.data-tone]="(outcome.OutcomeStatus === 'Resolved' || outcome.OutcomeStatus === 'Engaged') ? 'success' : 'warning'">
+              {{ outcome.OutcomeStatus }}
+            </span>
+          </div>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric-tile">
+            <span class="metric-label">Reported Fee</span>
+            <span class="metric-val">{{ outcome.ReportedFeeAmount != null ? ('$' + outcome.ReportedFeeAmount + ' ' + outcome.CurrencyCode) : 'N/A' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Estimated Fee</span>
+            <span class="metric-val">{{ outcome.EstimatedFeeAmount != null ? ('$' + outcome.EstimatedFeeAmount + ' ' + outcome.CurrencyCode) : 'N/A' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Notes</span>
+            <span class="metric-val">{{ outcome.AttributionNotes || '—' }}</span>
+          </div>
+        </div>
+      </section>
+    }
+  `,
+})
+export class ReferralOutcomeHeroPanel extends BaseFormPanel {
+  public get TypedRecord(): ReferralOutcomeEntity | null {
+    return this.Record instanceof ReferralOutcomeEntity ? this.Record : null;
+  }
+}
+
+@RegisterClassEx(BaseFormPanel, {
+  key: 'referrals:professional-availability-window-hero-panel',
+  skipNullKeyWarning: true,
+  metadata: {
+    entity: 'MJ_BizApps_Referrals: Professional Availability Windows',
+    slot: 'before-fields',
+    sortKey: 5,
+    contributionKey: 'referrals-availability-window-hero',
+  },
+})
+@Component({
+  standalone: true,
+  imports: [CommonModule, MJButtonDirective],
+  selector: 'mj-professional-availability-window-hero-panel',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [HERO_PANEL_STYLES],
+  template: `
+    @if (TypedRecord; as win) {
+      <section class="mj-referrals-hero" aria-label="Professional Availability Window">
+        <div class="hero-header">
+          <div>
+            <h3 class="hero-title">{{ win.WindowType }} Availability</h3>
+            <div class="hero-sub">{{ win.IsActive ? 'Active' : 'Inactive' }}</div>
+          </div>
+          <div class="hero-actions">
+            <span class="status-pill" [attr.data-tone]="win.IsActive ? 'success' : 'error'">
+              {{ win.IsActive ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric-tile">
+            <span class="metric-label">Capacity Override</span>
+            <span class="metric-val">{{ win.CapacityOverride != null ? win.CapacityOverride : 'N/A' }}</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Window</span>
+            <span class="metric-val">
+              {{ win.StartsAt ? (win.StartsAt | date:'shortDate') : 'N/A' }} – {{ win.EndsAt ? (win.EndsAt | date:'shortDate') : 'N/A' }}
+            </span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Reason</span>
+            <span class="metric-val">{{ win.Reason || '—' }}</span>
+          </div>
+        </div>
+      </section>
+    }
+  `,
+})
+export class ProfessionalAvailabilityWindowHeroPanel extends BaseFormPanel {
+  public get TypedRecord(): ProfessionalAvailabilityWindowEntity | null {
+    return this.Record instanceof ProfessionalAvailabilityWindowEntity ? this.Record : null;
   }
 }
 
@@ -665,7 +831,7 @@ export class ReferralFeedbackHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-person-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -678,7 +844,7 @@ export class ReferralFeedbackHeroPanel extends BaseFormPanel {
             <div class="hero-sub">Referrals activity associated with this person</div>
           </div>
           <div class="hero-actions">
-            <button type="button" class="btn-sm" (click)="OpenIntake()">New Referral Intake</button>
+            <button type="button" mjButton Variant="outline" Size="sm" (click)="OpenIntake()">New Referral Intake</button>
           </div>
         </div>
         <div class="hero-metrics">
@@ -720,20 +886,28 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
     }
     const rv = new RunView();
     const md = new Metadata();
-    const proRes = await rv.RunView<ProfessionalProfileEntity>(
-      {
-        EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
-        ExtraFilter: `PersonID = '${recId}'`,
-        ResultType: 'entity_object',
-      },
+    const [proRes, reqRes] = await rv.RunViews(
+      [
+        {
+          EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
+          ExtraFilter: `PersonID = '${recId}'`,
+          ResultType: 'entity_object',
+        },
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+          ExtraFilter: `SeekerPersonID = '${recId}'`,
+          ResultType: 'entity_object',
+        },
+      ],
       md.CurrentUser,
     );
     this.HasProProfile = proRes.Success && proRes.Results.length > 0;
+    this.RequestCount = reqRes.Success ? reqRes.Results.length : 0;
     this.cdr.markForCheck();
   }
 
   public OpenIntake(): void {
-    this.navService.OpenNewEntityRecord('MJ_BizApps_Referrals: Referral Requests');
+    void this.navService.OpenNavItemByName('Seeker Intake');
   }
 }
 
@@ -750,7 +924,7 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-organization-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -774,7 +948,9 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
           </div>
           <div class="metric-tile">
             <span class="metric-label">Actions</span>
-            <span class="metric-val"><a style="cursor: pointer;" (click)="OpenDirectory()">Referral Inquiries</a></span>
+            <span class="metric-val">
+              <button type="button" mjButton Variant="flat" Size="sm" (click)="OpenDirectory()">Referral Inquiries</button>
+            </span>
           </div>
         </div>
       </section>
@@ -814,7 +990,7 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
   }
 
   public OpenDirectory(): void {
-    this.navService.OpenNewEntityRecord('MJ_BizApps_Referrals: Referral Requests');
+    void this.navService.OpenNavItemByName('Directory & Pros');
   }
 }
 
@@ -831,7 +1007,7 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-user-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -851,11 +1027,15 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
           </div>
           <div class="metric-tile">
             <span class="metric-label">Lead Inbox</span>
-            <span class="metric-val"><a style="cursor: pointer;" (click)="OpenInbox()">Inquiries</a></span>
+            <span class="metric-val">
+              <button type="button" mjButton Variant="flat" Size="sm" (click)="OpenInbox()">Inquiries</button>
+            </span>
           </div>
           <div class="metric-tile">
             <span class="metric-label">Telemetry</span>
-            <span class="metric-val"><a style="cursor: pointer;" (click)="OpenTelemetry()">View Network</a></span>
+            <span class="metric-val">
+              <button type="button" mjButton Variant="flat" Size="sm" (click)="OpenTelemetry()">View Network</button>
+            </span>
           </div>
         </div>
       </section>
@@ -895,11 +1075,11 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
   }
 
   public OpenInbox(): void {
-    this.navService.OpenNewEntityRecord('MJ_BizApps_Referrals: Referral Requests');
+    void this.navService.OpenNavItemByName('Pro Lead Inbox');
   }
 
   public OpenTelemetry(): void {
-    this.navService.OpenNewEntityRecord('MJ_BizApps_Referrals: Referral Requests');
+    void this.navService.OpenNavItemByName('Ops Telemetry');
   }
 }
 
@@ -916,21 +1096,21 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-professional-credential-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
   template: `
     @if (TypedRecord; as cred) {
       <section class="mj-referrals-hero">
-        <div class="hero-top">
+        <div class="hero-header">
           <div>
             <h3 class="hero-title">{{ cred.CredentialName || cred.CredentialCode || 'Credential' }}</h3>
-            <p class="hero-sub">Code: {{ cred.CredentialCode }} • Provider: {{ cred.ProviderKey }}</p>
+            <div class="hero-sub">Code: {{ cred.CredentialCode }} • Provider: {{ cred.ProviderKey }}</div>
           </div>
           <div class="hero-actions">
-            <span class="badge" [attr.data-status]="cred.VerificationStatus">{{ cred.VerificationStatus }}</span>
-            <button type="button" class="btn-outline" (click)="OpenProfile(cred.ProfessionalProfileID)">
+            <span class="status-pill" [attr.data-tone]="cred.VerificationStatus === 'Verified' ? 'success' : 'warning'">{{ cred.VerificationStatus }}</span>
+            <button type="button" mjButton Variant="outline" Size="sm" (click)="OpenProfile(cred.ProfessionalProfileID)">
               View Profile
             </button>
           </div>

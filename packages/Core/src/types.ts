@@ -1,10 +1,13 @@
 import type {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralFeedbackEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 
@@ -20,6 +23,14 @@ export type ReferralAssignmentStatus = ReferralAssignmentEntity['Status'];
 export type FeedbackSubmittedByType = ReferralFeedbackEntity['SubmittedByType'];
 export type FeedbackOutcomeStatus = ReferralFeedbackEntity['OutcomeStatus'];
 
+// Wave 3 Slice 1: SLA Escalation, Outcomes & Readiness
+export type EscalationTriggerType = ReferralEscalationEntity['TriggerType'];
+export type EscalationStatus = ReferralEscalationEntity['Status'];
+export type EscalationRecommendedAction = ReferralEscalationEntity['RecommendedAction'];
+export type OutcomeStatus = ReferralOutcomeEntity['OutcomeStatus'];
+export type AvailabilityWindowType = ProfessionalAvailabilityWindowEntity['WindowType'];
+export type ReferralSourceChannel = ReferralRequestEntity['SourceChannel'];
+
 export interface ScoreBreakdown {
   PracticeAreaScore: number;
   JurisdictionScore: number;
@@ -28,6 +39,7 @@ export interface ScoreBreakdown {
   RatingScore: number;
   LanguageBonus: number;
   SemanticScore?: number;
+  ReciprocityBoost?: number;
   TotalScore: number;
 }
 
@@ -61,6 +73,12 @@ export interface MatchCriteria {
   MatterTitle?: string | null;
   MatterSummary?: string | null;
   Keywords?: string[];
+  /**
+   * When true, adds a clamp((ReciprocityIndex - 1) * 5, 0, 5) bonus for
+   * professionals who send more referrals than they accept. Defaults to
+   * false so existing callers see byte-identical scores.
+   */
+  ApplyReciprocityBoost?: boolean;
 }
 
 export interface ConflictPartyInput {

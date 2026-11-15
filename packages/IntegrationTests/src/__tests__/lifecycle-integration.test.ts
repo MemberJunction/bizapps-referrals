@@ -32,6 +32,7 @@ import {
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
@@ -56,6 +57,7 @@ interface EntityStore {
   requests: ReferralRequestEntity[];
   conflictParties: ConflictCheckPartyEntity[];
   assignments: ReferralAssignmentEntity[];
+  escalations: ReferralEscalationEntity[];
 }
 
 type StoreEntity =
@@ -66,7 +68,8 @@ type StoreEntity =
   | ReferralTierEntity
   | ReferralRequestEntity
   | ConflictCheckPartyEntity
-  | ReferralAssignmentEntity;
+  | ReferralAssignmentEntity
+  | ReferralEscalationEntity;
 
 function makeEntity<T extends object>(data: Partial<T> & { ID: string }, storeList: T[]): T {
   const obj = {
@@ -161,6 +164,18 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
           ? store.assignments.filter((a) => a.ReferralRequestID.toLowerCase() === reqMatch[1].toLowerCase())
           : store.assignments;
       }
+    } else if (params.EntityName === 'MJ_BizApps_Referrals: Referral Escalations') {
+      const dedupMatch = /DedupKey = '([^']+)'/.exec(filter);
+      const reqMatch = /ReferralRequestID = '([^']+)'/i.exec(filter);
+      if (dedupMatch) {
+        results = store.escalations.filter((e) => e.DedupKey === dedupMatch[1] && e.Status === 'Open');
+      } else if (reqMatch) {
+        results = store.escalations.filter(
+          (e) => e.ReferralRequestID.toLowerCase() === reqMatch[1].toLowerCase() && e.Status === 'Open',
+        );
+      } else {
+        results = store.escalations;
+      }
     }
 
     return {
@@ -197,6 +212,9 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
       if (entityName === 'MJ_BizApps_Referrals: Conflict Check Parties') {
         return makeEntity<ConflictCheckPartyEntity>({ ID: nextUuid() } as ConflictCheckPartyEntity, store.conflictParties) as object as T;
       }
+      if (entityName === 'MJ_BizApps_Referrals: Referral Escalations') {
+        return makeEntity<ReferralEscalationEntity>({ ID: nextUuid() } as ReferralEscalationEntity, store.escalations) as object as T;
+      }
       throw new Error(`Unsupported entity: ${entityName}`);
     },
   };
@@ -217,6 +235,7 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
       requests: [],
       conflictParties: [],
       assignments: [],
+      escalations: [],
     };
 
     for (const [idx, proId] of [PRO_1_ID, PRO_2_ID, PRO_3_ID].entries()) {
@@ -245,6 +264,7 @@ describe('@mj-biz-apps/referrals-integration-tests', () => {
           Code: 'PRIORITY',
           SLAResponseHours: 8,
           MaxCascadeAttempts: 3,
+          MaxEscalationLevel: 3,
         } as ReferralTierEntity,
         store.tiers,
       ),

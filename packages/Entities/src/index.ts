@@ -11,6 +11,10 @@ export {
   mjBizAppsReferralsConflictCheckPartyEntity as ConflictCheckPartyEntity,
   mjBizAppsReferralsReferralAssignmentEntity as ReferralAssignmentEntity,
   mjBizAppsReferralsReferralFeedbackEntity as ReferralFeedbackEntity,
+  mjBizAppsReferralsReferralEscalationEntity as ReferralEscalationEntity,
+  mjBizAppsReferralsReferralOutcomeEntity as ReferralOutcomeEntity,
+  mjBizAppsReferralsProfessionalAvailabilityWindowEntity as ProfessionalAvailabilityWindowEntity,
+  mjBizAppsReferralsReciprocitySnapshotEntity as ReciprocitySnapshotEntity,
 } from './generated/entity_subclasses.js';
 
 import { z } from 'zod';

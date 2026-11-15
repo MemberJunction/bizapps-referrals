@@ -8,7 +8,11 @@
       "PriorityWeight": 1.0,
       "RequireConflictCheck": true,
       "Description": "Standard 24-hour SLA response window with up to 3 cascade attempts.",
-      "IsActive": true
+      "IsActive": true,
+      "EscalationWarningPercent": 75,
+      "MaxEscalationLevel": 3,
+      "UrgentSLAMultiplier": 0.5,
+      "EscalationActionType": "Notify"
     }
   },
   {
@@ -20,7 +24,11 @@
       "PriorityWeight": 1.5,
       "RequireConflictCheck": true,
       "Description": "Accelerated 8-hour SLA response window with up to 5 cascade attempts.",
-      "IsActive": true
+      "IsActive": true,
+      "EscalationWarningPercent": 60,
+      "MaxEscalationLevel": 3,
+      "UrgentSLAMultiplier": 0.35,
+      "EscalationActionType": "AdminAlert"
     }
   },
   {
@@ -32,7 +40,11 @@
       "PriorityWeight": 1.0,
       "RequireConflictCheck": true,
       "Description": "Pro bono referral tier with 48-hour SLA response window.",
-      "IsActive": true
+      "IsActive": true,
+      "EscalationWarningPercent": 75,
+      "MaxEscalationLevel": 3,
+      "UrgentSLAMultiplier": 0.5,
+      "EscalationActionType": "Notify"
     }
   }
 ]

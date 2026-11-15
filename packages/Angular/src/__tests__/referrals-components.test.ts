@@ -176,6 +176,7 @@ describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-
   });
 
   it('renders ReferralsSeekerIntakeComponent DOM, passes draft ConflictParties to FindMatches, persists preferences across recreation, and aborts Draft on party failure', async () => {
+    runViewMock.mockResolvedValue({ Success: true, Results: [] });
     runViewsMock.mockResolvedValue([
       { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A' }] },
       { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware' }] },

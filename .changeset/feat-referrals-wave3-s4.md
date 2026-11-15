@@ -1,0 +1,18 @@
+---
+"@mj-biz-apps/referrals-core": minor
+"@mj-biz-apps/referrals-actions": minor
+"@mj-biz-apps/referrals-ng": minor
+---
+
+Wave 3 Slice 4 (Closed-Loop Intelligence UI): Escalation Console, Reciprocity Scorecard, Pro Inbox & Seeker Intake enhancements, hero panels, navigation fixes, and an mjButton/design-token migration pass across every Angular component.
+
+- Two new `BaseResourceComponent` resources, bringing the Referrals app to 7 `DefaultNavItems`:
+  - **Escalation Console** (`ReferralsEscalationConsoleResource`, nav `Escalations`): open escalations grouped by `EscalationLevel` with a live SLA countdown (time-to-breach when a linked assignment deadline exists, elapsed-since-triggered otherwise), KPI tiles (open-by-level, SLA breaches in the last 7 days, exhausted requests), Acknowledge / Resolve (disabled until notes are entered) / Dismiss, admin-only Reopen with an "Expand to parent practice area" toggle for `CascadeExhausted` escalations, an "Ask AI Advisor" action surfacing `RecommendedAction` with an AI/Rules `Source` label parsed from `AIRationaleJSON`, and a linked-Task chip when `LinkedTaskID` is set.
+  - **Reciprocity Scorecard** (`ReferralsReciprocityScorecardResource`, nav `Reciprocity`): a quarter selector persisted via `UserInfoEngine`, KPI tiles, and a `ReciprocityIndex`-descending ranked table (Sent/Received/Accepted/Resolved/AcceptanceRate with a token-styled bar/MedianResponseHours/SLA breaches/ReciprocityIndex/AttributedFeeTotal/Readiness) with a Recompute action.
+- Added the missing `Referrals.DismissEscalation` `BaseRemotableOperation` + `BaseAction` pair (mirroring `AcknowledgeEscalation`/`ResolveEscalation`) so the Escalation Console's Dismiss action has a server-side counterpart, plus its `MJ: Action Params` metadata.
+- Pro Inbox: Mark In Progress, a "Complete & Report Outcome" panel (`OutcomeStatus` + fee fields via `CascadeRoutingService.CompleteReferral`, now accepting an optional `FeeAmount`), and an Availability manager (pause/leave/reduce-capacity with date-range validation rejecting `EndsAt <= StartsAt`).
+- Seeker Intake: an urgency selector driving an SLA preview ("Expected first response within ~Xh" from `SLAResponseHours` × `UrgentSLAMultiplier`), per-candidate readiness badges from a batch `ProfessionalProfile` lookup, a client-side "Explain this match" panel surfacing `ExplainableMatchReasons`/`MatchSummary`, and a feedback-assignment list now scoped to the current seeker's email with resolved `DisplayName`s instead of raw professional-profile UUIDs.
+- Ops Telemetry: an Escalations KPI tile linking to the Escalation Console, and the `SupplyDemandMatrix` getter converted to a memoized field recomputed once per `Refresh()`.
+- 3 new hero panels (`ReferralEscalationHeroPanel`, `ReferralOutcomeHeroPanel`, `ProfessionalAvailabilityWindowHeroPanel`) registered alongside the existing 15 `BaseFormComponent` forms and prior hero panels.
+- Bug fixes: `UserReferralsOverviewPanel`/`PersonReferralsOverviewPanel` now navigate via `NavigationService.OpenNavItemByName` instead of `OpenNewEntityRecord`; `PersonReferralsOverviewPanel.RequestCount` is now populated from a batched query instead of always reading `0`; `ReferralRequestHeroPanel` guards its assignment-count `ExtraFilter` with `AssertValidUUID`; `ProfessionalCredentialHeroPanel` now uses only real `HERO_PANEL_STYLES` classes.
+- Full `mjButton`/design-token migration across `packages/Angular/src/lib/**`: zero `class="btn`/`btn-primary`, every `<button>` carries `mjButton`, zero inline `style="..."` attributes, zero `<a>` tags without `href`/`routerLink`, zero raw hex/rgb/hsl color literals, and zero `window.print`/`localStorage` usage.

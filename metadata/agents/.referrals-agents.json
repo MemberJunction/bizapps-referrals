@@ -91,11 +91,140 @@
           "primaryKey": {
             "ID": "A4000003-0000-0000-0000-000000000007"
           }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SubmitReferralIntake",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000008"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.MarkReferralInProgress",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000009"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.CompleteReferral",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000A"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SetAvailabilityWindow",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000B"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.ReopenExhaustedReferral",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000C"
+          }
         }
       ]
     },
     "primaryKey": {
       "ID": "A4000001-0000-0000-0000-000000000002"
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals Escalation Advisor",
+      "Description": "AI advisor agent for the Wave 3 escalation lifecycle: evaluates and acknowledges SLA/urgent escalations, recommends the next escalation action, explains candidate match rationale, and reads reciprocity scorecards.",
+      "IconClass": "fa-solid fa-triangle-exclamation",
+      "Status": "Active",
+      "TypeID": "@lookup:MJ: AI Agent Types.Name=Loop"
+    },
+    "relatedEntities": {
+      "MJ: AI Agent Prompts": [
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "PromptID": "@lookup:MJ: AI Prompts.Name=Referrals Escalation Advisor",
+            "ExecutionOrder": 0,
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000002-0000-0000-0000-000000000002"
+          }
+        }
+      ],
+      "MJ: AI Agent Actions": [
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.EvaluateEscalations",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000D"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RecommendEscalationAction",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000E"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.ExplainMatch",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-00000000000F"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.GetReciprocityScorecard",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000010"
+          }
+        },
+        {
+          "fields": {
+            "AgentID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.AcknowledgeEscalation",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "A4000003-0000-0000-0000-000000000011"
+          }
+        }
+      ]
+    },
+    "primaryKey": {
+      "ID": "A4000001-0000-0000-0000-000000000005"
     }
   }
 ]

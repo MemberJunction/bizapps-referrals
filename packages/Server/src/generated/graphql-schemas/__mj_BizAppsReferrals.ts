@@ -1112,16 +1112,25 @@ export class mjBizAppsReferralsProfessionalProfile_ {
     @Field(() => Int, {nullable: true}) 
     TotalCompletedCount?: number;
         
-    @Field(() => Boolean, {nullable: true}) 
+    @Field(() => Boolean, {nullable: true})
     IsActive?: boolean;
-        
-    @Field() 
+
+    @Field(() => Float, {nullable: true})
+    ReadinessScore?: number;
+
+    @Field(() => Float, {nullable: true})
+    ReciprocityIndex?: number;
+
+    @Field({nullable: true})
+    ReadinessComputedAt?: Date;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
-    @Field({nullable: true}) 
+
+    @Field({nullable: true})
     @MaxLength(250)
     Person?: string;
         
@@ -1218,10 +1227,19 @@ export class CreatemjBizAppsReferralsProfessionalProfileInput {
     @Field(() => Boolean, { nullable: true })
     IsActive?: boolean;
 
+    @Field(() => Float, { nullable: true })
+    ReadinessScore?: number;
+
+    @Field(() => Float, { nullable: true })
+    ReciprocityIndex: number | null;
+
+    @Field(() => Date, { nullable: true })
+    ReadinessComputedAt: Date | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Professional Profiles
@@ -1303,13 +1321,22 @@ export class UpdatemjBizAppsReferralsProfessionalProfileInput {
     @Field(() => Boolean, { nullable: true })
     IsActive?: boolean;
 
+    @Field(() => Float, { nullable: true })
+    ReadinessScore?: number;
+
+    @Field(() => Float, { nullable: true })
+    ReciprocityIndex?: number | null;
+
+    @Field(() => Date, { nullable: true })
+    ReadinessComputedAt?: Date | null;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Professional Profiles
 //****************************************************************************
@@ -1445,19 +1472,31 @@ export class mjBizAppsReferralsReferralAssignment_ {
     @Field({nullable: true}) 
     ResponseNotes?: string;
         
-    @Field({nullable: true}) 
+    @Field({nullable: true})
     @MaxLength(255)
     DeclineReason?: string;
-        
-    @Field() 
+
+    @Field({nullable: true})
+    SLAWarningSentAt?: Date;
+
+    @Field(() => Float, {nullable: true})
+    ResponseHours?: number;
+
+    @Field({nullable: true})
+    CompletedAt?: Date;
+
+    @Field({nullable: true})
+    AIRationaleJSON?: string;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
+
     @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
     ReadableFields___?: string[];
-        
+
 }
 
 //****************************************************************************
@@ -1507,10 +1546,22 @@ export class CreatemjBizAppsReferralsReferralAssignmentInput {
     @Field(() => String, { nullable: true })
     DeclineReason: string | null;
 
+    @Field(() => Date, { nullable: true })
+    SLAWarningSentAt: Date | null;
+
+    @Field(() => Float, { nullable: true })
+    ResponseHours: number | null;
+
+    @Field(() => Date, { nullable: true })
+    CompletedAt: Date | null;
+
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON: string | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Referral Assignments
@@ -1559,13 +1610,25 @@ export class UpdatemjBizAppsReferralsReferralAssignmentInput {
     @Field(() => String, { nullable: true })
     DeclineReason?: string | null;
 
+    @Field(() => Date, { nullable: true })
+    SLAWarningSentAt?: Date | null;
+
+    @Field(() => Float, { nullable: true })
+    ResponseHours?: number | null;
+
+    @Field(() => Date, { nullable: true })
+    CompletedAt?: Date | null;
+
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON?: string | null;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Referral Assignments
 //****************************************************************************
@@ -1947,10 +2010,24 @@ export class mjBizAppsReferralsReferralRequest_ {
     @Field({nullable: true}) 
     AcceptedAt?: Date;
         
-    @Field({nullable: true}) 
+    @Field({nullable: true})
     CompletedAt?: Date;
-        
-    @Field() 
+
+    @Field({nullable: true})
+    @MaxLength(30)
+    SourceChannel?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    ReferringProfessionalID?: string;
+
+    @Field(() => Int, {nullable: true})
+    EscalationLevel?: number;
+
+    @Field({nullable: true})
+    LastEscalatedAt?: Date;
+
+    @Field()
     _mj__CreatedAt: Date;
         
     @Field() 
@@ -2048,10 +2125,22 @@ export class CreatemjBizAppsReferralsReferralRequestInput {
     @Field(() => Date, { nullable: true })
     CompletedAt: Date | null;
 
+    @Field({ nullable: true })
+    SourceChannel?: string;
+
+    @Field(() => String, { nullable: true })
+    ReferringProfessionalID: string | null;
+
+    @Field(() => Int, { nullable: true })
+    EscalationLevel?: number;
+
+    @Field(() => Date, { nullable: true })
+    LastEscalatedAt: Date | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Referral Requests
@@ -2124,13 +2213,25 @@ export class UpdatemjBizAppsReferralsReferralRequestInput {
     @Field(() => Date, { nullable: true })
     CompletedAt?: Date | null;
 
+    @Field({ nullable: true })
+    SourceChannel?: string;
+
+    @Field(() => String, { nullable: true })
+    ReferringProfessionalID?: string | null;
+
+    @Field(() => Int, { nullable: true })
+    EscalationLevel?: number;
+
+    @Field(() => Date, { nullable: true })
+    LastEscalatedAt?: Date | null;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Referral Requests
 //****************************************************************************
@@ -2249,18 +2350,31 @@ export class mjBizAppsReferralsReferralTier_ {
     @Field({nullable: true}) 
     Description?: string;
         
-    @Field(() => Boolean, {nullable: true}) 
+    @Field(() => Boolean, {nullable: true})
     IsActive?: boolean;
-        
-    @Field() 
+
+    @Field(() => Int, {nullable: true})
+    EscalationWarningPercent?: number;
+
+    @Field(() => Int, {nullable: true})
+    MaxEscalationLevel?: number;
+
+    @Field(() => Float, {nullable: true})
+    UrgentSLAMultiplier?: number;
+
+    @Field({nullable: true})
+    @MaxLength(30)
+    EscalationActionType?: string;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
+
     @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
     ReadableFields___?: string[];
-        
+
 }
 
 //****************************************************************************
@@ -2295,10 +2409,22 @@ export class CreatemjBizAppsReferralsReferralTierInput {
     @Field(() => Boolean, { nullable: true })
     IsActive?: boolean;
 
+    @Field(() => Int, { nullable: true })
+    EscalationWarningPercent?: number;
+
+    @Field(() => Int, { nullable: true })
+    MaxEscalationLevel?: number;
+
+    @Field(() => Float, { nullable: true })
+    UrgentSLAMultiplier?: number;
+
+    @Field({ nullable: true })
+    EscalationActionType?: string;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Referral Tiers
@@ -2332,13 +2458,25 @@ export class UpdatemjBizAppsReferralsReferralTierInput {
     @Field(() => Boolean, { nullable: true })
     IsActive?: boolean;
 
+    @Field(() => Int, { nullable: true })
+    EscalationWarningPercent?: number;
+
+    @Field(() => Int, { nullable: true })
+    MaxEscalationLevel?: number;
+
+    @Field(() => Float, { nullable: true })
+    UrgentSLAMultiplier?: number;
+
+    @Field({ nullable: true })
+    EscalationActionType?: string;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Referral Tiers
 //****************************************************************************
@@ -2712,3 +2850,984 @@ export class mjBizAppsReferralsProfessionalCredentialResolver extends ResolverBa
         return this.DeleteRecord('MJ_BizApps_Referrals: Professional Credentials', key, options, provider, userPayload, pubSub);
     }
 }
+
+//****************************************************************************
+// ENTITY CLASS for MJ_BizApps_Referrals: Referral Escalations
+//****************************************************************************
+@ObjectType({ description: "SLA warning/breach escalation events raised against a ReferralRequest or ReferralAssignment." })
+export class mjBizAppsReferralsReferralEscalation_ {
+    @Field() 
+    @MaxLength(36)
+    ID: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ReferralRequestID?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ReferralAssignmentID?: string;
+        
+    @Field(() => Int, {nullable: true}) 
+    EscalationLevel?: number;
+        
+    @Field({nullable: true}) 
+    @MaxLength(60)
+    TriggerType?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(40)
+    Status?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(60)
+    RecommendedAction?: string;
+        
+    @Field({nullable: true}) 
+    Notes?: string;
+        
+    @Field({nullable: true}) 
+    TriggeredAt?: Date;
+        
+    @Field({nullable: true}) 
+    AcknowledgedAt?: Date;
+        
+    @Field({nullable: true})
+    ResolvedAt?: Date;
+
+    @Field({nullable: true})
+    @MaxLength(200)
+    DedupKey?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    LinkedTaskID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    AcknowledgedByPersonID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    ResolvedByPersonID?: string;
+
+    @Field({nullable: true})
+    ResolutionNotes?: string;
+
+    @Field({nullable: true})
+    AIRationaleJSON?: string;
+
+    @Field()
+    _mj__CreatedAt: Date;
+
+    @Field()
+    _mj__UpdatedAt: Date;
+
+    @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
+    ReadableFields___?: string[];
+
+}
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Referral Escalations
+//****************************************************************************
+@InputType()
+export class CreatemjBizAppsReferralsReferralEscalationInput {
+    @Field({ nullable: true })
+    ID?: string;
+
+    @Field({ nullable: true })
+    ReferralRequestID?: string;
+
+    @Field(() => String, { nullable: true })
+    ReferralAssignmentID: string | null;
+
+    @Field(() => Int, { nullable: true })
+    EscalationLevel?: number;
+
+    @Field({ nullable: true })
+    TriggerType?: string;
+
+    @Field({ nullable: true })
+    Status?: string;
+
+    @Field({ nullable: true })
+    RecommendedAction?: string;
+
+    @Field(() => String, { nullable: true })
+    Notes: string | null;
+
+    @Field(() => Date, { nullable: true })
+    TriggeredAt: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    AcknowledgedAt: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    ResolvedAt: Date | null;
+
+    @Field(() => String, { nullable: true })
+    DedupKey: string | null;
+
+    @Field(() => String, { nullable: true })
+    LinkedTaskID: string | null;
+
+    @Field(() => String, { nullable: true })
+    AcknowledgedByPersonID: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolvedByPersonID: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolutionNotes: string | null;
+
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON: string | null;
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Referral Escalations
+//****************************************************************************
+@InputType()
+export class UpdatemjBizAppsReferralsReferralEscalationInput {
+    @Field()
+    ID: string;
+
+    @Field(() => String, { nullable: true })
+    ReferralRequestID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ReferralAssignmentID?: string | null;
+
+    @Field(() => Int, { nullable: true })
+    EscalationLevel?: number;
+
+    @Field({ nullable: true })
+    TriggerType?: string;
+
+    @Field({ nullable: true })
+    Status?: string;
+
+    @Field({ nullable: true })
+    RecommendedAction?: string;
+
+    @Field(() => String, { nullable: true })
+    Notes?: string | null;
+
+    @Field(() => Date, { nullable: true })
+    TriggeredAt?: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    AcknowledgedAt?: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    ResolvedAt?: Date | null;
+
+    @Field(() => String, { nullable: true })
+    DedupKey?: string | null;
+
+    @Field(() => String, { nullable: true })
+    LinkedTaskID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    AcknowledgedByPersonID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolvedByPersonID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolutionNotes?: string | null;
+
+    @Field(() => String, { nullable: true })
+    AIRationaleJSON?: string | null;
+
+    @Field(() => [KeyValuePairInput], { nullable: true })
+    OldValues___?: KeyValuePairInput[];
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+
+//****************************************************************************
+// RESOLVER for MJ_BizApps_Referrals: Referral Escalations
+//****************************************************************************
+@ObjectType()
+export class RunmjBizAppsReferralsReferralEscalationViewResult {
+    @Field(() => [mjBizAppsReferralsReferralEscalation_])
+    Results: mjBizAppsReferralsReferralEscalation_[];
+
+    @Field(() => String, {nullable: true})
+    UserViewRunID?: string;
+
+    @Field(() => Int, {nullable: true})
+    RowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    TotalRowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    ExecutionTime: number;
+
+    @Field({nullable: true})
+    ErrorMessage?: string;
+
+    @Field(() => Boolean, {nullable: false})
+    Success: boolean;
+}
+
+@Resolver(mjBizAppsReferralsReferralEscalation_)
+export class mjBizAppsReferralsReferralEscalationResolver extends ResolverBase {
+    @Query(() => RunmjBizAppsReferralsReferralEscalationViewResult)
+    async RunmjBizAppsReferralsReferralEscalationViewByID(@Arg('input', () => RunViewByIDInput) input: RunViewByIDInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByIDGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReferralEscalationViewResult)
+    async RunmjBizAppsReferralsReferralEscalationViewByName(@Arg('input', () => RunViewByNameInput) input: RunViewByNameInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByNameGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReferralEscalationViewResult)
+    async RunmjBizAppsReferralsReferralEscalationDynamicView(@Arg('input', () => RunDynamicViewInput) input: RunDynamicViewInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        input.EntityName = 'MJ_BizApps_Referrals: Referral Escalations';
+        return super.RunDynamicViewGeneric(input, provider, userPayload, pubSub);
+    }
+    @Query(() => mjBizAppsReferralsReferralEscalation_, { nullable: true })
+    async mjBizAppsReferralsReferralEscalation(@Arg('ID', () => String) ID: string, @Ctx() { userPayload, providers }: AppContext, @PubSub() pubSub: PubSubEngine): Promise<mjBizAppsReferralsReferralEscalation_ | null> {
+        this.CheckUserReadPermissions('MJ_BizApps_Referrals: Referral Escalations', userPayload);
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        const sSQL = `SELECT * FROM ${provider.QuoteSchemaAndView('__mj_BizAppsReferrals', 'vwReferralEscalations')} WHERE ${provider.QuoteIdentifier('ID')}=${provider.BuildParameterPlaceholder(0)} ` + this.getRowLevelSecurityWhereClause(provider, 'MJ_BizApps_Referrals: Referral Escalations', userPayload, EntityPermissionType.Read, 'AND');
+        const rows = await provider.ExecuteSQL(sSQL, [ID], undefined, this.GetUserFromPayload(userPayload));
+        const result = await this.MapFieldNamesToCodeNames('MJ_BizApps_Referrals: Referral Escalations', rows && rows.length > 0 ? rows[0] : null, this.GetUserFromPayload(userPayload));
+        return result;
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralEscalation_)
+    async CreatemjBizAppsReferralsReferralEscalation(
+        @Arg('input', () => CreatemjBizAppsReferralsReferralEscalationInput) input: CreatemjBizAppsReferralsReferralEscalationInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.CreateRecord('MJ_BizApps_Referrals: Referral Escalations', input, provider, userPayload, pubSub)
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralEscalation_)
+    async UpdatemjBizAppsReferralsReferralEscalation(
+        @Arg('input', () => UpdatemjBizAppsReferralsReferralEscalationInput) input: UpdatemjBizAppsReferralsReferralEscalationInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.UpdateRecord('MJ_BizApps_Referrals: Referral Escalations', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralEscalation_)
+    async DeletemjBizAppsReferralsReferralEscalation(@Arg('ID', () => String) ID: string, @Arg('options___', () => DeleteOptionsInput) options: DeleteOptionsInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadWriteProvider(providers);
+        const key = new CompositeKey([{FieldName: 'ID', Value: ID}]);
+        return this.DeleteRecord('MJ_BizApps_Referrals: Referral Escalations', key, options, provider, userPayload, pubSub);
+    }
+
+}
+
+
+//****************************************************************************
+// ENTITY CLASS for MJ_BizApps_Referrals: Referral Outcomes
+//****************************************************************************
+@ObjectType({ description: "Terminal outcome recorded when a ReferralAssignment is marked complete." })
+export class mjBizAppsReferralsReferralOutcome_ {
+    @Field() 
+    @MaxLength(36)
+    ID: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ReferralRequestID?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ReferralAssignmentID?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ProfessionalProfileID?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(60)
+    OutcomeStatus?: string;
+        
+    @Field(() => Float, {nullable: true}) 
+    ResponseHours?: number;
+        
+    @Field({nullable: true}) 
+    CompletionNotes?: string;
+        
+    @Field({nullable: true})
+    CompletedAt?: Date;
+
+    @Field(() => Float, {nullable: true})
+    FeeAmount?: number;
+
+    @Field()
+    _mj__CreatedAt: Date;
+
+    @Field()
+    _mj__UpdatedAt: Date;
+
+    @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
+    ReadableFields___?: string[];
+
+}
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Referral Outcomes
+//****************************************************************************
+@InputType()
+export class CreatemjBizAppsReferralsReferralOutcomeInput {
+    @Field({ nullable: true })
+    ID?: string;
+
+    @Field({ nullable: true })
+    ReferralRequestID?: string;
+
+    @Field({ nullable: true })
+    ReferralAssignmentID?: string;
+
+    @Field({ nullable: true })
+    ProfessionalProfileID?: string;
+
+    @Field({ nullable: true })
+    OutcomeStatus?: string;
+
+    @Field(() => Float, { nullable: true })
+    ResponseHours?: number;
+
+    @Field(() => String, { nullable: true })
+    CompletionNotes: string | null;
+
+    @Field(() => Date, { nullable: true })
+    CompletedAt: Date | null;
+
+    @Field(() => Float, { nullable: true })
+    FeeAmount: number | null;
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Referral Outcomes
+//****************************************************************************
+@InputType()
+export class UpdatemjBizAppsReferralsReferralOutcomeInput {
+    @Field()
+    ID: string;
+
+    @Field(() => String, { nullable: true })
+    ReferralRequestID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ReferralAssignmentID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ProfessionalProfileID?: string | null;
+
+    @Field({ nullable: true })
+    OutcomeStatus?: string;
+
+    @Field(() => Float, { nullable: true })
+    ResponseHours?: number;
+
+    @Field(() => String, { nullable: true })
+    CompletionNotes?: string | null;
+
+    @Field(() => Date, { nullable: true })
+    CompletedAt?: Date | null;
+
+    @Field(() => Float, { nullable: true })
+    FeeAmount?: number | null;
+
+    @Field(() => [KeyValuePairInput], { nullable: true })
+    OldValues___?: KeyValuePairInput[];
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+    
+//****************************************************************************
+// RESOLVER for MJ_BizApps_Referrals: Referral Outcomes
+//****************************************************************************
+@ObjectType()
+export class RunmjBizAppsReferralsReferralOutcomeViewResult {
+    @Field(() => [mjBizAppsReferralsReferralOutcome_])
+    Results: mjBizAppsReferralsReferralOutcome_[];
+
+    @Field(() => String, {nullable: true})
+    UserViewRunID?: string;
+
+    @Field(() => Int, {nullable: true})
+    RowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    TotalRowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    ExecutionTime: number;
+
+    @Field({nullable: true})
+    ErrorMessage?: string;
+
+    @Field(() => Boolean, {nullable: false})
+    Success: boolean;
+}
+
+@Resolver(mjBizAppsReferralsReferralOutcome_)
+export class mjBizAppsReferralsReferralOutcomeResolver extends ResolverBase {
+    @Query(() => RunmjBizAppsReferralsReferralOutcomeViewResult)
+    async RunmjBizAppsReferralsReferralOutcomeViewByID(@Arg('input', () => RunViewByIDInput) input: RunViewByIDInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByIDGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReferralOutcomeViewResult)
+    async RunmjBizAppsReferralsReferralOutcomeViewByName(@Arg('input', () => RunViewByNameInput) input: RunViewByNameInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByNameGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReferralOutcomeViewResult)
+    async RunmjBizAppsReferralsReferralOutcomeDynamicView(@Arg('input', () => RunDynamicViewInput) input: RunDynamicViewInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        input.EntityName = 'MJ_BizApps_Referrals: Referral Outcomes';
+        return super.RunDynamicViewGeneric(input, provider, userPayload, pubSub);
+    }
+    @Query(() => mjBizAppsReferralsReferralOutcome_, { nullable: true })
+    async mjBizAppsReferralsReferralOutcome(@Arg('ID', () => String) ID: string, @Ctx() { userPayload, providers }: AppContext, @PubSub() pubSub: PubSubEngine): Promise<mjBizAppsReferralsReferralOutcome_ | null> {
+        this.CheckUserReadPermissions('MJ_BizApps_Referrals: Referral Outcomes', userPayload);
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        const sSQL = `SELECT * FROM ${provider.QuoteSchemaAndView('__mj_BizAppsReferrals', 'vwReferralOutcomes')} WHERE ${provider.QuoteIdentifier('ID')}=${provider.BuildParameterPlaceholder(0)} ` + this.getRowLevelSecurityWhereClause(provider, 'MJ_BizApps_Referrals: Referral Outcomes', userPayload, EntityPermissionType.Read, 'AND');
+        const rows = await provider.ExecuteSQL(sSQL, [ID], undefined, this.GetUserFromPayload(userPayload));
+        const result = await this.MapFieldNamesToCodeNames('MJ_BizApps_Referrals: Referral Outcomes', rows && rows.length > 0 ? rows[0] : null, this.GetUserFromPayload(userPayload));
+        return result;
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralOutcome_)
+    async CreatemjBizAppsReferralsReferralOutcome(
+        @Arg('input', () => CreatemjBizAppsReferralsReferralOutcomeInput) input: CreatemjBizAppsReferralsReferralOutcomeInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.CreateRecord('MJ_BizApps_Referrals: Referral Outcomes', input, provider, userPayload, pubSub)
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralOutcome_)
+    async UpdatemjBizAppsReferralsReferralOutcome(
+        @Arg('input', () => UpdatemjBizAppsReferralsReferralOutcomeInput) input: UpdatemjBizAppsReferralsReferralOutcomeInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.UpdateRecord('MJ_BizApps_Referrals: Referral Outcomes', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsReferralOutcome_)
+    async DeletemjBizAppsReferralsReferralOutcome(@Arg('ID', () => String) ID: string, @Arg('options___', () => DeleteOptionsInput) options: DeleteOptionsInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadWriteProvider(providers);
+        const key = new CompositeKey([{FieldName: 'ID', Value: ID}]);
+        return this.DeleteRecord('MJ_BizApps_Referrals: Referral Outcomes', key, options, provider, userPayload, pubSub);
+    }
+
+}
+
+
+//****************************************************************************
+// ENTITY CLASS for MJ_BizApps_Referrals: Professional Availability Windows
+//****************************************************************************
+@ObjectType({ description: "Recurring, date-range, or blackout availability windows for a ProfessionalProfile." })
+export class mjBizAppsReferralsProfessionalAvailabilityWindow_ {
+    @Field() 
+    @MaxLength(36)
+    ID: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ProfessionalProfileID?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(40)
+    WindowType?: string;
+        
+    @Field(() => Int, {nullable: true}) 
+    DayOfWeek?: number;
+        
+    @Field(() => Int, {nullable: true}) 
+    StartTimeMinutes?: number;
+        
+    @Field(() => Int, {nullable: true}) 
+    EndTimeMinutes?: number;
+        
+    @Field({nullable: true}) 
+    StartDate?: Date;
+        
+    @Field({nullable: true}) 
+    EndDate?: Date;
+        
+    @Field(() => Boolean, {nullable: true}) 
+    IsAvailable?: boolean;
+        
+    @Field({nullable: true}) 
+    @MaxLength(100)
+    TimeZone?: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(255)
+    Notes?: string;
+        
+    @Field() 
+    _mj__CreatedAt: Date;
+        
+    @Field() 
+    _mj__UpdatedAt: Date;
+        
+    @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
+    ReadableFields___?: string[];
+        
+}
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Professional Availability Windows
+//****************************************************************************
+@InputType()
+export class CreatemjBizAppsReferralsProfessionalAvailabilityWindowInput {
+    @Field({ nullable: true })
+    ID?: string;
+
+    @Field({ nullable: true })
+    ProfessionalProfileID?: string;
+
+    @Field({ nullable: true })
+    WindowType?: string;
+
+    @Field(() => Int, { nullable: true })
+    DayOfWeek?: number;
+
+    @Field(() => Int, { nullable: true })
+    StartTimeMinutes?: number;
+
+    @Field(() => Int, { nullable: true })
+    EndTimeMinutes?: number;
+
+    @Field(() => Date, { nullable: true })
+    StartDate: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    EndDate: Date | null;
+
+    @Field(() => Boolean, { nullable: true })
+    IsAvailable?: boolean;
+
+    @Field({ nullable: true })
+    TimeZone?: string;
+
+    @Field({ nullable: true })
+    Notes?: string;
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+    
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Professional Availability Windows
+//****************************************************************************
+@InputType()
+export class UpdatemjBizAppsReferralsProfessionalAvailabilityWindowInput {
+    @Field()
+    ID: string;
+
+    @Field(() => String, { nullable: true })
+    ProfessionalProfileID?: string | null;
+
+    @Field({ nullable: true })
+    WindowType?: string;
+
+    @Field(() => Int, { nullable: true })
+    DayOfWeek?: number;
+
+    @Field(() => Int, { nullable: true })
+    StartTimeMinutes?: number;
+
+    @Field(() => Int, { nullable: true })
+    EndTimeMinutes?: number;
+
+    @Field(() => Date, { nullable: true })
+    StartDate?: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    EndDate?: Date | null;
+
+    @Field(() => Boolean, { nullable: true })
+    IsAvailable?: boolean;
+
+    @Field({ nullable: true })
+    TimeZone?: string;
+
+    @Field({ nullable: true })
+    Notes?: string;
+
+    @Field(() => [KeyValuePairInput], { nullable: true })
+    OldValues___?: KeyValuePairInput[];
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+    
+//****************************************************************************
+// RESOLVER for MJ_BizApps_Referrals: Professional Availability Windows
+//****************************************************************************
+@ObjectType()
+export class RunmjBizAppsReferralsProfessionalAvailabilityWindowViewResult {
+    @Field(() => [mjBizAppsReferralsProfessionalAvailabilityWindow_])
+    Results: mjBizAppsReferralsProfessionalAvailabilityWindow_[];
+
+    @Field(() => String, {nullable: true})
+    UserViewRunID?: string;
+
+    @Field(() => Int, {nullable: true})
+    RowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    TotalRowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    ExecutionTime: number;
+
+    @Field({nullable: true})
+    ErrorMessage?: string;
+
+    @Field(() => Boolean, {nullable: false})
+    Success: boolean;
+}
+
+@Resolver(mjBizAppsReferralsProfessionalAvailabilityWindow_)
+export class mjBizAppsReferralsProfessionalAvailabilityWindowResolver extends ResolverBase {
+    @Query(() => RunmjBizAppsReferralsProfessionalAvailabilityWindowViewResult)
+    async RunmjBizAppsReferralsProfessionalAvailabilityWindowViewByID(@Arg('input', () => RunViewByIDInput) input: RunViewByIDInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByIDGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsProfessionalAvailabilityWindowViewResult)
+    async RunmjBizAppsReferralsProfessionalAvailabilityWindowViewByName(@Arg('input', () => RunViewByNameInput) input: RunViewByNameInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByNameGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsProfessionalAvailabilityWindowViewResult)
+    async RunmjBizAppsReferralsProfessionalAvailabilityWindowDynamicView(@Arg('input', () => RunDynamicViewInput) input: RunDynamicViewInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        input.EntityName = 'MJ_BizApps_Referrals: Professional Availability Windows';
+        return super.RunDynamicViewGeneric(input, provider, userPayload, pubSub);
+    }
+    @Query(() => mjBizAppsReferralsProfessionalAvailabilityWindow_, { nullable: true })
+    async mjBizAppsReferralsProfessionalAvailabilityWindow(@Arg('ID', () => String) ID: string, @Ctx() { userPayload, providers }: AppContext, @PubSub() pubSub: PubSubEngine): Promise<mjBizAppsReferralsProfessionalAvailabilityWindow_ | null> {
+        this.CheckUserReadPermissions('MJ_BizApps_Referrals: Professional Availability Windows', userPayload);
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        const sSQL = `SELECT * FROM ${provider.QuoteSchemaAndView('__mj_BizAppsReferrals', 'vwProfessionalAvailabilityWindows')} WHERE ${provider.QuoteIdentifier('ID')}=${provider.BuildParameterPlaceholder(0)} ` + this.getRowLevelSecurityWhereClause(provider, 'MJ_BizApps_Referrals: Professional Availability Windows', userPayload, EntityPermissionType.Read, 'AND');
+        const rows = await provider.ExecuteSQL(sSQL, [ID], undefined, this.GetUserFromPayload(userPayload));
+        const result = await this.MapFieldNamesToCodeNames('MJ_BizApps_Referrals: Professional Availability Windows', rows && rows.length > 0 ? rows[0] : null, this.GetUserFromPayload(userPayload));
+        return result;
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalAvailabilityWindow_)
+    async CreatemjBizAppsReferralsProfessionalAvailabilityWindow(
+        @Arg('input', () => CreatemjBizAppsReferralsProfessionalAvailabilityWindowInput) input: CreatemjBizAppsReferralsProfessionalAvailabilityWindowInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.CreateRecord('MJ_BizApps_Referrals: Professional Availability Windows', input, provider, userPayload, pubSub)
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalAvailabilityWindow_)
+    async UpdatemjBizAppsReferralsProfessionalAvailabilityWindow(
+        @Arg('input', () => UpdatemjBizAppsReferralsProfessionalAvailabilityWindowInput) input: UpdatemjBizAppsReferralsProfessionalAvailabilityWindowInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.UpdateRecord('MJ_BizApps_Referrals: Professional Availability Windows', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsProfessionalAvailabilityWindow_)
+    async DeletemjBizAppsReferralsProfessionalAvailabilityWindow(@Arg('ID', () => String) ID: string, @Arg('options___', () => DeleteOptionsInput) options: DeleteOptionsInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadWriteProvider(providers);
+        const key = new CompositeKey([{FieldName: 'ID', Value: ID}]);
+        return this.DeleteRecord('MJ_BizApps_Referrals: Professional Availability Windows', key, options, provider, userPayload, pubSub);
+    }
+
+}
+
+
+//****************************************************************************
+// ENTITY CLASS for MJ_BizApps_Referrals: Reciprocity Snapshots
+//****************************************************************************
+@ObjectType({ description: "Periodic snapshot of a ProfessionalProfile referral give/receive balance used to compute ReciprocityIndex." })
+export class mjBizAppsReferralsReciprocitySnapshot_ {
+    @Field() 
+    @MaxLength(36)
+    ID: string;
+        
+    @Field({nullable: true}) 
+    @MaxLength(36)
+    ProfessionalProfileID?: string;
+        
+    @Field({nullable: true}) 
+    SnapshotDate?: Date;
+        
+    @Field({nullable: true}) 
+    PeriodStartDate?: Date;
+        
+    @Field({nullable: true}) 
+    PeriodEndDate?: Date;
+        
+    @Field(() => Int, {nullable: true}) 
+    ReferralsGivenCount?: number;
+        
+    @Field(() => Int, {nullable: true}) 
+    ReferralsReceivedCount?: number;
+        
+    @Field(() => Float, {nullable: true})
+    ReciprocityIndex?: number;
+
+    @Field(() => Int, {nullable: true})
+    AcceptedCount?: number;
+
+    @Field(() => Int, {nullable: true})
+    ResolvedCount?: number;
+
+    @Field(() => Int, {nullable: true})
+    SLABreachCount?: number;
+
+    @Field(() => Float, {nullable: true})
+    AcceptanceRate?: number;
+
+    @Field(() => Float, {nullable: true})
+    MedianResponseHours?: number;
+
+    @Field(() => Float, {nullable: true})
+    AttributedFeeTotal?: number;
+
+    @Field()
+    _mj__CreatedAt: Date;
+
+    @Field()
+    _mj__UpdatedAt: Date;
+
+    @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
+    ReadableFields___?: string[];
+
+}
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Reciprocity Snapshots
+//****************************************************************************
+@InputType()
+export class CreatemjBizAppsReferralsReciprocitySnapshotInput {
+    @Field({ nullable: true })
+    ID?: string;
+
+    @Field({ nullable: true })
+    ProfessionalProfileID?: string;
+
+    @Field(() => Date, { nullable: true })
+    SnapshotDate: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    PeriodStartDate?: Date;
+
+    @Field(() => Date, { nullable: true })
+    PeriodEndDate?: Date;
+
+    @Field(() => Int, { nullable: true })
+    ReferralsGivenCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ReferralsReceivedCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    ReciprocityIndex?: number;
+
+    @Field(() => Int, { nullable: true })
+    AcceptedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ResolvedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    SLABreachCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    AcceptanceRate?: number;
+
+    @Field(() => Float, { nullable: true })
+    MedianResponseHours?: number;
+
+    @Field(() => Float, { nullable: true })
+    AttributedFeeTotal?: number;
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+
+
+//****************************************************************************
+// INPUT TYPE for MJ_BizApps_Referrals: Reciprocity Snapshots
+//****************************************************************************
+@InputType()
+export class UpdatemjBizAppsReferralsReciprocitySnapshotInput {
+    @Field()
+    ID: string;
+
+    @Field(() => String, { nullable: true })
+    ProfessionalProfileID?: string | null;
+
+    @Field(() => Date, { nullable: true })
+    SnapshotDate?: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    PeriodStartDate?: Date | null;
+
+    @Field(() => Date, { nullable: true })
+    PeriodEndDate?: Date | null;
+
+    @Field(() => Int, { nullable: true })
+    ReferralsGivenCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ReferralsReceivedCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    ReciprocityIndex?: number;
+
+    @Field(() => Int, { nullable: true })
+    AcceptedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ResolvedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    SLABreachCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    AcceptanceRate?: number;
+
+    @Field(() => Float, { nullable: true })
+    MedianResponseHours?: number;
+
+    @Field(() => Float, { nullable: true })
+    AttributedFeeTotal?: number;
+
+    @Field(() => [KeyValuePairInput], { nullable: true })
+    OldValues___?: KeyValuePairInput[];
+
+    @Field(() => RestoreContextInput, { nullable: true })
+    RestoreContext___?: RestoreContextInput;
+}
+
+//****************************************************************************
+// RESOLVER for MJ_BizApps_Referrals: Reciprocity Snapshots
+//****************************************************************************
+@ObjectType()
+export class RunmjBizAppsReferralsReciprocitySnapshotViewResult {
+    @Field(() => [mjBizAppsReferralsReciprocitySnapshot_])
+    Results: mjBizAppsReferralsReciprocitySnapshot_[];
+
+    @Field(() => String, {nullable: true})
+    UserViewRunID?: string;
+
+    @Field(() => Int, {nullable: true})
+    RowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    TotalRowCount: number;
+
+    @Field(() => Int, {nullable: true})
+    ExecutionTime: number;
+
+    @Field({nullable: true})
+    ErrorMessage?: string;
+
+    @Field(() => Boolean, {nullable: false})
+    Success: boolean;
+}
+
+@Resolver(mjBizAppsReferralsReciprocitySnapshot_)
+export class mjBizAppsReferralsReciprocitySnapshotResolver extends ResolverBase {
+    @Query(() => RunmjBizAppsReferralsReciprocitySnapshotViewResult)
+    async RunmjBizAppsReferralsReciprocitySnapshotViewByID(@Arg('input', () => RunViewByIDInput) input: RunViewByIDInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByIDGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReciprocitySnapshotViewResult)
+    async RunmjBizAppsReferralsReciprocitySnapshotViewByName(@Arg('input', () => RunViewByNameInput) input: RunViewByNameInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        return super.RunViewByNameGeneric(input, provider, userPayload, pubSub);
+    }
+
+    @Query(() => RunmjBizAppsReferralsReciprocitySnapshotViewResult)
+    async RunmjBizAppsReferralsReciprocitySnapshotDynamicView(@Arg('input', () => RunDynamicViewInput) input: RunDynamicViewInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        input.EntityName = 'MJ_BizApps_Referrals: Reciprocity Snapshots';
+        return super.RunDynamicViewGeneric(input, provider, userPayload, pubSub);
+    }
+    @Query(() => mjBizAppsReferralsReciprocitySnapshot_, { nullable: true })
+    async mjBizAppsReferralsReciprocitySnapshot(@Arg('ID', () => String) ID: string, @Ctx() { userPayload, providers }: AppContext, @PubSub() pubSub: PubSubEngine): Promise<mjBizAppsReferralsReciprocitySnapshot_ | null> {
+        this.CheckUserReadPermissions('MJ_BizApps_Referrals: Reciprocity Snapshots', userPayload);
+        const provider = GetReadOnlyProvider(providers, { allowFallbackToReadWrite: true });
+        const sSQL = `SELECT * FROM ${provider.QuoteSchemaAndView('__mj_BizAppsReferrals', 'vwReciprocitySnapshots')} WHERE ${provider.QuoteIdentifier('ID')}=${provider.BuildParameterPlaceholder(0)} ` + this.getRowLevelSecurityWhereClause(provider, 'MJ_BizApps_Referrals: Reciprocity Snapshots', userPayload, EntityPermissionType.Read, 'AND');
+        const rows = await provider.ExecuteSQL(sSQL, [ID], undefined, this.GetUserFromPayload(userPayload));
+        const result = await this.MapFieldNamesToCodeNames('MJ_BizApps_Referrals: Reciprocity Snapshots', rows && rows.length > 0 ? rows[0] : null, this.GetUserFromPayload(userPayload));
+        return result;
+    }
+
+    @Mutation(() => mjBizAppsReferralsReciprocitySnapshot_)
+    async CreatemjBizAppsReferralsReciprocitySnapshot(
+        @Arg('input', () => CreatemjBizAppsReferralsReciprocitySnapshotInput) input: CreatemjBizAppsReferralsReciprocitySnapshotInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.CreateRecord('MJ_BizApps_Referrals: Reciprocity Snapshots', input, provider, userPayload, pubSub)
+    }
+
+    @Mutation(() => mjBizAppsReferralsReciprocitySnapshot_)
+    async UpdatemjBizAppsReferralsReciprocitySnapshot(
+        @Arg('input', () => UpdatemjBizAppsReferralsReciprocitySnapshotInput) input: UpdatemjBizAppsReferralsReciprocitySnapshotInput,
+        @Ctx() { providers, userPayload }: AppContext,
+        @PubSub() pubSub: PubSubEngine
+    ) {
+        const provider = GetReadWriteProvider(providers);
+        return this.UpdateRecord('MJ_BizApps_Referrals: Reciprocity Snapshots', input, provider, userPayload, pubSub);
+    }
+
+    @Mutation(() => mjBizAppsReferralsReciprocitySnapshot_)
+    async DeletemjBizAppsReferralsReciprocitySnapshot(@Arg('ID', () => String) ID: string, @Arg('options___', () => DeleteOptionsInput) options: DeleteOptionsInput, @Ctx() { providers, userPayload }: AppContext, @PubSub() pubSub: PubSubEngine) {
+        const provider = GetReadWriteProvider(providers);
+        const key = new CompositeKey([{FieldName: 'ID', Value: ID}]);
+        return this.DeleteRecord('MJ_BizApps_Referrals: Reciprocity Snapshots', key, options, provider, userPayload, pubSub);
+    }
+
+}
+

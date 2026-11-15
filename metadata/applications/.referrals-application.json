@@ -36,6 +36,18 @@
           "Icon": "fa-solid fa-address-book",
           "ResourceType": "Custom",
           "DriverClass": "ReferralsCredentialDirectoryResource"
+        },
+        {
+          "Label": "Escalations",
+          "Icon": "fa-solid fa-triangle-exclamation",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsEscalationConsoleResource"
+        },
+        {
+          "Label": "Reciprocity",
+          "Icon": "fa-solid fa-arrows-rotate",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsReciprocityScorecardResource"
         }
       ]
     },
@@ -155,6 +167,50 @@
           },
           "primaryKey": {
             "ID": "E1000001-0000-0000-0000-000000000008"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Escalations",
+            "Sequence": 9,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000009"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Outcomes",
+            "Sequence": 10,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000010"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Professional Availability Windows",
+            "Sequence": 11,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000011"
+          }
+        },
+        {
+          "fields": {
+            "ApplicationID": "@parent:ID",
+            "EntityID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Reciprocity Snapshots",
+            "Sequence": 12,
+            "DefaultForNewUser": true
+          },
+          "primaryKey": {
+            "ID": "E1000001-0000-0000-0000-000000000012"
           }
         }
       ]

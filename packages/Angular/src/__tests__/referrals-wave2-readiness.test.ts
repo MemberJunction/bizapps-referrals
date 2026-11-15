@@ -30,7 +30,7 @@ function walkFiles(dir: string, exts: string[]): string[] {
 }
 
 describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
-  it('registers all 11 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
+  it('registers all 15 BaseFormComponent classes, form panels, and all 7 DefaultNavItems resources in ClassFactory', () => {
     LoadBizAppsReferralsClient();
 
     const entitiesJsonPath = path.join(repoRoot, 'metadata/entities/.entities.json');
@@ -38,7 +38,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       fields: { Name: string };
     }>;
     const expectedEntities = entityRecords.map((r) => r.fields.Name);
-    expect(expectedEntities).toHaveLength(11);
+    expect(expectedEntities).toHaveLength(15);
     expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(expectedEntities.length);
     for (const entityName of expectedEntities) {
       expect(
@@ -47,15 +47,32 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       ).toBeDefined();
     }
 
+    // BaseFormPanel hero panels are a deliberately smaller, curated subset (not
+    // one-per-entity — e.g. the 4 Wave 3 Slice 1 entities use plain
+    // BaseFormComponent forms with no dedicated hero panel), so this asserts a
+    // stable floor rather than parity with the entity count.
     const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
-    expect(panelRegs.length).toBeGreaterThanOrEqual(expectedEntities.length);
+    expect(panelRegs.length).toBeGreaterThanOrEqual(17);
+
+    // AC-44: the 3 new Wave 3 Slice 4 hero panels are reachable by their exact
+    // @RegisterClassEx(BaseFormPanel, { key: ... }) registration key.
+    for (const key of [
+      'referrals:referral-escalation-hero-panel',
+      'referrals:referral-outcome-hero-panel',
+      'referrals:professional-availability-window-hero-panel',
+    ]) {
+      expect(
+        MJGlobal.Instance.ClassFactory.GetRegistration(BaseFormPanel, key),
+        `Missing BaseFormPanel registration for key '${key}'`,
+      ).toBeDefined();
+    }
 
     const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
     const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{
       fields: { DefaultNavItems: Array<{ Label: string; DriverClass: string; Icon: string }> };
     }>;
     const navItems = parsed[0].fields.DefaultNavItems;
-    expect(navItems).toHaveLength(5);
+    expect(navItems).toHaveLength(7);
     for (const item of navItems) {
       expect(
         MJGlobal.Instance.ClassFactory.GetRegistration(BaseResourceComponent, item.DriverClass),
@@ -126,7 +143,13 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     }
   });
 
-  it('enforces zero handwritten .Get()/.Set() calls in authored packages and zero un-typed casts across packages', () => {
+  // This test file's own path is excluded from each scan below (not the whole
+  // __tests__ directory) because its source literally contains the regex
+  // patterns being searched for (e.g. the string '.(Get|Set)(' and '<any>'
+  // appear in this file's own source as scan patterns, not as violations).
+  const SELF_TEST_FILE = 'referrals-wave2-readiness.test.ts';
+
+  it('enforces zero handwritten .Get()/.Set() calls in authored packages (including tests) and zero un-typed casts across packages', () => {
     // Generated entity classes in packages/Entities/src/generated/ wrap BaseEntity.Get/Set;
     // all handwritten packages must use strongly-typed entity property accessors only.
     const handwrittenDirs = [
@@ -137,7 +160,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       'packages/Server/src',
     ];
     for (const rel of handwrittenDirs) {
-      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.includes('__tests__'));
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.endsWith(SELF_TEST_FILE));
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content, `Forbidden .Get()/.Set() in ${file}`).not.toMatch(/\.(Get|Set)\(\s*['"]/);
@@ -148,10 +171,36 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     const forbiddenRegex = new RegExp(`\\b${forbiddenWord}\\b`);
     const allPkgDirs = [...handwrittenDirs, 'packages/IntegrationTests/src'];
     for (const rel of allPkgDirs) {
-      const files = walkFiles(path.join(repoRoot, rel), ['.ts']);
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter((f) => !f.endsWith(SELF_TEST_FILE));
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content, `Forbidden ${forbiddenWord} type/cast in ${file}`).not.toMatch(forbiddenRegex);
+      }
+    }
+  });
+
+  it('AC-2: enforces zero `: any` / `as any` / `<any>` type annotations or casts across all handwritten packages, including __tests__', () => {
+    const handwrittenDirs = [
+      'packages/Core/src',
+      'packages/Actions/src',
+      'packages/Angular/src',
+      'packages/EntitiesServer/src',
+      'packages/Server/src',
+      'packages/IntegrationTests/src',
+    ];
+    // Strip comments before matching so prose like "as well as any active matter parties"
+    // in a /** */ or // comment is never mistaken for a real `as any` cast.
+    const stripComments = (src: string): string =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const anyRegex = /:\s*any\b|\bas\s+any\b|<any>/;
+
+    for (const rel of handwrittenDirs) {
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter(
+        (f) => !f.includes('generated') && !f.endsWith(SELF_TEST_FILE),
+      );
+      for (const file of files) {
+        const content = stripComments(fs.readFileSync(file, 'utf8'));
+        expect(content, `Forbidden 'any' type/cast in ${file}`).not.toMatch(anyRegex);
       }
     }
   });

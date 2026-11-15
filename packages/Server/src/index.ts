@@ -25,12 +25,22 @@ export {
   type HealthProbeContext,
   type LiveCrudVerifierResult,
 } from './probes/ReferralLifecycleProbe.js';
-export { ReferralsSlaSweepScheduler, type SlaSweepRunRecord } from './SweepScheduler.js';
+export { ReferralsSlaSweepScheduler, type SlaSweepRunRecord, type ReciprocityRunRecord } from './SweepScheduler.js';
 
 export interface LoadBizAppsReferralsServerOptions {
   contextUser?: UserInfo;
   sweepIntervalMs?: number;
   disableAutoSweep?: boolean;
+  /**
+   * Key for the `BaseEscalationNotifier` @RegisterClass implementation to notify on new
+   * escalations. Defaults to `'BizAppsTasks'`; falls back to `'None'` if that notifier
+   * is not resolvable (e.g. the sibling BizApps Tasks app isn't installed in this tenant).
+   */
+  escalationNotifierKey?: string;
+  /** Disables the daily automatic ReciprocitySnapshot recompute pass. */
+  disableAutoReciprocity?: boolean;
+  /** Interval in ms between automatic reciprocity recompute passes. Defaults to 24h. */
+  reciprocityIntervalMs?: number;
 }
 
 let shutdownHooksRegistered = false;
@@ -70,7 +80,11 @@ export function LoadBizAppsReferralsServer(options?: LoadBizAppsReferralsServerO
 
   if (!options?.disableAutoSweep) {
     registerShutdownHooks();
-    ReferralsSlaSweepScheduler.Start(resolveSystemUser(options?.contextUser), options?.sweepIntervalMs);
+    ReferralsSlaSweepScheduler.Start(resolveSystemUser(options?.contextUser), options?.sweepIntervalMs, {
+      escalationNotifierKey: options?.escalationNotifierKey ?? 'BizAppsTasks',
+      disableAutoReciprocity: options?.disableAutoReciprocity,
+      reciprocityIntervalMs: options?.reciprocityIntervalMs,
+    });
   }
 }
 

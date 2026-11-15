@@ -100,14 +100,15 @@ flowchart LR
 
 ## What You Get
 
-### 10 Database Tables (`__mj_BizAppsReferrals` schema)
+### 14 Database Tables (`__mj_BizAppsReferrals` schema)
 
 | Category | Tables | Purpose |
 |---|---|---|
-| **Taxonomy & Tiers** | `PracticeArea`, `Jurisdiction`, `ReferralTier` | Hierarchical practice-area tree, geographic/bar jurisdictions, and SLA/cascade tier policies |
-| **Directory & Credentials** | `ProfessionalProfile`, `ProfessionalPracticeArea`, `ProfessionalJurisdiction` | Member profiles linked to `Person`/`Organization`, practice proficiencies, capacity caps, and verified license admissions |
-| **Intake & Screening** | `ReferralRequest`, `ConflictCheckParty` | Seeker matter intake, urgency/budget metadata, and opposing/related parties for conflict checks |
-| **Routing & Outcomes** | `ReferralAssignment`, `ReferralFeedback` | Sequential cascade offers with `MatchScore`, `MatchRationaleJSON`, SLA deadlines, and post-referral outcome ratings |
+| **Taxonomy & Tiers** | `PracticeArea`, `Jurisdiction`, `ReferralTier` | Hierarchical practice-area tree, geographic/bar jurisdictions, and SLA/cascade/escalation tier policies |
+| **Directory & Credentials** | `ProfessionalProfile`, `ProfessionalPracticeArea`, `ProfessionalJurisdiction`, `ProfessionalCredential` | Member profiles linked to `Person`/`Organization`, practice proficiencies, capacity caps, verified license admissions, and normalized credentials |
+| **Intake & Screening** | `ReferralRequest`, `ConflictCheckParty` | Seeker matter intake, urgency/budget metadata, source channel, and opposing/related parties for conflict checks |
+| **Routing & Outcomes** | `ReferralAssignment`, `ReferralFeedback`, `ReferralOutcome` | Sequential cascade offers with `MatchScore`, `MatchRationaleJSON`, SLA deadlines, post-referral outcome ratings, and terminal completion records |
+| **Escalation & Readiness** | `ReferralEscalation`, `ProfessionalAvailabilityWindow`, `ReciprocitySnapshot` | SLA warning/breach escalation events, recurring/date-range/blackout availability windows, and periodic give/receive reciprocity snapshots |
 
 ### 7 TypeScript Packages
 
@@ -134,6 +135,13 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 | `RouteReferralAction` / `RouteReferralOperation` | Dispatches the next `ReferralAssignment` in sequence with an SLA deadline |
 | `RespondToReferralAction` / `RespondToReferralOperation` | Atomically records `Accepted`, `Declined`, or `ConflictFlagged` and auto-cascades on non-acceptance |
 | `SweepExpiredReferralSLAsAction` / `SweepExpiredReferralSLAsOperation` | Marks expired `Offered` assignments as `TimedOut` and cascades to the next ranked candidate |
+| `MarkReferralInProgressAction` / `CompleteReferralAction` | Transactional, authorization-checked, idempotent lifecycle completion; the latter creates a `ReferralOutcome` |
+| `SetAvailabilityWindowAction` | Creates/updates a `ProfessionalAvailabilityWindow` (Recurring / DateRange / Blackout) |
+| `EvaluateEscalationsAction` / `AcknowledgeEscalationAction` / `ResolveEscalationAction` / `DismissEscalationAction` | SLA-warning/urgent-unassigned escalation evaluation and coordinator/admin-gated lifecycle transitions |
+| `ReopenExhaustedReferralAction` | Admin-only reopen of an `Exhausted` request, excluding previously-assigned professionals |
+| `RecomputeReciprocityAction` / `GetReciprocityScorecardAction` | Batch recompute and on-demand read of per-professional reciprocity scorecards |
+| `ExplainMatchAction` | AI (or deterministic fallback) match rationale, persisted onto each candidate's `ReferralAssignment.AIRationaleJSON` |
+| `RecommendEscalationActionAction` | AI-advised (or rules-fallback) `RecommendedAction` + rationale for an open `ReferralEscalation` |
 
 ---
 
@@ -143,10 +151,13 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 
 - **`ReferralsSeekerIntakeComponent`** (*Seeker Intake*): Natural-language matter intake bar, practice/jurisdiction/urgency filters, trust & SLA KPI strip, and ranked professional match cards with verified credential badges and match rationale.
 - **`ReferralsProInboxComponent`** (*Pro Lead Inbox*): Incoming referral queue with live SLA countdown timers, `ConflictCheckParty` screening list, one-click `Accept` / `Flag Conflict` / `Decline` actions, and capacity controls.
-- **`ReferralsOpsTelemetryComponent`** (*Ops Telemetry*): Association executive KPI strip, `Active Referral Dispatch Telemetry` table with cascade controls, and `Supply-Demand Gap Matrix`.
+- **`ReferralsOpsTelemetryComponent`** (*Ops Telemetry*): Association executive KPI strip (including an Escalations tile linking to the Escalation Console), `Active Referral Dispatch Telemetry` table with cascade controls, and a memoized `Supply-Demand Gap Matrix`.
+- **`ReferralsEscalationConsoleComponent`** (*Escalations*): Open escalations grouped by level with a live SLA countdown, Acknowledge/Resolve/Dismiss, admin-only Reopen with parent-practice-area expansion, and an "Ask AI Advisor" panel.
+- **`ReferralsReciprocityScorecardComponent`** (*Reciprocity*): Quarter-selectable, `ReciprocityIndex`-ranked professional scorecard table with a Recompute action.
 - **Custom Entity Forms (`BaseFormPanel`)**:
   - `ReferralRequestHeroPanel` — intake status, conflict screening summary, and `Candidate Cascade Ladder`
   - `ProfessionalProfileHeroPanel` — bar/license verification audit, capacity & routing policy, and historical acceptance/rating metrics
+  - `ReferralEscalationHeroPanel` / `ReferralOutcomeHeroPanel` / `ProfessionalAvailabilityWindowHeroPanel` — hero summaries for the Wave 3 escalation/outcome/availability entities
 
 ---
 
@@ -156,6 +167,53 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **Pluggable Verification Providers (`@mj-biz-apps/referrals-core`)**: `ReferralCredentialService` supports `Manual` (coordinator/admin-verified with `ContextUser` derivation), `ExternalAction` (requires configured adapter or HMAC-SHA256 signed verification payload; fails closed), and `BizAppsCredentialingBridge` (dynamic discovery of `MJ_BizApps_Credentialing` entities with person-level subject matching and ambiguity fail-closed).
 - **Credential Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.VerifyCredential`, `Referrals.SyncProfileCredentials`, and `Referrals.ListCredentialProviders`.
 - **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: Includes `Directory & Pros` (`ReferralsCredentialDirectoryResource`), `BaseFormComponent` + `BaseFormPanel` registrations for all 11 entities, and `--mj-*` design token compliance.
+
+---
+
+## Wave 3 Slice 1: SLA Escalation, Lifecycle Completion & Capacity Readiness
+
+- **Schema v1.2.0 (`V202611151000`)**: Adds `ReferralEscalation`, `ReferralOutcome`, `ProfessionalAvailabilityWindow`, and `ReciprocitySnapshot` across both SQL Server (`migrations/`) and PostgreSQL (`migrations-pg/`), plus additive escalation/readiness columns on `ReferralTier`, `ReferralRequest`, `ReferralAssignment` (widening `Status` to include `InProgress`/`Completed`), and `ProfessionalProfile`.
+- **`CapacityReadinessService` (`@mj-biz-apps/referrals-core`)**: `ResolveEffectiveAvailability` layers explicit `ProfessionalAvailabilityWindow` records (Recurring / DateRange / Blackout) on top of `AvailabilityStatus`; `ComputeReadinessScore` produces a 5-factor 0-100 breakdown (Availability, Capacity, Responsiveness, Rating, Reciprocity); `ComputeSLADeadline` applies the tier's `UrgentSLAMultiplier` for `Urgent` referrals. `MatchingEngine` now disqualifies candidates outside their configured availability windows.
+- **Lifecycle Completion (`CascadeRoutingService`)**: `MarkInProgress` and `CompleteReferral` are transactional, authorization-checked *before* any writes, and idempotent on repeat calls. `CompleteReferral` creates a `ReferralOutcome`, decrements `ActiveReferralCount` (never below 0), increments `TotalCompletedCount`, and recomputes a 90-day rolling `AverageResponseHours`. Cascade `CascadeOrder` numbering was fixed so conflict-rejected candidates are always numbered after eligible ones.
+- **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.MarkReferralInProgress`, `Referrals.CompleteReferral`, `Referrals.SetAvailabilityWindow`.
+- **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: `BaseFormComponent` + `BaseFormPanel` registrations for all 15 entities.
+
+---
+
+## Wave 3 Slice 2: Escalation Engine, Reopen & Reciprocity Scorecards
+
+- **Schema**: Additive escalation-lifecycle columns on `ReferralEscalation` (`DedupKey`, `LinkedTaskID`, `AcknowledgedByPersonID`, `ResolvedByPersonID`, `ResolutionNotes`; `TriggerType` widened to 6 values — `SLAWarning`, `SLABreach`, `ManualEscalation`, `CapacityExhausted`, `CascadeExhausted`, `UrgentUnassigned` — and `Status` widened to 4 — `Open`, `Acknowledged`, `Resolved`, `Dismissed`), `FeeAmount` on `ReferralOutcome`, and full scorecard metrics (`AcceptedCount`, `ResolvedCount`, `SLABreachCount`, `AcceptanceRate`, `MedianResponseHours`, `AttributedFeeTotal`, with a unique index per profile/period) on `ReciprocitySnapshot`. Consolidated into the single `V202611151000__v1.2.0__SLA_Escalation_Outcomes_And_Readiness` migration per the one-migration-per-dialect policy (there is no separate v1.2.1 migration).
+- **`SlaEscalationService` (`@mj-biz-apps/referrals-core`)**: `EvaluateEscalations` raises SLA-warning and urgent-unassigned escalations; `RaiseEscalation` is idempotent by `DedupKey` and caps `EscalationLevel` at the tier's `MaxEscalationLevel`; `AcknowledgeEscalation` / `ResolveEscalation` / `DismissEscalation` enforce coordinator/admin authorization *before* any writes. Notifications are dispatched through a pluggable `BaseEscalationNotifier` (`None`, `BizAppsTasks` — the latter discovers the sibling BizApps Tasks schema at runtime via `provider.Entities` and raw parameterized SQL, with no static dependency on that package).
+- **`CascadeRoutingService.ReopenExhaustedRequest`**: Admin-only reopen of an `Exhausted` referral — re-runs matching excluding every previously-assigned professional, optionally expanding to the parent `PracticeArea`, and auto-resolves the open `CascadeExhausted` escalation when a new candidate is found.
+- **`ReciprocityScorecardService` (`@mj-biz-apps/referrals-core`)**: `ComputeScorecard` computes `ReciprocityIndex = round((Sent + 1) / (Accepted + 1), 3)` plus Sent/Received/Accepted/Resolved/SLABreachCount/AcceptanceRate/MedianResponseHours/AttributedFeeTotal; `RecomputeSnapshots` batch-upserts `ReciprocitySnapshot` rows per professional per UTC calendar quarter and updates `ProfessionalProfile.ReciprocityIndex` / `ReadinessScore` / `ReadinessComputedAt`. `MatchingEngine.ScoreCandidate` can apply an optional reciprocity-based match-score boost (`ApplyReciprocityBoost`).
+- **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.EvaluateEscalations`, `Referrals.AcknowledgeEscalation`, `Referrals.ResolveEscalation`, `Referrals.ReopenExhaustedReferral`, `Referrals.RecomputeReciprocity`, `Referrals.GetReciprocityScorecard`.
+- **`ReferralsSlaSweepScheduler` (`@mj-biz-apps/referrals-server`)**: `RunOnce` now runs the SLA sweep followed by `EvaluateEscalations` and reports `EscalationsRaised` on `SlaSweepRunRecord`; a second recurring timer (`reciprocityIntervalMs`, default 24h; `disableAutoReciprocity` to turn it off) drives daily `RecomputeReciprocity` passes. `LoadBizAppsReferralsServer` accepts an `escalationNotifierKey` option (default `BizAppsTasks`), safely falling back to `None` at evaluation time when that notifier isn't registered.
+
+---
+
+## Wave 3 Slice 3: AI Match Rationale & Escalation Advisor
+
+- **Schema**: `ReferralEscalation.AIRationaleJSON`, folded into the single consolidated `V202611151000__v1.2.0__SLA_Escalation_Outcomes_And_Readiness` migration alongside the rest of Wave 3 (Spec SS2.1 requires exactly one migration per dialect).
+- **Client-safe operation bases (`@mj-biz-apps/referrals-core/operations/ai-operations`)**: `ExplainMatchOperationBase` and `RecommendEscalationOperationBase` declare only their `OperationKey` and typed input/output contract (no server implementation) so client bundles can resolve and `.Execute()` them without pulling in any `@memberjunction/ai-*` package - `@mj-biz-apps/referrals-core` has zero AI dependencies.
+- **`ReferralAIRationaleService` (`@mj-biz-apps/referrals-actions/ai`)**:
+  - `BuildRationaleContext` hands the AI advisor only practice area/jurisdiction names, urgency, tier, conflict-party counts per role, and each candidate's match score/breakdown/explainable reasons/readiness/reciprocity - never seeker name/email/phone/company, matter text, or conflict party names/organizations.
+  - `ExplainMatch` generates and persists a `{Source: 'AI'|'Deterministic', Summary, Rationale, Risks[], GeneratedAt}` rationale onto every `Offered`/`Queued` `ReferralAssignment.AIRationaleJSON` for a request, dropping any AI-returned entry whose ID isn't in the candidate set and falling back to a deterministic rationale built from `ExplainableMatchReasons` when the AI prompt is missing/unavailable or its output is invalid. Never throws to the caller.
+  - `RecommendEscalationAction` validates and persists a `RecommendedAction` (from the `Notify`/`Reassign`/`AdminAlert`/`EscalateToTier` union) and rationale on the escalation; skips the AI call (0 executor invocations) when a rationale already exists unless `Force` is set (1 invocation); never mutates `Status`, `EscalationLevel`, `CascadeOrder`, or any assignment row.
+  - `IReferralPromptExecutor` / `MJReferralPromptExecutor` wrap `AIPromptRunner` + `AIEngineBase` prompt-by-name lookup; tests inject a fake executor via `ReferralAIRationaleService.ConfigureExecutor`.
+- **New Actions**: `Referrals.ExplainMatch`, `Referrals.RecommendEscalationAction`.
+- **Prompts & Agents**: `Referrals Match Rationale` and `Referrals Escalation Advisor` prompts; new Loop agent **Referrals Escalation Advisor** linked to `EvaluateEscalations`, `RecommendEscalationAction`, `ExplainMatch`, `GetReciprocityScorecard`, and `AcknowledgeEscalation`; Wave 3 lifecycle/reopen actions (`SubmitReferralIntake`, `MarkReferralInProgress`, `CompleteReferral`, `SetAvailabilityWindow`, `ReopenExhaustedReferral`) linked to the existing **Referrals Triage & Concierge** agent.
+- **Dependencies**: `@memberjunction/ai-prompts`, `@memberjunction/ai-core-plus`, `@memberjunction/ai-engine-base` pinned to `6.2.1` in `packages/Actions/package.json` only.
+
+---
+
+## Wave 3 Slice 4: Escalation Console, Reciprocity Scorecard & Closed-Loop UI
+
+- **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: Two new resources bring the Referrals app to 7 `DefaultNavItems` — `ReferralsEscalationConsoleComponent` (*Escalations*) and `ReferralsReciprocityScorecardComponent` (*Reciprocity*). The Escalation Console groups open escalations by `EscalationLevel` with a live SLA countdown (time-to-breach when a linked assignment deadline exists, elapsed-since-triggered otherwise), KPI tiles, Acknowledge/Resolve (disabled until notes are entered)/Dismiss, admin-only Reopen with an "Expand to parent practice area" toggle, and an "Ask AI Advisor" action surfacing `RecommendedAction` with an AI/Rules `Source` label. The Reciprocity Scorecard offers a `UserInfoEngine`-persisted quarter selector and a `ReciprocityIndex`-descending ranked table with a Recompute action.
+- **New Action**: `Referrals.DismissEscalation` (`BaseRemotableOperation` + `BaseAction`, mirroring `AcknowledgeEscalation`/`ResolveEscalation`) gives the Escalation Console's Dismiss action a server-side counterpart.
+- **Pro Inbox enhancements**: Mark In Progress, a "Complete & Report Outcome" panel (`CascadeRoutingService.CompleteReferral` now accepts an optional `FeeAmount`), and an Availability manager with date-range validation.
+- **Seeker Intake enhancements**: an urgency selector driving an SLA preview, per-candidate readiness badges, a client-side "Explain this match" panel, and a feedback-assignment list scoped to the current seeker's email with resolved professional `DisplayName`s.
+- **3 new hero panels** and bug fixes to `UserReferralsOverviewPanel` / `PersonReferralsOverviewPanel` navigation and `RequestCount`.
+- **mjButton/design-token migration**: every Angular component in `packages/Angular/src/lib/**` now uses `MJButtonDirective`, zero inline styles, zero raw color literals, and zero bare `<a>` tags.
 
 ---
 

@@ -1,4 +1,19 @@
+import { UserInfo } from '@memberjunction/core';
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const ADMIN_ROLE_NAMES = new Set([
+  'administrator',
+  'referrals admin',
+  'association admin',
+  'sysadmin',
+]);
+
+/** True when `contextUser` holds an Association Admin / Referrals Admin / Administrator / SysAdmin role. */
+export function IsAssociationAdmin(contextUser: UserInfo): boolean {
+  const roles = contextUser.UserRoles ?? [];
+  return roles.some((r) => ADMIN_ROLE_NAMES.has((r.Role ?? '').trim().toLowerCase()));
+}
 
 export class InvalidUUIDError extends Error {
   public readonly FieldName: string;
