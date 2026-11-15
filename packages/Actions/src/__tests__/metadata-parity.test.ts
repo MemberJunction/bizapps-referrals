@@ -6,11 +6,13 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../../../..');
 const metadataPath = resolve(repoRoot, 'metadata/actions/.referrals-actions.json');
+const agentsMetadataPath = resolve(repoRoot, 'metadata/agents/.referrals-agents.json');
 const sourceFiles = [
   resolve(__dirname, '../index.ts'),
   resolve(__dirname, '../lifecycle-actions.ts'),
   resolve(__dirname, '../escalation-actions.ts'),
   resolve(__dirname, '../reciprocity-actions.ts'),
+  resolve(__dirname, '../ai-actions.ts'),
 ];
 
 interface ActionMetadataRecord {
@@ -98,5 +100,49 @@ describe('Referrals Action metadata parity', () => {
     expect(declared.has('Referrals.ReopenExhaustedReferral')).toBe(true);
     expect(declared.has('Referrals.RecomputeReciprocity')).toBe(true);
     expect(declared.has('Referrals.GetReciprocityScorecard')).toBe(true);
+  });
+
+  it('registers the 2 Wave 3 Slice 3 AI actions (ExplainMatch, RecommendEscalationAction) in metadata', () => {
+    expect(declared.has('Referrals.ExplainMatch')).toBe(true);
+    expect(declared.has('Referrals.RecommendEscalationAction')).toBe(true);
+  });
+
+  it('every @lookup:MJ: Actions.Name=X reference in metadata/agents/.referrals-agents.json resolves to a declared action', () => {
+    const agentsRaw = readFileSync(agentsMetadataPath, 'utf8');
+    const lookupRe = /"ActionID":\s*"@lookup:MJ: Actions\.Name=([^"]+)"/g;
+    const referencedActionNames = new Set<string>();
+    for (const match of agentsRaw.matchAll(lookupRe)) {
+      referencedActionNames.add(match[1]);
+    }
+    expect(referencedActionNames.size).toBeGreaterThan(0);
+    const missing: string[] = [];
+    for (const actionName of referencedActionNames) {
+      if (!declared.has(actionName)) {
+        missing.push(actionName);
+      }
+    }
+    expect(missing, `Agent-referenced actions missing from metadata/actions/.referrals-actions.json: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('the new Referrals Escalation Advisor agent is linked to its 5 required actions', () => {
+    const agentsRaw = readFileSync(agentsMetadataPath, 'utf8');
+    const agents = JSON.parse(agentsRaw) as Array<{
+      fields: { Name: string };
+      relatedEntities?: { 'MJ: AI Agent Actions'?: Array<{ fields: { ActionID: string } }> };
+    }>;
+    const advisor = agents.find((a) => a.fields.Name === 'Referrals Escalation Advisor');
+    expect(advisor).toBeDefined();
+    const linkedActionNames = (advisor?.relatedEntities?.['MJ: AI Agent Actions'] ?? []).map((a) =>
+      a.fields.ActionID.replace('@lookup:MJ: Actions.Name=', ''),
+    );
+    expect(linkedActionNames).toEqual(
+      expect.arrayContaining([
+        'Referrals.EvaluateEscalations',
+        'Referrals.RecommendEscalationAction',
+        'Referrals.ExplainMatch',
+        'Referrals.GetReciprocityScorecard',
+        'Referrals.AcknowledgeEscalation',
+      ]),
+    );
   });
 });
