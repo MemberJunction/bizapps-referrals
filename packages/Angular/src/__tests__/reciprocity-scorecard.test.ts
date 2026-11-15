@@ -107,11 +107,11 @@ describe('ReferralsReciprocityScorecardComponent (Wave 3 Slice 4, AC-37/AC-39)',
   function snapshotFor(profile: ProfessionalProfileEntity, reciprocityIndex: number): ReciprocitySnapshotEntity {
     return {
       ProfessionalProfileID: profile.ID,
-      ReferralsGivenCount: 10,
-      ReferralsReceivedCount: 5,
-      AcceptedCount: 4,
-      ResolvedCount: 3,
-      AcceptanceRate: 80,
+      ReferralsSent: 10,
+      ReferralsReceived: 5,
+      ReferralsAccepted: 4,
+      ReferralsResolved: 3,
+      AcceptanceRate: 0.8,
       MedianResponseHours: 2.5,
       SLABreachCount: 1,
       ReciprocityIndex: reciprocityIndex,
@@ -147,8 +147,10 @@ describe('ReferralsReciprocityScorecardComponent (Wave 3 Slice 4, AC-37/AC-39)',
     fixture.detectChanges();
 
     expect(cmp.Rows.map((r) => r.ProfessionalProfileID)).toEqual(['p-high', 'p-low']);
+    expect(cmp.Rows[0].AcceptanceRate).toBe(80);
     const host: HTMLElement = fixture.nativeElement;
     expect(host.textContent).toContain('High Giver');
+    expect(host.textContent).toContain('80%');
     expect(host.querySelectorAll('.readiness-badge')).toHaveLength(2);
     fixture.destroy();
   });

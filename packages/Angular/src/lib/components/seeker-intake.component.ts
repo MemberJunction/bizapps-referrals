@@ -695,7 +695,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     );
     if (result.Success) {
       for (const pro of result.Results) {
-        this.CandidateReadinessMap[pro.ID] = pro.ReadinessScore;
+        this.CandidateReadinessMap[pro.ID] = pro.ReadinessScore ?? 0;
       }
     }
   }

@@ -93,9 +93,9 @@ describe('ReferralsEscalationConsoleComponent (Wave 3 Slice 4, AC-37/AC-38)', ()
       EscalationLevel: 1,
       TriggerType: 'CascadeExhausted',
       Status: 'Open',
-      RecommendedAction: 'Reassign',
+      RecommendedAction: 'ExpandPracticeArea',
       Notes: null,
-      TriggeredAt: new Date('2026-11-10T00:00:00.000Z'),
+      RaisedAt: new Date('2026-11-10T00:00:00.000Z'),
       AcknowledgedAt: null,
       ResolvedAt: null,
       DedupKey: null,
@@ -213,7 +213,7 @@ describe('ReferralsEscalationConsoleComponent (Wave 3 Slice 4, AC-37/AC-38)', ()
       Success: true,
       Output: {
         ReferralEscalationID: esc.ID,
-        RecommendedAction: 'EscalateToTier',
+        RecommendedAction: 'ReassignNextCandidate',
         Source: 'AI',
         Summary: 'Escalate to the senior tier; capacity is exhausted in this practice area.',
         Rationale: 'No eligible professionals remain after 3 cascade attempts.',
@@ -236,7 +236,7 @@ describe('ReferralsEscalationConsoleComponent (Wave 3 Slice 4, AC-37/AC-38)', ()
     expect(cmp.AdvisorResult[esc.ID]?.Source).toBe('AI');
     const host: HTMLElement = fixture.nativeElement;
     expect(host.textContent).toContain('AI Advisor');
-    expect(host.textContent).toContain('EscalateToTier');
+    expect(host.textContent).toContain('ReassignNextCandidate');
     fixture.destroy();
   });
 });

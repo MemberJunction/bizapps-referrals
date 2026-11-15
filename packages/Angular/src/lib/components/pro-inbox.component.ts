@@ -114,6 +114,12 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                 <span>Ends</span>
                 <input type="date" [(ngModel)]="AvailabilityEndsAt" aria-label="Availability window end date" />
               </label>
+              @if (AvailabilityMode === 'ReducedCapacity') {
+                <label class="cap-label">
+                  <span>Capacity Override</span>
+                  <input type="number" min="0" [(ngModel)]="AvailabilityCapacityOverride" aria-label="Availability capacity override" />
+                </label>
+              }
               <button type="button" mjButton Variant="primary" Size="sm" (click)="SaveAvailabilityWindow()" [disabled]="IsSavingAvailability">
                 {{ IsSavingAvailability ? 'Saving...' : 'Save Window' }}
               </button>
@@ -511,6 +517,7 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
   public AvailabilityMode: ProfessionalAvailabilityWindowEntity['WindowType'] = 'Paused';
   public AvailabilityStartsAt = '';
   public AvailabilityEndsAt = '';
+  public AvailabilityCapacityOverride: number | null = null;
   public IsSavingAvailability = false;
   public AvailabilityError = '';
   public CompletionOutcomeStatus: OutcomeStatus = 'Resolved';
@@ -662,6 +669,11 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
       this.cdr.markForCheck();
       return;
     }
+    if (this.AvailabilityMode === 'ReducedCapacity' && (this.AvailabilityCapacityOverride == null || this.AvailabilityCapacityOverride < 0)) {
+      this.AvailabilityError = 'A non-negative Capacity Override is required for Reduced Capacity windows.';
+      this.cdr.markForCheck();
+      return;
+    }
     this.IsSavingAvailability = true;
     this.cdr.markForCheck();
     try {
@@ -670,10 +682,10 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
         {
           ProfessionalProfileID: this.CurrentProfile.ID,
           WindowType: this.AvailabilityMode,
-          StartDate: startsAt,
-          EndDate: endsAt,
-          IsAvailable: false,
-          Notes: `${this.AvailabilityMode} window set from Pro Inbox.`,
+          StartsAt: startsAt,
+          EndsAt: endsAt,
+          CapacityOverride: this.AvailabilityMode === 'ReducedCapacity' ? this.AvailabilityCapacityOverride : null,
+          Reason: `${this.AvailabilityMode} window set from Pro Inbox.`,
         },
         md.CurrentUser,
       );
@@ -681,6 +693,7 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
       this.ShowAvailabilityManager = false;
       this.AvailabilityStartsAt = '';
       this.AvailabilityEndsAt = '';
+      this.AvailabilityCapacityOverride = null;
     } catch (err) {
       this.AvailabilityError = err instanceof Error ? err.message : 'Failed to save availability window.';
     } finally {

@@ -325,11 +325,13 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
         ProfessionalProfileID: s.ProfessionalProfileID,
         DisplayName: profile?.DisplayName ?? s.ProfessionalProfileID,
         ReadinessScore: profile?.ReadinessScore ?? 0,
-        Sent: s.ReferralsGivenCount,
-        Received: s.ReferralsReceivedCount,
-        Accepted: s.AcceptedCount,
-        Resolved: s.ResolvedCount,
-        AcceptanceRate: s.AcceptanceRate,
+        Sent: s.ReferralsSent,
+        Received: s.ReferralsReceived,
+        Accepted: s.ReferralsAccepted,
+        Resolved: s.ReferralsResolved,
+        // AcceptanceRate is persisted as a 0..1 fraction; convert to a 0..100
+        // percentage here so the template's bare `%` suffix renders correctly.
+        AcceptanceRate: s.AcceptanceRate * 100,
         MedianResponseHours: s.MedianResponseHours,
         SLABreachCount: s.SLABreachCount,
         ReciprocityIndex: s.ReciprocityIndex,

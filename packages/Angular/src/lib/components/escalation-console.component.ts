@@ -12,7 +12,6 @@ import {
   MJPageLayoutComponent,
 } from '@memberjunction/ng-ui-components';
 import {
-  AIRationaleSource,
   CascadeRoutingService,
   EscalationTransitionResult,
   IsAssociationAdmin,
@@ -23,7 +22,7 @@ import {
 import { ReferralAssignmentEntity, ReferralEscalationEntity, ReferralRequestEntity } from '@mj-biz-apps/referrals-entities';
 
 interface PersistedEscalationRationale {
-  Source: AIRationaleSource;
+  Source: string;
   Summary: string;
   Rationale: string;
   GeneratedAt: string;
@@ -340,7 +339,7 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
             ExtraFilter: "Status = 'Open' OR Status = 'Acknowledged'",
-            OrderBy: 'EscalationLevel DESC, TriggeredAt ASC',
+            OrderBy: 'EscalationLevel DESC, RaisedAt ASC',
             ResultType: 'entity_object',
           },
           {
@@ -361,7 +360,7 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
 
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const breaches = results[1]?.Success ? (results[1].Results as ReferralEscalationEntity[]) : [];
-      this.BreachesLast7Days = breaches.filter((b) => new Date(b.TriggeredAt).getTime() >= sevenDaysAgo).length;
+      this.BreachesLast7Days = breaches.filter((b) => new Date(b.RaisedAt).getTime() >= sevenDaysAgo).length;
 
       this.ExhaustedRequestCount = results[2]?.Success ? results[2].Results.length : 0;
 
@@ -444,7 +443,7 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
       const minutes = Math.floor((Math.abs(diffMs) % (60 * 60 * 1000)) / 60000);
       return diffMs >= 0 ? `SLA in ${hours}h ${minutes}m` : `SLA breached ${hours}h ${minutes}m ago`;
     }
-    const triggeredMs = new Date(esc.TriggeredAt).getTime();
+    const triggeredMs = new Date(esc.RaisedAt).getTime();
     const elapsedMs = now - triggeredMs;
     const hours = Math.floor(elapsedMs / (60 * 60 * 1000));
     const minutes = Math.floor((elapsedMs % (60 * 60 * 1000)) / 60000);

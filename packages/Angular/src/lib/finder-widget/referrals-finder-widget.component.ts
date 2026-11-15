@@ -623,7 +623,7 @@ export class ReferralsFinderWidgetComponent implements OnInit {
             AvailabilityStatus: p.AvailabilityStatus,
             AverageResponseHours: p.AverageResponseHours,
             AverageRating: p.AverageRating,
-            ReadinessScore: p.ReadinessScore,
+            ReadinessScore: p.ReadinessScore ?? 0,
             Score: scoreResult.Score,
             ExplainableMatchReasons: scoreResult.ExplainableMatchReasons,
             MatchSummary: scoreResult.MatchSummary,

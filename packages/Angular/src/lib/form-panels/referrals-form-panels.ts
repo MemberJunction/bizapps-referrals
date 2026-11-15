@@ -668,7 +668,7 @@ export class ReferralFeedbackHeroPanel extends BaseFormPanel {
         <div class="hero-header">
           <div>
             <h3 class="hero-title">Level {{ esc.EscalationLevel }} — {{ esc.TriggerType }}</h3>
-            <div class="hero-sub">Triggered: {{ esc.TriggeredAt | date:'medium' }}</div>
+            <div class="hero-sub">Triggered: {{ esc.RaisedAt | date:'medium' }}</div>
           </div>
           <div class="hero-actions">
             <span class="status-pill" [attr.data-tone]="StatusTone(esc.Status)">{{ esc.Status }}</span>
@@ -727,7 +727,7 @@ export class ReferralEscalationHeroPanel extends BaseFormPanel {
         <div class="hero-header">
           <div>
             <h3 class="hero-title">Outcome: {{ outcome.OutcomeStatus }}</h3>
-            <div class="hero-sub">Completed: {{ outcome.CompletedAt | date:'medium' }}</div>
+            <div class="hero-sub">Closed: {{ outcome.ClosedAt ? (outcome.ClosedAt | date:'medium') : 'N/A' }}</div>
           </div>
           <div class="hero-actions">
             <span class="status-pill" [attr.data-tone]="(outcome.OutcomeStatus === 'Resolved' || outcome.OutcomeStatus === 'Engaged') ? 'success' : 'warning'">
@@ -737,16 +737,16 @@ export class ReferralEscalationHeroPanel extends BaseFormPanel {
         </div>
         <div class="hero-metrics">
           <div class="metric-tile">
-            <span class="metric-label">Response Hours</span>
-            <span class="metric-val">{{ outcome.ResponseHours != null ? (outcome.ResponseHours + 'h') : 'N/A' }}</span>
+            <span class="metric-label">Reported Fee</span>
+            <span class="metric-val">{{ outcome.ReportedFeeAmount != null ? ('$' + outcome.ReportedFeeAmount + ' ' + outcome.CurrencyCode) : 'N/A' }}</span>
           </div>
           <div class="metric-tile">
-            <span class="metric-label">Fee Amount</span>
-            <span class="metric-val">{{ outcome.FeeAmount != null ? ('$' + outcome.FeeAmount) : 'N/A' }}</span>
+            <span class="metric-label">Estimated Fee</span>
+            <span class="metric-val">{{ outcome.EstimatedFeeAmount != null ? ('$' + outcome.EstimatedFeeAmount + ' ' + outcome.CurrencyCode) : 'N/A' }}</span>
           </div>
           <div class="metric-tile">
             <span class="metric-label">Notes</span>
-            <span class="metric-val">{{ outcome.CompletionNotes || '—' }}</span>
+            <span class="metric-val">{{ outcome.AttributionNotes || '—' }}</span>
           </div>
         </div>
       </section>
@@ -781,28 +781,28 @@ export class ReferralOutcomeHeroPanel extends BaseFormPanel {
         <div class="hero-header">
           <div>
             <h3 class="hero-title">{{ win.WindowType }} Availability</h3>
-            <div class="hero-sub">Time Zone: {{ win.TimeZone }}</div>
+            <div class="hero-sub">{{ win.IsActive ? 'Active' : 'Inactive' }}</div>
           </div>
           <div class="hero-actions">
-            <span class="status-pill" [attr.data-tone]="win.IsAvailable ? 'success' : 'error'">
-              {{ win.IsAvailable ? 'Available' : 'Unavailable' }}
+            <span class="status-pill" [attr.data-tone]="win.IsActive ? 'success' : 'error'">
+              {{ win.IsActive ? 'Active' : 'Inactive' }}
             </span>
           </div>
         </div>
         <div class="hero-metrics">
           <div class="metric-tile">
-            <span class="metric-label">Day of Week</span>
-            <span class="metric-val">{{ win.DayOfWeek != null ? win.DayOfWeek : 'N/A' }}</span>
+            <span class="metric-label">Capacity Override</span>
+            <span class="metric-val">{{ win.CapacityOverride != null ? win.CapacityOverride : 'N/A' }}</span>
           </div>
           <div class="metric-tile">
-            <span class="metric-label">Date Range</span>
+            <span class="metric-label">Window</span>
             <span class="metric-val">
-              {{ win.StartDate ? (win.StartDate | date:'shortDate') : 'N/A' }} – {{ win.EndDate ? (win.EndDate | date:'shortDate') : 'N/A' }}
+              {{ win.StartsAt ? (win.StartsAt | date:'shortDate') : 'N/A' }} – {{ win.EndsAt ? (win.EndsAt | date:'shortDate') : 'N/A' }}
             </span>
           </div>
           <div class="metric-tile">
-            <span class="metric-label">Notes</span>
-            <span class="metric-val">{{ win.Notes || '—' }}</span>
+            <span class="metric-label">Reason</span>
+            <span class="metric-val">{{ win.Reason || '—' }}</span>
           </div>
         </div>
       </section>

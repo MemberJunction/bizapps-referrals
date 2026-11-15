@@ -184,9 +184,29 @@ describe('Wave 3 Slice 4 Pro Inbox (AC-40) & Seeker Intake (AC-41) enhancements'
 
       expect(cmp.AvailabilityError).toBe('');
       expect(setAvailSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ ProfessionalProfileID: profileId, IsAvailable: false }),
+        expect.objectContaining({ ProfessionalProfileID: profileId, WindowType: 'Paused' }),
         mockCurrentUser,
       );
+      fixture.destroy();
+    });
+
+    it('rejects a ReducedCapacity window without a CapacityOverride', async () => {
+      mockInboxViews();
+      TestBed.configureTestingModule({
+        imports: [ReferralsProInboxComponent],
+        providers: [{ provide: NavigationService, useValue: { OpenEntityRecord: vi.fn(), OpenNavItemByName: vi.fn() } }],
+      });
+      const fixture = TestBed.createComponent(ReferralsProInboxComponent);
+      const cmp = fixture.componentInstance;
+      await cmp.ngOnInit();
+
+      cmp.AvailabilityMode = 'ReducedCapacity';
+      cmp.AvailabilityStartsAt = '2026-12-01';
+      cmp.AvailabilityEndsAt = '2026-12-10';
+      cmp.AvailabilityCapacityOverride = null;
+      await cmp.SaveAvailabilityWindow();
+
+      expect(cmp.AvailabilityError).toContain('Capacity Override');
       fixture.destroy();
     });
 

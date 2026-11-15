@@ -2235,7 +2235,7 @@ export class ProfessionalCredentialFormComponent extends BaseFormComponent {
         Icon="fa-solid fa-clock"
         [Form]="this"
         [FormContext]="formContext">
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="TriggeredAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="RaisedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="AcknowledgedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ResolvedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
       </mj-collapsible-panel>
@@ -2297,9 +2297,13 @@ export class ReferralEscalationFormComponent extends BaseFormComponent {
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralAssignmentID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="OutcomeStatus" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ResponseHours" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CompletionNotes" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CompletedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EngagedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ClosedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EstimatedFeeAmount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReportedFeeAmount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CurrencyCode" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReportedByType" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="AttributionNotes" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
       </mj-collapsible-panel>
 
       <mj-collapsible-panel
@@ -2356,14 +2360,11 @@ export class ReferralOutcomeFormComponent extends BaseFormComponent {
         [FormContext]="formContext">
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="WindowType" Type="select" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="DayOfWeek" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="StartTimeMinutes" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EndTimeMinutes" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="StartDate" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EndDate" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IsAvailable" Type="checkbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="TimeZone" Type="textbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="Notes" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="StartsAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="EndsAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="CapacityOverride" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="IsActive" Type="checkbox" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="Reason" Type="textarea" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
       </mj-collapsible-panel>
 
       <mj-collapsible-panel
@@ -2419,11 +2420,13 @@ export class ProfessionalAvailabilityWindowFormComponent extends BaseFormCompone
         [Form]="this"
         [FormContext]="formContext">
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ProfessionalProfileID" Type="textbox" LinkType="Record" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="SnapshotDate" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodStartDate" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodEndDate" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsGivenCount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
-        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsReceivedCount" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ComputedAt" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodStart" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="PeriodEnd" Type="datepicker" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsSent" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsReceived" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsAccepted" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
+        <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReferralsResolved" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
         <mj-form-field [Record]="record" [ShowLabel]="true" FieldName="ReciprocityIndex" Type="number" [EditMode]="EditMode" [FormContext]="formContext"></mj-form-field>
       </mj-collapsible-panel>
 
