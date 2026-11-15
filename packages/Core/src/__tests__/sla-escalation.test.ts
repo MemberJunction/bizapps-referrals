@@ -16,6 +16,8 @@ const PERSON_1_ID = '40000000-0000-4000-8000-000000000001';
 const COORDINATOR_USER_ID = '50000000-0000-4000-8000-000000000001';
 const OUTSIDER_USER_ID = '50000000-0000-4000-8000-000000000099';
 
+type FieldValue = string | number | boolean | Date | null;
+
 function makeUser(roles: string[], id: string = COORDINATOR_USER_ID): UserInfo {
   return new UserInfo(undefined, {
     ID: id,
@@ -24,8 +26,8 @@ function makeUser(roles: string[], id: string = COORDINATOR_USER_ID): UserInfo {
   });
 }
 
-function makeTier(overrides: Partial<ReferralTierEntity> = {}): ReferralTierEntity {
-  const data: Record<string, string | number> = {
+function makeTier(overrides: Record<string, FieldValue> = {}): ReferralTierEntity {
+  const data: Record<string, FieldValue> = {
     ID: TIER_ID,
     SLAResponseHours: 24,
     EscalationWarningPercent: 75,
@@ -33,7 +35,9 @@ function makeTier(overrides: Partial<ReferralTierEntity> = {}): ReferralTierEnti
     UrgentSLAMultiplier: 1,
     ...overrides,
   };
-  return Object.assign(data, { Load: async (id: string) => id.toLowerCase() === TIER_ID.toLowerCase() }) as ReferralTierEntity;
+  const tier = data as ReferralTierEntity;
+  tier.Load = async (id: string) => id.toLowerCase() === TIER_ID.toLowerCase();
+  return tier;
 }
 
 interface MockStore {
@@ -43,31 +47,35 @@ interface MockStore {
   escalations: Map<string, ReferralEscalationEntity>;
 }
 
-function makeRequest(id: string, overrides: Partial<ReferralRequestEntity> = {}): ReferralRequestEntity {
-  const data: Record<string, string | number | null> = {
+function makeEscalation(fields: Record<string, FieldValue>): ReferralEscalationEntity {
+  return { ...fields } as ReferralEscalationEntity;
+}
+
+function makeRequest(id: string, overrides: Record<string, FieldValue> = {}): ReferralRequestEntity {
+  const data: Record<string, FieldValue> = {
     ID: id,
     ReferralTierID: TIER_ID,
     UrgencyLevel: 'Standard',
     Status: 'Routed',
     EscalationLevel: 0,
     LastEscalatedAt: null,
-    SubmittedAt: new Date().toISOString(),
+    SubmittedAt: new Date(),
     ...overrides,
   };
-  return data as unknown as ReferralRequestEntity;
+  return data as ReferralRequestEntity;
 }
 
-function makeAssignment(id: string, requestId: string, overrides: Partial<ReferralAssignmentEntity> = {}): ReferralAssignmentEntity {
-  const data: Record<string, string | number | null> = {
+function makeAssignment(id: string, requestId: string, overrides: Record<string, FieldValue> = {}): ReferralAssignmentEntity {
+  const data: Record<string, FieldValue> = {
     ID: id,
     ReferralRequestID: requestId,
     Status: 'Offered',
-    OfferedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-    SLADeadlineAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    OfferedAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
+    SLADeadlineAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
     SLAWarningSentAt: null,
     ...overrides,
   };
-  return data as unknown as ReferralAssignmentEntity;
+  return data as ReferralAssignmentEntity;
 }
 
 let escalationSeq = 1;
@@ -79,7 +87,7 @@ class MockEscalationProvider implements IMetadataProvider, IRunViewProvider {
 
   public async GetEntityObject<T>(entityName: string): Promise<T> {
     if (entityName === 'MJ_BizApps_Referrals: Referral Requests') {
-      const target: Record<string, unknown> = {};
+      const target = ({} as Record<string, FieldValue>) as ReferralRequestEntity;
       target.Load = async (id: string) => {
         const found = this.store.requests.get(id.toLowerCase());
         if (!found) return false;
@@ -87,24 +95,24 @@ class MockEscalationProvider implements IMetadataProvider, IRunViewProvider {
         return true;
       };
       target.Save = async () => {
-        this.store.requests.set((target.ID as string).toLowerCase(), { ...target } as ReferralRequestEntity);
+        this.store.requests.set(target.ID.toLowerCase(), { ...target } as ReferralRequestEntity);
         return true;
       };
-      return target as T;
+      return target as object as T;
     }
     if (entityName === 'MJ_BizApps_Referrals: Referral Tiers') {
-      const target: Record<string, unknown> = {};
+      const target = ({} as Record<string, FieldValue>) as ReferralTierEntity;
       target.Load = async (id: string) => {
         const found = this.store.tiers.get(id.toLowerCase());
         if (!found) return false;
         Object.assign(target, found);
         return true;
       };
-      return target as T;
+      return target as object as T;
     }
     if (entityName === 'MJ_BizApps_Referrals: Referral Escalations') {
       const newId = `60000000-0000-4000-8000-${String(escalationSeq++).padStart(12, '0')}`;
-      const target: Record<string, unknown> = { ID: newId };
+      const target = ({ ID: newId } as Record<string, FieldValue>) as ReferralEscalationEntity;
       target.Load = async (id: string) => {
         const found = this.store.escalations.get(id.toLowerCase());
         if (!found) return false;
@@ -112,10 +120,10 @@ class MockEscalationProvider implements IMetadataProvider, IRunViewProvider {
         return true;
       };
       target.Save = async () => {
-        this.store.escalations.set((target.ID as string).toLowerCase(), { ...target } as ReferralEscalationEntity);
+        this.store.escalations.set(target.ID.toLowerCase(), { ...target } as ReferralEscalationEntity);
         return true;
       };
-      return target as T;
+      return target as object as T;
     }
     throw new Error(`Unexpected entity '${entityName}'`);
   }
@@ -134,12 +142,12 @@ class MockEscalationProvider implements IMetadataProvider, IRunViewProvider {
           return true;
         })
         .map((a) => {
-          const target: Record<string, unknown> = { ...a };
+          const target = ({ ...a } as Record<string, FieldValue>) as ReferralAssignmentEntity;
           target.Save = async () => {
-            this.store.assignments.set((target.ID as string).toLowerCase(), { ...target } as ReferralAssignmentEntity);
+            this.store.assignments.set(target.ID.toLowerCase(), { ...target } as ReferralAssignmentEntity);
             return true;
           };
-          return target as unknown as ReferralAssignmentEntity;
+          return target;
         });
       return { Success: true, Results: items as T[] } as RunViewResult<T>;
     }
@@ -241,8 +249,8 @@ describe('SlaEscalationService', () => {
         [
           ASSIGN_1_ID.toLowerCase(),
           makeAssignment(ASSIGN_1_ID, REQ_1_ID, {
-            OfferedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-            SLADeadlineAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+            OfferedAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
+            SLADeadlineAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
           }),
         ],
       ]),
@@ -269,7 +277,7 @@ describe('SlaEscalationService', () => {
           makeRequest(REQ_2_ID, {
             UrgencyLevel: 'Urgent',
             Status: 'Routed',
-            SubmittedAt: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
+            SubmittedAt: new Date(Date.now() - 10 * 60 * 60 * 1000),
           }),
         ],
       ]),
@@ -292,10 +300,7 @@ describe('SlaEscalationService', () => {
       requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID)]]),
       assignments: new Map(),
       escalations: new Map([
-        [
-          ASSIGN_1_ID.toLowerCase(),
-          { ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Open', EscalationLevel: 1 } as unknown as ReferralEscalationEntity,
-        ],
+        [ASSIGN_1_ID.toLowerCase(), makeEscalation({ ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Open', EscalationLevel: 1 })],
       ]),
     };
     const dp = new MockEscalationProvider(store);
@@ -316,10 +321,7 @@ describe('SlaEscalationService', () => {
       requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID, { EscalationLevel: 1 })]]),
       assignments: new Map(),
       escalations: new Map([
-        [
-          ASSIGN_1_ID.toLowerCase(),
-          { ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Resolved', EscalationLevel: 1 } as unknown as ReferralEscalationEntity,
-        ],
+        [ASSIGN_1_ID.toLowerCase(), makeEscalation({ ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Resolved', EscalationLevel: 1 })],
       ]),
     };
     const dp = new MockEscalationProvider(store);
@@ -327,12 +329,10 @@ describe('SlaEscalationService', () => {
 
     await expect(SlaEscalationService.ResolveEscalation(ASSIGN_1_ID, coordinator, dp)).rejects.toThrow(InvalidLifecycleStateError);
 
-    store.escalations.set(ASSIGN_1_ID.toLowerCase(), {
-      ID: ASSIGN_1_ID,
-      ReferralRequestID: REQ_1_ID,
-      Status: 'Open',
-      EscalationLevel: 1,
-    } as unknown as ReferralEscalationEntity);
+    store.escalations.set(
+      ASSIGN_1_ID.toLowerCase(),
+      makeEscalation({ ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Open', EscalationLevel: 1 }),
+    );
 
     const result = await SlaEscalationService.ResolveEscalation(ASSIGN_1_ID, coordinator, dp, 'Fixed.');
     expect(result.Status).toBe('Resolved');

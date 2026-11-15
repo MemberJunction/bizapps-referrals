@@ -163,7 +163,7 @@ function createInMemoryProvider(store: EntityStore): IMetadataProvider & IRunVie
         ? store.snapshots.filter((s) => s.ProfessionalProfileID.toLowerCase() === match[1].toLowerCase())
         : store.snapshots;
     } else if (params.EntityName === 'MJ_BizApps_Common: People') {
-      results = [{ ID: PERSON_ADMIN_ID } as unknown as ReferralOutcomeEntity];
+      results = [{ ID: PERSON_ADMIN_ID } as object as ReferralOutcomeEntity];
     }
 
     return {

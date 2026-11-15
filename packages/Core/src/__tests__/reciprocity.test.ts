@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IMetadataProvider, IRunViewProvider, RunViewParams, RunViewResult, UserInfo } from '@memberjunction/core';
-import type {
-  ProfessionalProfileEntity,
-  ReciprocitySnapshotEntity,
-  ReferralAssignmentEntity,
-  ReferralOutcomeEntity,
-  ReferralRequestEntity,
-} from '@mj-biz-apps/referrals-entities';
+import type { ProfessionalProfileEntity, ReciprocitySnapshotEntity } from '@mj-biz-apps/referrals-entities';
 import { CurrentUtcQuarter, ReciprocityScorecardData, ReciprocityScorecardService } from '../index.js';
 
 const PROFILE_ID = '10000000-0000-4000-8000-000000000001';
@@ -14,8 +8,8 @@ const OTHER_PROFILE_ID = '10000000-0000-4000-8000-000000000002';
 
 const PERIOD = { Start: new Date('2026-01-01T00:00:00.000Z'), End: new Date('2026-03-31T23:59:59.999Z') };
 
-function withinPeriod(hoursFromStart: number): string {
-  return new Date(PERIOD.Start.getTime() + hoursFromStart * 60 * 60 * 1000).toISOString();
+function withinPeriod(hoursFromStart: number): Date {
+  return new Date(PERIOD.Start.getTime() + hoursFromStart * 60 * 60 * 1000);
 }
 
 describe('ReciprocityScorecardService.ComputeScorecard', () => {
@@ -25,18 +19,18 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
         { ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(1) },
         { ID: 'r2', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(2) },
         { ID: 'r3', ReferringProfessionalID: OTHER_PROFILE_ID, SubmittedAt: withinPeriod(3) },
-      ] as unknown as ReferralRequestEntity[],
+      ],
       assignments: [
         { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1.5, OfferedAt: withinPeriod(1), RespondedAt: null },
         { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: PROFILE_ID, Status: 'Completed', ResponseHours: 2.5, OfferedAt: withinPeriod(2), RespondedAt: null },
         { ID: 'a3', ReferralRequestID: 'x3', ProfessionalProfileID: PROFILE_ID, Status: 'Expired', ResponseHours: null, OfferedAt: withinPeriod(3), RespondedAt: null },
         { ID: 'a4', ReferralRequestID: 'x4', ProfessionalProfileID: PROFILE_ID, Status: 'Declined', ResponseHours: 0.5, OfferedAt: withinPeriod(4), RespondedAt: null },
         { ID: 'a5', ReferralRequestID: 'x5', ProfessionalProfileID: PROFILE_ID, Status: 'ConflictRejected', ResponseHours: null, OfferedAt: withinPeriod(5), RespondedAt: null },
-      ] as unknown as ReferralAssignmentEntity[],
+      ],
       outcomes: [
         { ID: 'o1', ReferralAssignmentID: 'a2', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Completed', CompletedAt: withinPeriod(6), FeeAmount: 1500 },
-        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Declined', CompletedAt: withinPeriod(7), FeeAmount: 0 },
-      ] as unknown as ReferralOutcomeEntity[],
+        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Cancelled', CompletedAt: withinPeriod(7), FeeAmount: 0 },
+      ],
     };
 
     const scorecard = ReciprocityScorecardService.ComputeScorecard(PROFILE_ID, PERIOD, data);
@@ -66,7 +60,7 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
       requests: [
         { ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(1) },
         { ID: 'r2', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(2) },
-      ] as unknown as ReferralRequestEntity[],
+      ],
       assignments: [],
       outcomes: [],
     };
@@ -80,15 +74,15 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
   });
 
   it('excludes requests, assignments, and outcomes outside the period window', () => {
-    const outOfPeriodIso = new Date(PERIOD.End.getTime() + 60 * 60 * 1000).toISOString();
+    const outOfPeriod = new Date(PERIOD.End.getTime() + 60 * 60 * 1000);
     const data: ReciprocityScorecardData = {
-      requests: [{ ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: outOfPeriodIso }] as unknown as ReferralRequestEntity[],
+      requests: [{ ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: outOfPeriod }],
       assignments: [
-        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: outOfPeriodIso, RespondedAt: null },
-      ] as unknown as ReferralAssignmentEntity[],
+        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: outOfPeriod, RespondedAt: null },
+      ],
       outcomes: [
-        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Completed', CompletedAt: outOfPeriodIso, FeeAmount: 500 },
-      ] as unknown as ReferralOutcomeEntity[],
+        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Completed', CompletedAt: outOfPeriod, FeeAmount: 500 },
+      ],
     };
 
     const scorecard = ReciprocityScorecardService.ComputeScorecard(PROFILE_ID, PERIOD, data);
@@ -108,16 +102,18 @@ describe('ReciprocityScorecardService.CurrentUtcQuarter', () => {
   });
 });
 
+type FieldValue = string | number | boolean | Date | null;
+
 interface MockStore {
   profiles: Map<string, ProfessionalProfileEntity>;
-  requests: ReferralRequestEntity[];
-  assignments: ReferralAssignmentEntity[];
-  outcomes: ReferralOutcomeEntity[];
+  requests: ReciprocityScorecardData['requests'];
+  assignments: ReciprocityScorecardData['assignments'];
+  outcomes: ReciprocityScorecardData['outcomes'];
   snapshots: Map<string, ReciprocitySnapshotEntity>;
 }
 
 function makeProfile(id: string): ProfessionalProfileEntity {
-  const data: Record<string, string | number | boolean | null> = {
+  const data: Record<string, FieldValue> = {
     ID: id,
     IsActive: true,
     AvailabilityStatus: 'Available',
@@ -129,7 +125,7 @@ function makeProfile(id: string): ProfessionalProfileEntity {
     ReadinessScore: null,
     ReadinessComputedAt: null,
   };
-  return data as unknown as ProfessionalProfileEntity;
+  return data as ProfessionalProfileEntity;
 }
 
 class MockReciprocityProvider implements IMetadataProvider, IRunViewProvider {
@@ -141,12 +137,14 @@ class MockReciprocityProvider implements IMetadataProvider, IRunViewProvider {
   public async GetEntityObject<T>(entityName: string): Promise<T> {
     if (entityName === 'MJ_BizApps_Referrals: Reciprocity Snapshots') {
       const newId = `20000000-0000-4000-8000-${String(this.seq++).padStart(12, '0')}`;
-      const target: Record<string, unknown> = { ID: newId };
-      target.Save = async () => {
-        this.store.snapshots.set((target.ID as string).toLowerCase(), { ...target } as ReciprocitySnapshotEntity);
-        return true;
-      };
-      return target as T;
+      const data: Record<string, FieldValue> = { ID: newId };
+      Object.assign(data, {
+        Save: async () => {
+          this.store.snapshots.set(newId.toLowerCase(), { ...data } as ReciprocitySnapshotEntity);
+          return true;
+        },
+      });
+      return data as object as T;
     }
     throw new Error(`Unexpected entity '${entityName}'`);
   }
@@ -157,13 +155,13 @@ class MockReciprocityProvider implements IMetadataProvider, IRunViewProvider {
       return { Success: true, Results: Array.from(this.store.profiles.values()) as T[] } as RunViewResult<T>;
     }
     if (params.EntityName === 'MJ_BizApps_Referrals: Referral Requests') {
-      return { Success: true, Results: this.store.requests as T[] } as RunViewResult<T>;
+      return { Success: true, Results: this.store.requests as object as T[] } as RunViewResult<T>;
     }
     if (params.EntityName === 'MJ_BizApps_Referrals: Referral Assignments') {
-      return { Success: true, Results: this.store.assignments as T[] } as RunViewResult<T>;
+      return { Success: true, Results: this.store.assignments as object as T[] } as RunViewResult<T>;
     }
     if (params.EntityName === 'MJ_BizApps_Referrals: Referral Outcomes') {
-      return { Success: true, Results: this.store.outcomes as T[] } as RunViewResult<T>;
+      return { Success: true, Results: this.store.outcomes as object as T[] } as RunViewResult<T>;
     }
     if (params.EntityName === 'MJ_BizApps_Referrals: Reciprocity Snapshots') {
       const match = /ProfessionalProfileID = '([^']+)'/i.exec(filter);
@@ -171,12 +169,14 @@ class MockReciprocityProvider implements IMetadataProvider, IRunViewProvider {
         ? Array.from(this.store.snapshots.values()).filter((s) => s.ProfessionalProfileID.toLowerCase() === match[1].toLowerCase())
         : Array.from(this.store.snapshots.values());
       const attached = existing.map((s) => {
-        const target: Record<string, unknown> = { ...s };
-        target.Save = async () => {
-          this.store.snapshots.set((target.ID as string).toLowerCase(), { ...target } as ReciprocitySnapshotEntity);
-          return true;
-        };
-        return target as unknown as ReciprocitySnapshotEntity;
+        const data: Record<string, FieldValue> = { ...(s as object as Record<string, FieldValue>) };
+        Object.assign(data, {
+          Save: async () => {
+            this.store.snapshots.set((data.ID as string).toLowerCase(), { ...data } as ReciprocitySnapshotEntity);
+            return true;
+          },
+        });
+        return data as object as ReciprocitySnapshotEntity;
       });
       return { Success: true, Results: attached as T[] } as RunViewResult<T>;
     }
@@ -189,12 +189,14 @@ class MockReciprocityProvider implements IMetadataProvider, IRunViewProvider {
 }
 
 function attachProfileSave(store: MockStore, profile: ProfessionalProfileEntity): ProfessionalProfileEntity {
-  const target = profile as unknown as Record<string, unknown>;
-  target.Save = async () => {
-    store.profiles.set((target.ID as string).toLowerCase(), { ...target } as ProfessionalProfileEntity);
-    return true;
-  };
-  return target as unknown as ProfessionalProfileEntity;
+  const data = profile as object as Record<string, FieldValue>;
+  Object.assign(data, {
+    Save: async () => {
+      store.profiles.set((data.ID as string).toLowerCase(), { ...data } as ProfessionalProfileEntity);
+      return true;
+    },
+  });
+  return data as object as ProfessionalProfileEntity;
 }
 
 describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
@@ -204,7 +206,7 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
       requests: [],
       assignments: [
         { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: withinPeriod(1), RespondedAt: null },
-      ] as unknown as ReferralAssignmentEntity[],
+      ],
       outcomes: [],
       snapshots: new Map(),
     };
@@ -228,21 +230,22 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
   });
 
   it('upserts into the existing ReciprocitySnapshot for the same profile/period instead of creating a duplicate', async () => {
-    const existingSnapshot = {
+    const existingSnapshotData: Record<string, FieldValue> = {
       ID: '30000000-0000-4000-8000-000000000001',
       ProfessionalProfileID: PROFILE_ID,
       PeriodStartDate: PERIOD.Start,
       PeriodEndDate: PERIOD.End,
       ReferralsGivenCount: 0,
       ReferralsReceivedCount: 0,
-    } as unknown as ReciprocitySnapshotEntity;
+    };
+    const existingSnapshot = existingSnapshotData as ReciprocitySnapshotEntity;
     const store: MockStore = {
       profiles: new Map(),
       requests: [],
       assignments: [
         { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Completed', ResponseHours: 3, OfferedAt: withinPeriod(1), RespondedAt: null },
         { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: PROFILE_ID, Status: 'Completed', ResponseHours: 3, OfferedAt: withinPeriod(2), RespondedAt: null },
-      ] as unknown as ReferralAssignmentEntity[],
+      ],
       outcomes: [],
       snapshots: new Map([[existingSnapshot.ID.toLowerCase(), existingSnapshot]]),
     };
