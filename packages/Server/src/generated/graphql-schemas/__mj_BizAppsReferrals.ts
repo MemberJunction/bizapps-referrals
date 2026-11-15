@@ -1121,6 +1121,9 @@ export class mjBizAppsReferralsProfessionalProfile_ {
     @Field(() => Float, {nullable: true})
     ReciprocityIndex?: number;
 
+    @Field({nullable: true})
+    ReadinessComputedAt?: Date;
+
     @Field()
     _mj__CreatedAt: Date;
 
@@ -1230,6 +1233,9 @@ export class CreatemjBizAppsReferralsProfessionalProfileInput {
     @Field(() => Float, { nullable: true })
     ReciprocityIndex: number | null;
 
+    @Field(() => Date, { nullable: true })
+    ReadinessComputedAt: Date | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
@@ -1320,6 +1326,9 @@ export class UpdatemjBizAppsReferralsProfessionalProfileInput {
 
     @Field(() => Float, { nullable: true })
     ReciprocityIndex?: number | null;
+
+    @Field(() => Date, { nullable: true })
+    ReadinessComputedAt?: Date | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
@@ -2883,18 +2892,37 @@ export class mjBizAppsReferralsReferralEscalation_ {
     @Field({nullable: true}) 
     AcknowledgedAt?: Date;
         
-    @Field({nullable: true}) 
+    @Field({nullable: true})
     ResolvedAt?: Date;
-        
-    @Field() 
+
+    @Field({nullable: true})
+    @MaxLength(200)
+    DedupKey?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    LinkedTaskID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    AcknowledgedByPersonID?: string;
+
+    @Field({nullable: true})
+    @MaxLength(36)
+    ResolvedByPersonID?: string;
+
+    @Field({nullable: true})
+    ResolutionNotes?: string;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
+
     @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
     ReadableFields___?: string[];
-        
+
 }
 
 //****************************************************************************
@@ -2935,10 +2963,25 @@ export class CreatemjBizAppsReferralsReferralEscalationInput {
     @Field(() => Date, { nullable: true })
     ResolvedAt: Date | null;
 
+    @Field(() => String, { nullable: true })
+    DedupKey: string | null;
+
+    @Field(() => String, { nullable: true })
+    LinkedTaskID: string | null;
+
+    @Field(() => String, { nullable: true })
+    AcknowledgedByPersonID: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolvedByPersonID: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolutionNotes: string | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Referral Escalations
@@ -2978,13 +3021,28 @@ export class UpdatemjBizAppsReferralsReferralEscalationInput {
     @Field(() => Date, { nullable: true })
     ResolvedAt?: Date | null;
 
+    @Field(() => String, { nullable: true })
+    DedupKey?: string | null;
+
+    @Field(() => String, { nullable: true })
+    LinkedTaskID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    AcknowledgedByPersonID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolvedByPersonID?: string | null;
+
+    @Field(() => String, { nullable: true })
+    ResolutionNotes?: string | null;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Referral Escalations
 //****************************************************************************
@@ -3103,18 +3161,21 @@ export class mjBizAppsReferralsReferralOutcome_ {
     @Field({nullable: true}) 
     CompletionNotes?: string;
         
-    @Field({nullable: true}) 
+    @Field({nullable: true})
     CompletedAt?: Date;
-        
-    @Field() 
+
+    @Field(() => Float, {nullable: true})
+    FeeAmount?: number;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
+
     @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
     ReadableFields___?: string[];
-        
+
 }
 
 //****************************************************************************
@@ -3146,10 +3207,13 @@ export class CreatemjBizAppsReferralsReferralOutcomeInput {
     @Field(() => Date, { nullable: true })
     CompletedAt: Date | null;
 
+    @Field(() => Float, { nullable: true })
+    FeeAmount: number | null;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Referral Outcomes
@@ -3179,6 +3243,9 @@ export class UpdatemjBizAppsReferralsReferralOutcomeInput {
 
     @Field(() => Date, { nullable: true })
     CompletedAt?: Date | null;
+
+    @Field(() => Float, { nullable: true })
+    FeeAmount?: number | null;
 
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
@@ -3531,18 +3598,36 @@ export class mjBizAppsReferralsReciprocitySnapshot_ {
     @Field(() => Int, {nullable: true}) 
     ReferralsReceivedCount?: number;
         
-    @Field(() => Float, {nullable: true}) 
+    @Field(() => Float, {nullable: true})
     ReciprocityIndex?: number;
-        
-    @Field() 
+
+    @Field(() => Int, {nullable: true})
+    AcceptedCount?: number;
+
+    @Field(() => Int, {nullable: true})
+    ResolvedCount?: number;
+
+    @Field(() => Int, {nullable: true})
+    SLABreachCount?: number;
+
+    @Field(() => Float, {nullable: true})
+    AcceptanceRate?: number;
+
+    @Field(() => Float, {nullable: true})
+    MedianResponseHours?: number;
+
+    @Field(() => Float, {nullable: true})
+    AttributedFeeTotal?: number;
+
+    @Field()
     _mj__CreatedAt: Date;
-        
-    @Field() 
+
+    @Field()
     _mj__UpdatedAt: Date;
-        
+
     @Field(() => [String], { nullable: true, description: `Field-level security: when non-null, the fields on this entity the calling user may read. Any other field arriving as null was withheld by the server rather than genuinely empty. Null for callers with no field restrictions.` })
     ReadableFields___?: string[];
-        
+
 }
 
 //****************************************************************************
@@ -3574,10 +3659,28 @@ export class CreatemjBizAppsReferralsReciprocitySnapshotInput {
     @Field(() => Float, { nullable: true })
     ReciprocityIndex?: number;
 
+    @Field(() => Int, { nullable: true })
+    AcceptedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ResolvedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    SLABreachCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    AcceptanceRate?: number;
+
+    @Field(() => Float, { nullable: true })
+    MedianResponseHours?: number;
+
+    @Field(() => Float, { nullable: true })
+    AttributedFeeTotal?: number;
+
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 
 //****************************************************************************
 // INPUT TYPE for MJ_BizApps_Referrals: Reciprocity Snapshots
@@ -3608,13 +3711,31 @@ export class UpdatemjBizAppsReferralsReciprocitySnapshotInput {
     @Field(() => Float, { nullable: true })
     ReciprocityIndex?: number;
 
+    @Field(() => Int, { nullable: true })
+    AcceptedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    ResolvedCount?: number;
+
+    @Field(() => Int, { nullable: true })
+    SLABreachCount?: number;
+
+    @Field(() => Float, { nullable: true })
+    AcceptanceRate?: number;
+
+    @Field(() => Float, { nullable: true })
+    MedianResponseHours?: number;
+
+    @Field(() => Float, { nullable: true })
+    AttributedFeeTotal?: number;
+
     @Field(() => [KeyValuePairInput], { nullable: true })
     OldValues___?: KeyValuePairInput[];
 
     @Field(() => RestoreContextInput, { nullable: true })
     RestoreContext___?: RestoreContextInput;
 }
-    
+
 //****************************************************************************
 // RESOLVER for MJ_BizApps_Referrals: Reciprocity Snapshots
 //****************************************************************************

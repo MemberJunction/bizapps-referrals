@@ -39,6 +39,7 @@ export interface ScoreBreakdown {
   RatingScore: number;
   LanguageBonus: number;
   SemanticScore?: number;
+  ReciprocityBoost?: number;
   TotalScore: number;
 }
 
@@ -72,6 +73,12 @@ export interface MatchCriteria {
   MatterTitle?: string | null;
   MatterSummary?: string | null;
   Keywords?: string[];
+  /**
+   * When true, adds a clamp((ReciprocityIndex - 1) * 5, 0, 5) bonus for
+   * professionals who send more referrals than they accept. Defaults to
+   * false so existing callers see byte-identical scores.
+   */
+  ApplyReciprocityBoost?: boolean;
 }
 
 export interface ConflictPartyInput {

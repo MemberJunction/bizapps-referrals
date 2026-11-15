@@ -455,6 +455,10 @@ export const mjBizAppsReferralsProfessionalProfileSchema = z.object({
         * * Field Name: ReciprocityIndex
         * * Display Name: Reciprocity Index
         * * SQL Data Type: decimal(5, 2)`),
+    ReadinessComputedAt: z.date().nullable().describe(`
+        * * Field Name: ReadinessComputedAt
+        * * Display Name: Readiness Computed At
+        * * SQL Data Type: datetimeoffset`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -2242,6 +2246,18 @@ export class mjBizAppsReferralsProfessionalProfileEntity extends BaseEntity<mjBi
     }
 
     /**
+    * * Field Name: ReadinessComputedAt
+    * * Display Name: Readiness Computed At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ReadinessComputedAt(): Date | null {
+        return this.Get('ReadinessComputedAt');
+    }
+    set ReadinessComputedAt(value: Date | null) {
+        this.Set('ReadinessComputedAt', value);
+    }
+
+    /**
     * * Field Name: __mj_CreatedAt
     * * Display Name: Created At
     * * SQL Data Type: datetimeoffset
@@ -3919,25 +3935,28 @@ export const mjBizAppsReferralsReferralEscalationSchema = z.object({
         * * Display Name: Escalation Level
     * * SQL Data Type: int
     * * Default Value: 1`),
-    TriggerType: z.union([z.literal('CapacityExhausted'), z.literal('ManualEscalation'), z.literal('SLABreach'), z.literal('SLAWarning')]).describe(`
+    TriggerType: z.union([z.literal('CapacityExhausted'), z.literal('CascadeExhausted'), z.literal('ManualEscalation'), z.literal('SLABreach'), z.literal('SLAWarning'), z.literal('UrgentUnassigned')]).describe(`
         * * Field Name: TriggerType
         * * Display Name: Trigger Type
     * * SQL Data Type: nvarchar(60)
     * * Default Value: SLAWarning
     * * Value List Type: List
-    * * Possible Values 
+    * * Possible Values
     *   * CapacityExhausted
+    *   * CascadeExhausted
     *   * ManualEscalation
     *   * SLABreach
-    *   * SLAWarning`),
-    Status: z.union([z.literal('Acknowledged'), z.literal('Open'), z.literal('Resolved')]).describe(`
+    *   * SLAWarning
+    *   * UrgentUnassigned`),
+    Status: z.union([z.literal('Acknowledged'), z.literal('Dismissed'), z.literal('Open'), z.literal('Resolved')]).describe(`
         * * Field Name: Status
         * * Display Name: Status
     * * SQL Data Type: nvarchar(40)
     * * Default Value: Open
     * * Value List Type: List
-    * * Possible Values 
+    * * Possible Values
     *   * Acknowledged
+    *   * Dismissed
     *   * Open
     *   * Resolved`),
     RecommendedAction: z.union([z.literal('AdminAlert'), z.literal('EscalateToTier'), z.literal('Notify'), z.literal('Reassign')]).describe(`
@@ -3968,6 +3987,28 @@ export const mjBizAppsReferralsReferralEscalationSchema = z.object({
         * * Field Name: ResolvedAt
         * * Display Name: Resolved At
     * * SQL Data Type: datetimeoffset`),
+    DedupKey: z.string().nullable().describe(`
+        * * Field Name: DedupKey
+        * * Display Name: Dedup Key
+    * * SQL Data Type: nvarchar(200)`),
+    LinkedTaskID: z.string().nullable().describe(`
+        * * Field Name: LinkedTaskID
+        * * Display Name: Linked Task
+    * * SQL Data Type: uniqueidentifier`),
+    AcknowledgedByPersonID: z.string().nullable().describe(`
+        * * Field Name: AcknowledgedByPersonID
+        * * Display Name: Acknowledged By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    ResolvedByPersonID: z.string().nullable().describe(`
+        * * Field Name: ResolvedByPersonID
+        * * Display Name: Resolved By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    ResolutionNotes: z.string().nullable().describe(`
+        * * Field Name: ResolutionNotes
+        * * Display Name: Resolution Notes
+    * * SQL Data Type: nvarchar(MAX)`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4029,6 +4070,10 @@ export const mjBizAppsReferralsReferralOutcomeSchema = z.object({
         * * Display Name: Completed At
     * * SQL Data Type: datetimeoffset
     * * Default Value: sysdatetimeoffset()`),
+    FeeAmount: z.number().nullable().describe(`
+        * * Field Name: FeeAmount
+        * * Display Name: Fee Amount
+    * * SQL Data Type: decimal(10, 2)`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4157,6 +4202,35 @@ export const mjBizAppsReferralsReciprocitySnapshotSchema = z.object({
         * * Display Name: Reciprocity Index
     * * SQL Data Type: decimal(5, 2)
     * * Default Value: 0.00`),
+    AcceptedCount: z.number().describe(`
+        * * Field Name: AcceptedCount
+        * * Display Name: Accepted Count
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    ResolvedCount: z.number().describe(`
+        * * Field Name: ResolvedCount
+        * * Display Name: Resolved Count
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    SLABreachCount: z.number().describe(`
+        * * Field Name: SLABreachCount
+        * * Display Name: SLA Breach Count
+    * * SQL Data Type: int
+    * * Default Value: 0`),
+    AcceptanceRate: z.number().describe(`
+        * * Field Name: AcceptanceRate
+        * * Display Name: Acceptance Rate
+    * * SQL Data Type: decimal(5, 2)
+    * * Default Value: 0`),
+    MedianResponseHours: z.number().nullable().describe(`
+        * * Field Name: MedianResponseHours
+        * * Display Name: Median Response Hours
+    * * SQL Data Type: decimal(6, 2)`),
+    AttributedFeeTotal: z.number().describe(`
+        * * Field Name: AttributedFeeTotal
+        * * Display Name: Attributed Fee Total
+    * * SQL Data Type: decimal(12, 2)
+    * * Default Value: 0`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4259,16 +4333,18 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     * * SQL Data Type: nvarchar(60)
     * * Default Value: SLAWarning
     * * Value List Type: List
-    * * Possible Values 
+    * * Possible Values
     *   * CapacityExhausted
+    *   * CascadeExhausted
     *   * ManualEscalation
     *   * SLABreach
     *   * SLAWarning
+    *   * UrgentUnassigned
     */
-    get TriggerType(): 'CapacityExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning' {
+    get TriggerType(): 'CapacityExhausted' | 'CascadeExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned' {
         return this.Get('TriggerType');
     }
-    set TriggerType(value: 'CapacityExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning') {
+    set TriggerType(value: 'CapacityExhausted' | 'CascadeExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned') {
         this.Set('TriggerType', value);
     }
 
@@ -4278,15 +4354,16 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     * * SQL Data Type: nvarchar(40)
     * * Default Value: Open
     * * Value List Type: List
-    * * Possible Values 
+    * * Possible Values
     *   * Acknowledged
+    *   * Dismissed
     *   * Open
     *   * Resolved
     */
-    get Status(): 'Acknowledged' | 'Open' | 'Resolved' {
+    get Status(): 'Acknowledged' | 'Dismissed' | 'Open' | 'Resolved' {
         return this.Get('Status');
     }
-    set Status(value: 'Acknowledged' | 'Open' | 'Resolved') {
+    set Status(value: 'Acknowledged' | 'Dismissed' | 'Open' | 'Resolved') {
         this.Set('Status', value);
     }
 
@@ -4356,6 +4433,68 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     }
     set ResolvedAt(value: Date | null) {
         this.Set('ResolvedAt', value);
+    }
+
+    /**
+    * * Field Name: DedupKey
+    * * Display Name: Dedup Key
+    * * SQL Data Type: nvarchar(200)
+    */
+    get DedupKey(): string | null {
+        return this.Get('DedupKey');
+    }
+    set DedupKey(value: string | null) {
+        this.Set('DedupKey', value);
+    }
+
+    /**
+    * * Field Name: LinkedTaskID
+    * * Display Name: Linked Task
+    * * SQL Data Type: uniqueidentifier
+    */
+    get LinkedTaskID(): string | null {
+        return this.Get('LinkedTaskID');
+    }
+    set LinkedTaskID(value: string | null) {
+        this.Set('LinkedTaskID', value);
+    }
+
+    /**
+    * * Field Name: AcknowledgedByPersonID
+    * * Display Name: Acknowledged By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)
+    */
+    get AcknowledgedByPersonID(): string | null {
+        return this.Get('AcknowledgedByPersonID');
+    }
+    set AcknowledgedByPersonID(value: string | null) {
+        this.Set('AcknowledgedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: ResolvedByPersonID
+    * * Display Name: Resolved By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)
+    */
+    get ResolvedByPersonID(): string | null {
+        return this.Get('ResolvedByPersonID');
+    }
+    set ResolvedByPersonID(value: string | null) {
+        this.Set('ResolvedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: ResolutionNotes
+    * * Display Name: Resolution Notes
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get ResolutionNotes(): string | null {
+        return this.Get('ResolutionNotes');
+    }
+    set ResolutionNotes(value: string | null) {
+        this.Set('ResolutionNotes', value);
     }
 
     /**
@@ -4515,6 +4654,18 @@ export class mjBizAppsReferralsReferralOutcomeEntity extends BaseEntity<mjBizApp
     }
     set CompletedAt(value: Date) {
         this.Set('CompletedAt', value);
+    }
+
+    /**
+    * * Field Name: FeeAmount
+    * * Display Name: Fee Amount
+    * * SQL Data Type: decimal(10, 2)
+    */
+    get FeeAmount(): number | null {
+        return this.Get('FeeAmount');
+    }
+    set FeeAmount(value: number | null) {
+        this.Set('FeeAmount', value);
     }
 
     /**
@@ -4863,6 +5014,83 @@ export class mjBizAppsReferralsReciprocitySnapshotEntity extends BaseEntity<mjBi
     }
     set ReciprocityIndex(value: number) {
         this.Set('ReciprocityIndex', value);
+    }
+
+    /**
+    * * Field Name: AcceptedCount
+    * * Display Name: Accepted Count
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get AcceptedCount(): number {
+        return this.Get('AcceptedCount');
+    }
+    set AcceptedCount(value: number) {
+        this.Set('AcceptedCount', value);
+    }
+
+    /**
+    * * Field Name: ResolvedCount
+    * * Display Name: Resolved Count
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get ResolvedCount(): number {
+        return this.Get('ResolvedCount');
+    }
+    set ResolvedCount(value: number) {
+        this.Set('ResolvedCount', value);
+    }
+
+    /**
+    * * Field Name: SLABreachCount
+    * * Display Name: SLA Breach Count
+    * * SQL Data Type: int
+    * * Default Value: 0
+    */
+    get SLABreachCount(): number {
+        return this.Get('SLABreachCount');
+    }
+    set SLABreachCount(value: number) {
+        this.Set('SLABreachCount', value);
+    }
+
+    /**
+    * * Field Name: AcceptanceRate
+    * * Display Name: Acceptance Rate
+    * * SQL Data Type: decimal(5, 2)
+    * * Default Value: 0
+    */
+    get AcceptanceRate(): number {
+        return this.Get('AcceptanceRate');
+    }
+    set AcceptanceRate(value: number) {
+        this.Set('AcceptanceRate', value);
+    }
+
+    /**
+    * * Field Name: MedianResponseHours
+    * * Display Name: Median Response Hours
+    * * SQL Data Type: decimal(6, 2)
+    */
+    get MedianResponseHours(): number | null {
+        return this.Get('MedianResponseHours');
+    }
+    set MedianResponseHours(value: number | null) {
+        this.Set('MedianResponseHours', value);
+    }
+
+    /**
+    * * Field Name: AttributedFeeTotal
+    * * Display Name: Attributed Fee Total
+    * * SQL Data Type: decimal(12, 2)
+    * * Default Value: 0
+    */
+    get AttributedFeeTotal(): number {
+        return this.Get('AttributedFeeTotal');
+    }
+    set AttributedFeeTotal(value: number) {
+        this.Set('AttributedFeeTotal', value);
     }
 
     /**

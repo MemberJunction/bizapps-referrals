@@ -8,10 +8,12 @@ import {
 } from '@memberjunction/core';
 import {
   ConflictCheckPartyEntity,
+  PracticeAreaEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralOutcomeEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
@@ -20,6 +22,7 @@ import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ActiveMatterPartyRecord, ConflictScreeningService, NormalizePartyName } from './ConflictScreeningService.js';
 import { MatchingEngine } from './MatchingEngine.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
+import { SlaEscalationService } from './SlaEscalationService.js';
 import {
   AssignmentResponseAction,
   CascadeRoutingResult,
@@ -531,6 +534,18 @@ export class CascadeRoutingService {
       if (eligibleCandidates.length === 0) {
         request.Status = 'Exhausted';
         await saveOrThrow(request, 'Exhausted ReferralRequest');
+        await SlaEscalationService.RaiseEscalation(
+          {
+            ReferralRequestID: validRequestId,
+            TriggerType: 'CascadeExhausted',
+            EscalationLevel: 2,
+            RecommendedAction: 'AdminAlert',
+            Notes: 'Cascade exhausted during initial routing: no eligible candidates remained after conflict screening.',
+            DedupKey: `CascadeExhausted:${validRequestId}`,
+          },
+          contextUser,
+          txProvider,
+        );
 
         ReferralTelemetry.RecordOperation({
           Operation: 'RouteReferral',
@@ -1067,6 +1082,18 @@ export class CascadeRoutingService {
 
     request.Status = 'Exhausted';
     await saveOrThrow(request, 'Exhausted ReferralRequest');
+    await SlaEscalationService.RaiseEscalation(
+      {
+        ReferralRequestID: validRequestId,
+        TriggerType: 'CascadeExhausted',
+        EscalationLevel: 2,
+        RecommendedAction: 'AdminAlert',
+        Notes: 'Cascade exhausted: no further eligible queued candidates after revalidation.',
+        DedupKey: `CascadeExhausted:${validRequestId}`,
+      },
+      contextUser,
+      resolveTransactionalProvider(provider),
+    );
     return null;
   }
 
@@ -1169,6 +1196,19 @@ export class CascadeRoutingService {
           await saveOrThrow(assignment, 'Expired ReferralAssignment');
         }
         processedIds.push(assignment.ID);
+        await SlaEscalationService.RaiseEscalation(
+          {
+            ReferralRequestID: assignment.ReferralRequestID,
+            ReferralAssignmentID: assignment.ID,
+            TriggerType: 'SLABreach',
+            EscalationLevel: 1,
+            RecommendedAction: 'Reassign',
+            Notes: `SLA deadline breached at ${asOfDate.toISOString()} for assignment offered to professional; cascading to next candidate.`,
+            DedupKey: `SLABreach:${assignment.ID}`,
+          },
+          contextUser,
+          md,
+        );
 
         let request = requestById.get(assignment.ReferralRequestID.toLowerCase());
         if (!request) {
@@ -1435,6 +1475,149 @@ export class CascadeRoutingService {
         ReferralOutcomeID: outcome.ID,
         AssignmentStatus: assignment.Status,
         RequestStatus: request.Status,
+      };
+    });
+  }
+
+  /**
+   * Admin-only recovery for an `Exhausted` referral: re-runs matching excluding every
+   * professional previously assigned to this request (regardless of outcome), optionally
+   * expanding the search to the parent `PracticeArea`, and offers the first eligible,
+   * conflict-cleared candidate found. Auto-resolves any open `CascadeExhausted`
+   * escalation. Returns `{Reopened: false}` with unchanged state when no candidates exist.
+   */
+  public static async ReopenExhaustedRequest(
+    referralRequestId: string,
+    contextUser: UserInfo,
+    options: { ExpandToAncestorPracticeArea?: boolean } = {},
+    provider?: IMetadataProvider & IRunViewProvider,
+  ): Promise<{
+    Reopened: boolean;
+    Status: ReferralRequestStatus;
+    ActiveAssignmentID: string | null;
+    ActiveProfessionalID: string | null;
+    SLADeadlineAt: string | null;
+  }> {
+    if (!IsAssociationAdmin(contextUser)) {
+      throw new AuthorizationError(
+        `User '${contextUser.ID}' is not authorized to reopen an exhausted referral (Association Admin required).`,
+      );
+    }
+
+    const validRequestId = AssertValidUUID(referralRequestId, 'ReferralRequestID');
+    const txProvider = resolveTransactionalProvider(provider);
+    const rv = new RunView(txProvider);
+
+    return withEntityTransaction(txProvider, async (md) => {
+      const request = await md.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', contextUser);
+      if (!(await request.Load(validRequestId))) {
+        throw new PersistenceError(`ReferralRequest '${validRequestId}' not found.`);
+      }
+      if (request.Status !== 'Exhausted') {
+        throw new InvalidLifecycleStateError(
+          `Cannot reopen ReferralRequest '${validRequestId}' from status '${request.Status}' (expected 'Exhausted').`,
+        );
+      }
+
+      const tier = await md.GetEntityObject<ReferralTierEntity>('MJ_BizApps_Referrals: Referral Tiers', contextUser);
+      if (!(await tier.Load(AssertValidUUID(request.ReferralTierID, 'ReferralTierID')))) {
+        throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
+      }
+
+      const allAssignmentsRes = await rv.RunView<ReferralAssignmentEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+          ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (!allAssignmentsRes.Success) {
+        throw new PersistenceError(`Failed loading existing assignments for '${validRequestId}'.`);
+      }
+      const previouslyAssignedIds = new Set(allAssignmentsRes.Results.map((a) => a.ProfessionalProfileID.toLowerCase()));
+      const maxCascadeOrder = allAssignmentsRes.Results.reduce((max, a) => Math.max(max, a.CascadeOrder), 0);
+
+      let practiceAreaId = AssertValidUUID(request.PracticeAreaID, 'PracticeAreaID');
+      if (options.ExpandToAncestorPracticeArea) {
+        const pa = await md.GetEntityObject<PracticeAreaEntity>('MJ_BizApps_Referrals: Practice Areas', contextUser);
+        if ((await pa.Load(practiceAreaId)) && pa.ParentID) {
+          practiceAreaId = AssertValidUUID(pa.ParentID, 'ParentPracticeAreaID');
+        }
+      }
+
+      const candidates = await MatchingEngine.FindMatches(
+        {
+          PracticeAreaID: practiceAreaId,
+          JurisdictionID: request.JurisdictionID,
+          RequiresProBono: request.RequiresProBono,
+          PreferredLanguage: request.PreferredLanguage,
+          SLAResponseHours: tier.SLAResponseHours,
+          MaxResults: tier.MaxCascadeAttempts * 2,
+        },
+        contextUser,
+        txProvider,
+        validRequestId,
+      );
+
+      const eligible = candidates.find(
+        (c) => c.Eligible && c.ConflictStatus === 'Cleared' && !previouslyAssignedIds.has(c.ProfessionalProfileID.toLowerCase()),
+      );
+      if (!eligible) {
+        return {
+          Reopened: false,
+          Status: request.Status,
+          ActiveAssignmentID: null,
+          ActiveProfessionalID: null,
+          SLADeadlineAt: null,
+        };
+      }
+
+      const now = new Date();
+      const isUrgent = request.UrgencyLevel === 'Urgent';
+      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
+
+      const assignment = await md.GetEntityObject<ReferralAssignmentEntity>('MJ_BizApps_Referrals: Referral Assignments', contextUser);
+      assignment.ReferralRequestID = validRequestId;
+      assignment.ProfessionalProfileID = eligible.ProfessionalProfileID;
+      assignment.CascadeOrder = maxCascadeOrder + 1;
+      assignment.MatchScore = eligible.Score;
+      assignment.ScoreBreakdownJSON = JSON.stringify(eligible.Breakdown);
+      assignment.ConflictStatus = 'Cleared';
+      assignment.Status = 'Offered';
+      assignment.OfferedAt = now;
+      assignment.SLADeadlineAt = slaDeadline;
+      await saveOrThrow(assignment, 'Reopened ReferralAssignment');
+
+      request.Status = 'Routed';
+      request.CurrentCascadeStep = assignment.CascadeOrder;
+      await saveOrThrow(request, 'Reopened ReferralRequest');
+
+      const openEscalationRes = await rv.RunView<ReferralEscalationEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
+          ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Open' AND TriggerType = 'CascadeExhausted'`,
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (openEscalationRes.Success) {
+        for (const esc of openEscalationRes.Results) {
+          await SlaEscalationService.ResolveEscalation(
+            esc.ID,
+            contextUser,
+            txProvider,
+            'Auto-resolved: referral reopened with a new candidate.',
+          );
+        }
+      }
+
+      return {
+        Reopened: true,
+        Status: 'Routed',
+        ActiveAssignmentID: assignment.ID,
+        ActiveProfessionalID: assignment.ProfessionalProfileID,
+        SLADeadlineAt: slaDeadline.toISOString(),
       };
     });
   }

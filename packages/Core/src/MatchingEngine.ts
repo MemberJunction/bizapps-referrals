@@ -213,9 +213,19 @@ export class MatchingEngine {
       }
     }
 
+    let reciprocityBoost: number | undefined;
+    if (criteria.ApplyReciprocityBoost) {
+      const reciprocityIndex = profile.ReciprocityIndex ?? 1;
+      reciprocityBoost = Math.max(0, Math.min(5, (reciprocityIndex - 1) * 5));
+      reciprocityBoost = Math.round(reciprocityBoost * 100) / 100;
+    }
+
     const totalScore = Math.min(
       100,
-      Math.round((practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus + semanticScore) * 100) / 100,
+      Math.round(
+        (practiceAreaScore + jurisdictionScore + capacityScore + responsivenessScore + ratingScore + languageBonus + semanticScore + (reciprocityBoost ?? 0)) *
+          100,
+      ) / 100,
     );
 
     const breakdown: ScoreBreakdown = {
@@ -226,6 +236,7 @@ export class MatchingEngine {
       RatingScore: ratingScore,
       LanguageBonus: languageBonus,
       SemanticScore: semanticScore,
+      ...(reciprocityBoost !== undefined ? { ReciprocityBoost: reciprocityBoost } : {}),
       TotalScore: totalScore,
     };
 
@@ -253,6 +264,9 @@ export class MatchingEngine {
     }
     if (languageBonus > 0 && criteria.PreferredLanguage) {
       explainableReasons.push(`Speaks preferred language (${criteria.PreferredLanguage})`);
+    }
+    if (reciprocityBoost !== undefined && reciprocityBoost > 0) {
+      explainableReasons.push(`Reciprocity: refers more than they accept (+${reciprocityBoost} pts)`);
     }
     const headroom = profile.MaxConcurrentReferrals - profile.ActiveReferralCount;
     explainableReasons.push(
