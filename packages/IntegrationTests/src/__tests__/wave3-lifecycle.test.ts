@@ -426,9 +426,9 @@ describe('@mj-biz-apps/referrals-integration-tests Wave 3 Slice 2 closed-loop li
     expect(recompute.ProcessedCount).toBeGreaterThanOrEqual(4);
     const pro4Snapshot = store.snapshots.find((s) => s.ProfessionalProfileID === PRO_4_ID);
     expect(pro4Snapshot).toBeDefined();
-    expect(pro4Snapshot!.ReferralsReceivedCount).toBe(1);
-    expect(pro4Snapshot!.AcceptedCount).toBe(1);
-    expect(pro4Snapshot!.ResolvedCount).toBe(1);
+    expect(pro4Snapshot!.ReferralsReceived).toBe(1);
+    expect(pro4Snapshot!.ReferralsAccepted).toBe(1);
+    expect(pro4Snapshot!.ReferralsResolved).toBe(1);
     const updatedPro4 = store.profiles.find((p) => p.ID === PRO_4_ID);
     expect(updatedPro4?.ReciprocityIndex).toBeGreaterThanOrEqual(0);
     expect(updatedPro4?.ReadinessComputedAt).not.toBeNull();

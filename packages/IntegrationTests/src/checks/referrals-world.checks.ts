@@ -115,9 +115,9 @@ export const ReferralsWorldChecks: NamedCheck[] = [
         {
           ReferralRequestID: request.ID,
           ReferralAssignmentID: assignment!.ID,
-          TriggerType: 'ManualOverride',
+          TriggerType: 'Manual',
           EscalationLevel: 1,
-          RecommendedAction: 'ContactProfessional',
+          RecommendedAction: 'ContactSeeker',
           Notes: 'RW4 integration check escalation.',
           DedupKey: dedupKey,
         },
@@ -130,7 +130,7 @@ export const ReferralsWorldChecks: NamedCheck[] = [
         {
           ReferralRequestID: request.ID,
           ReferralAssignmentID: assignment!.ID,
-          TriggerType: 'ManualOverride',
+          TriggerType: 'Manual',
           EscalationLevel: 1,
           DedupKey: dedupKey,
         },
@@ -165,7 +165,7 @@ export const ReferralsWorldChecks: NamedCheck[] = [
         {
           EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
           ExtraFilter: `ProfessionalProfileID='${vance.ID}'`,
-          OrderBy: 'SnapshotDate DESC',
+          OrderBy: 'ComputedAt DESC',
           MaxRows: 1,
           ResultType: 'entity_object',
         },
