@@ -153,6 +153,12 @@ function buildStore(): Store {
     Status: 'Routed',
     RequiresProBono: false,
     PreferredLanguage: null,
+    // Sentinel PII values (AC-32): must never appear in any AI prompt input.
+    SeekerName: 'SENTINEL_NAME_JANE',
+    SeekerEmail: 'sentinel@example.com',
+    SeekerPhone: '555-0199-SENTINEL',
+    SeekerCompany: 'SENTINEL_CORP',
+    MatterSummary: 'SENTINEL_MATTER_SECRET',
   } as object as ReferralRequestEntity;
   const assignment = makeEntity<ReferralAssignmentEntity>(
     {
@@ -173,8 +179,10 @@ function buildStore(): Store {
     EscalationLevel: 1,
     TriggerType: 'SLAWarning',
     Status: 'Open',
-    RecommendedAction: 'Notify',
+    RecommendedAction: 'ContactProfessional',
     AIRationaleJSON: null,
+    // Sentinel PII value (AC-32): must never appear in any AI prompt input.
+    Notes: 'SENTINEL_NOTE_PII',
   } as object as ReferralEscalationEntity;
 
   return {
@@ -193,7 +201,9 @@ function buildStore(): Store {
     tiers: [tier],
     requests: [request],
     assignments: [assignment],
-    conflictParties: [],
+    conflictParties: [
+      { ReferralRequestID: REQ_1_ID, PartyName: 'SENTINEL_PARTY_LLC', PartyRole: 'Adverse', OrganizationName: 'SENTINEL_PARTY_LLC' } as ConflictCheckPartyEntity,
+    ],
     escalations: [escalation],
   };
 }
@@ -309,6 +319,33 @@ describe('ReferralAIRationaleService.ExplainMatch', () => {
     expect(persisted.Summary).toBe('Strong fit');
   });
 
+  it('AC-32: never leaks seeker/matter/conflict-party PII into the match-rationale AI prompt input', async () => {
+    const store = buildStore();
+    const provider = createProvider(store);
+    const fake = new FakePromptExecutor();
+    fake.QueueResult({
+      Success: true,
+      Result: { rationales: [{ professionalProfileId: PRO_1_ID, summary: 'Strong fit', rationale: 'Matches practice area.', risks: [] }] },
+      PromptRunID: 'run-sentinel-match',
+    });
+    ReferralAIRationaleService.ConfigureExecutor(fake);
+
+    await ReferralAIRationaleService.ExplainMatch(REQ_1_ID, testUser, provider);
+
+    const sentinels = [
+      'SENTINEL_NAME_JANE',
+      'sentinel@example.com',
+      '555-0199-SENTINEL',
+      'SENTINEL_CORP',
+      'SENTINEL_MATTER_SECRET',
+      'SENTINEL_PARTY_LLC',
+    ];
+    const serializedInput = JSON.stringify(fake.LastData);
+    for (const sentinel of sentinels) {
+      expect(serializedInput).not.toContain(sentinel);
+    }
+  });
+
   it('drops a rationale entry whose professionalProfileId is not in the candidate set and falls back to Deterministic', async () => {
     const store = buildStore();
     const provider = createProvider(store);
@@ -358,7 +395,7 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
     const fake = new FakePromptExecutor();
     fake.QueueResult({
       Success: true,
-      Result: { recommendedAction: 'Reassign', summary: 'Reassign to a less-loaded professional', rationale: 'Capacity issue detected.' },
+      Result: { recommendedAction: 'AdvanceCascade', summary: 'Advance to a less-loaded professional', rationale: 'Capacity issue detected.' },
       PromptRunID: 'run-3',
     });
     ReferralAIRationaleService.ConfigureExecutor(fake);
@@ -367,14 +404,14 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
 
     expect(fake.CallCount).toBe(1);
     expect(result.Skipped).toBe(false);
-    expect(result.RecommendedAction).toBe('Reassign');
-    expect(store.escalations[0].RecommendedAction).toBe('Reassign');
+    expect(result.RecommendedAction).toBe('AdvanceCascade');
+    expect(store.escalations[0].RecommendedAction).toBe('AdvanceCascade');
     expect(store.escalations[0].AIRationaleJSON).not.toBeNull();
   });
 
   it('skips the AI call (0 executor calls) when AIRationaleJSON already exists and Force is not set', async () => {
     const store = buildStore();
-    store.escalations[0].RecommendedAction = 'Notify';
+    store.escalations[0].RecommendedAction = 'ContactProfessional';
     store.escalations[0].AIRationaleJSON = JSON.stringify({ Source: 'AI', Summary: 'Existing', Rationale: 'Existing rationale.', GeneratedAt: new Date().toISOString() });
     const provider = createProvider(store);
     const fake = new FakePromptExecutor();
@@ -384,7 +421,7 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
 
     expect(fake.CallCount).toBe(0);
     expect(result.Skipped).toBe(true);
-    expect(result.RecommendedAction).toBe('Notify');
+    expect(result.RecommendedAction).toBe('ContactProfessional');
   });
 
   it('re-invokes the executor exactly once when Force is set even if AIRationaleJSON already exists', async () => {
@@ -394,7 +431,7 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
     const fake = new FakePromptExecutor();
     fake.QueueResult({
       Success: true,
-      Result: { recommendedAction: 'AdminAlert', summary: 'Escalate to admin', rationale: 'Urgent unassigned risk.' },
+      Result: { recommendedAction: 'ReassignTier', summary: 'Escalate to a higher tier', rationale: 'Urgent unassigned risk.' },
       PromptRunID: 'run-4',
     });
     ReferralAIRationaleService.ConfigureExecutor(fake);
@@ -403,7 +440,7 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
 
     expect(fake.CallCount).toBe(1);
     expect(result.Skipped).toBe(false);
-    expect(result.RecommendedAction).toBe('AdminAlert');
+    expect(result.RecommendedAction).toBe('ReassignTier');
   });
 
   it('falls back to the deterministic rules default when the AI output is outside the RecommendedAction union', async () => {
@@ -415,8 +452,46 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
 
     const result = await ReferralAIRationaleService.RecommendEscalationAction(ESC_1_ID, {}, testUser, provider);
 
-    expect(result.RecommendedAction).toBe('Notify');
+    expect(result.RecommendedAction).toBe('ContactProfessional');
     expect(JSON.parse(store.escalations[0].AIRationaleJSON!).Source).toBe('Deterministic');
+  });
+
+  it('rejects an empty/whitespace-only AI summary or rationale and falls back to a non-empty deterministic rationale (AC-33)', async () => {
+    const store = buildStore();
+    const provider = createProvider(store);
+    const fake = new FakePromptExecutor();
+    fake.QueueResult({ Success: true, Result: { recommendedAction: 'ContactProfessional', summary: '   ', rationale: '' }, PromptRunID: 'run-5b' });
+    ReferralAIRationaleService.ConfigureExecutor(fake);
+
+    const result = await ReferralAIRationaleService.RecommendEscalationAction(ESC_1_ID, {}, testUser, provider);
+
+    expect(result.Source).toBe('Deterministic');
+    expect(result.Summary.trim().length).toBeGreaterThan(0);
+    expect(result.Rationale.trim().length).toBeGreaterThan(0);
+  });
+
+  it('AC-32: never leaks seeker/matter/conflict-party/Notes PII into the AI advisor prompt input', async () => {
+    const store = buildStore();
+    const provider = createProvider(store);
+    const fake = new FakePromptExecutor();
+    fake.QueueResult({ Success: true, Result: { recommendedAction: 'ContactProfessional', summary: 'ok', rationale: 'ok rationale' }, PromptRunID: 'run-sentinel' });
+    ReferralAIRationaleService.ConfigureExecutor(fake);
+
+    await ReferralAIRationaleService.RecommendEscalationAction(ESC_1_ID, {}, testUser, provider);
+
+    const sentinels = [
+      'SENTINEL_NAME_JANE',
+      'sentinel@example.com',
+      '555-0199-SENTINEL',
+      'SENTINEL_CORP',
+      'SENTINEL_MATTER_SECRET',
+      'SENTINEL_PARTY_LLC',
+      'SENTINEL_NOTE_PII',
+    ];
+    const serializedInput = JSON.stringify(fake.LastData);
+    for (const sentinel of sentinels) {
+      expect(serializedInput).not.toContain(sentinel);
+    }
   });
 
   it('never mutates escalation Status/EscalationLevel or the linked assignment Status/CascadeOrder', async () => {
@@ -427,7 +502,7 @@ describe('ReferralAIRationaleService.RecommendEscalationAction', () => {
     const originalCascadeOrder = store.assignments[0].CascadeOrder;
     const provider = createProvider(store);
     const fake = new FakePromptExecutor();
-    fake.QueueResult({ Success: true, Result: { recommendedAction: 'Notify', summary: 'x', rationale: 'y' }, PromptRunID: 'run-6' });
+    fake.QueueResult({ Success: true, Result: { recommendedAction: 'ContactProfessional', summary: 'x', rationale: 'y' }, PromptRunID: 'run-6' });
     ReferralAIRationaleService.ConfigureExecutor(fake);
 
     await ReferralAIRationaleService.RecommendEscalationAction(ESC_1_ID, {}, testUser, provider);

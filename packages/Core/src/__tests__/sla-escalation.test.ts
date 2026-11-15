@@ -171,9 +171,16 @@ class MockEscalationProvider implements IMetadataProvider, IRunViewProvider {
       const reqMatch = /ReferralRequestID = '([^']+)'/i.exec(filter);
       let items = Array.from(this.store.escalations.values());
       if (dedupMatch) {
-        items = items.filter((e) => e.DedupKey === dedupMatch[1] && e.Status === 'Open');
+        // Dedup now checks across ALL statuses, not just Open (CR-13).
+        items = items.filter((e) => e.DedupKey === dedupMatch[1]);
       } else if (reqMatch) {
-        items = items.filter((e) => e.ReferralRequestID.toLowerCase() === reqMatch[1].toLowerCase() && e.Status === 'Open');
+        if (filter.includes("(Status = 'Open' OR Status = 'Acknowledged')")) {
+          items = items.filter(
+            (e) => e.ReferralRequestID.toLowerCase() === reqMatch[1].toLowerCase() && (e.Status === 'Open' || e.Status === 'Acknowledged'),
+          );
+        } else {
+          items = items.filter((e) => e.ReferralRequestID.toLowerCase() === reqMatch[1].toLowerCase() && e.Status === 'Open');
+        }
       }
       return { Success: true, Results: items as T[] } as RunViewResult<T>;
     }
@@ -199,7 +206,7 @@ describe('SlaEscalationService', () => {
     const result = await SlaEscalationService.RaiseEscalation(
       {
         ReferralRequestID: REQ_1_ID,
-        TriggerType: 'ManualEscalation',
+        TriggerType: 'ManualOverride',
         EscalationLevel: 5,
         DedupKey: 'MANUAL:1',
       },
@@ -338,5 +345,110 @@ describe('SlaEscalationService', () => {
     expect(result.Status).toBe('Resolved');
     expect(result.RequestEscalationLevelReset).toBe(true);
     expect(store.requests.get(REQ_1_ID.toLowerCase())?.EscalationLevel).toBe(0);
+  });
+
+  it('RaiseEscalation deduplicates by DedupKey across ALL statuses (CR-13): a Resolved escalation still blocks a re-raise', async () => {
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier()]]),
+      requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID)]]),
+      assignments: new Map(),
+      escalations: new Map([
+        [ASSIGN_1_ID.toLowerCase(), makeEscalation({ ID: ASSIGN_1_ID, ReferralRequestID: REQ_1_ID, Status: 'Resolved', DedupKey: 'SLABreach:resolved-dup', EscalationLevel: 1 })],
+      ]),
+    };
+    const dp = new MockEscalationProvider(store);
+    const user = makeUser(['Coordinator']);
+
+    const result = await SlaEscalationService.RaiseEscalation(
+      { ReferralRequestID: REQ_1_ID, TriggerType: 'SLABreach', EscalationLevel: 1, DedupKey: 'SLABreach:resolved-dup' },
+      user,
+      dp,
+    );
+    expect(result.Raised).toBe(false);
+    expect(result.ReferralEscalationID).toBe(ASSIGN_1_ID);
+    expect(store.escalations.size).toBe(1);
+  });
+
+  it('EvaluateEscalations: 0 raised at T0+5h59m, 1 raised (+SLAWarningSentAt) at T0+6h, 0 raised on an immediate repeat call', async () => {
+    const offeredAt = new Date('2026-01-01T00:00:00.000Z');
+    // 24h tier, 75% warning threshold -> warning fires at 18h elapsed.
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier({ SLAResponseHours: 24, EscalationWarningPercent: 75 })]]),
+      requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID)]]),
+      assignments: new Map([
+        [
+          ASSIGN_1_ID.toLowerCase(),
+          makeAssignment(ASSIGN_1_ID, REQ_1_ID, {
+            OfferedAt: offeredAt,
+            SLADeadlineAt: new Date(offeredAt.getTime() + 24 * 60 * 60 * 1000),
+          }),
+        ],
+      ]),
+      escalations: new Map(),
+    };
+    const dp = new MockEscalationProvider(store);
+    const user = makeUser(['Coordinator']);
+
+    const beforeThreshold = new Date(offeredAt.getTime() + 17 * 60 * 60 * 1000 + 59 * 60 * 1000);
+    const resultBefore = await SlaEscalationService.EvaluateEscalations(beforeThreshold, user, dp);
+    expect(resultBefore.WarningsRaised).toBe(0);
+    expect(store.escalations.size).toBe(0);
+
+    const atThreshold = new Date(offeredAt.getTime() + 18 * 60 * 60 * 1000);
+    const resultAt = await SlaEscalationService.EvaluateEscalations(atThreshold, user, dp);
+    expect(resultAt.WarningsRaised).toBe(1);
+    expect(store.escalations.size).toBe(1);
+    expect(store.assignments.get(ASSIGN_1_ID.toLowerCase())?.SLAWarningSentAt).not.toBeNull();
+
+    const repeatResult = await SlaEscalationService.EvaluateEscalations(atThreshold, user, dp);
+    expect(repeatResult.WarningsRaised).toBe(0);
+    expect(store.escalations.size).toBe(1);
+  });
+
+  it('EvaluateEscalations never raises UrgentUnassigned for a Standard-urgency request, however long it has been unassigned', async () => {
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier({ SLAResponseHours: 4, UrgentSLAMultiplier: 1 })]]),
+      requests: new Map([
+        [
+          REQ_2_ID.toLowerCase(),
+          makeRequest(REQ_2_ID, {
+            UrgencyLevel: 'Standard',
+            Status: 'Routed',
+            SubmittedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+          }),
+        ],
+      ]),
+      assignments: new Map(),
+      escalations: new Map(),
+    };
+    const dp = new MockEscalationProvider(store);
+    const user = makeUser(['Coordinator']);
+
+    const result = await SlaEscalationService.EvaluateEscalations(new Date(), user, dp);
+    expect(result.UrgentRaised).toBe(0);
+    expect(store.escalations.size).toBe(0);
+  });
+
+  it('ResolveEscalation/DismissEscalation recompute request.EscalationLevel as the max across remaining Open/Acknowledged escalations (CR-14)', async () => {
+    const lowerEscId = ASSIGN_1_ID;
+    const higherEscId = '30000000-0000-4000-8000-000000000099';
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier()]]),
+      requests: new Map([[REQ_1_ID.toLowerCase(), makeRequest(REQ_1_ID, { EscalationLevel: 2 })]]),
+      assignments: new Map(),
+      escalations: new Map([
+        [lowerEscId.toLowerCase(), makeEscalation({ ID: lowerEscId, ReferralRequestID: REQ_1_ID, Status: 'Acknowledged', EscalationLevel: 2 })],
+        [higherEscId.toLowerCase(), makeEscalation({ ID: higherEscId, ReferralRequestID: REQ_1_ID, Status: 'Open', EscalationLevel: 1 })],
+      ]),
+    };
+    const dp = new MockEscalationProvider(store);
+    const coordinator = makeUser(['Coordinator']);
+
+    // Dismissing the level-1 escalation leaves the level-2 Acknowledged one active, so the
+    // request's EscalationLevel must remain 2, not reset to 0.
+    const result = await SlaEscalationService.DismissEscalation(higherEscId, coordinator, dp, 'Not needed.');
+    expect(result.Status).toBe('Dismissed');
+    expect(result.RequestEscalationLevelReset).toBe(false);
+    expect(store.requests.get(REQ_1_ID.toLowerCase())?.EscalationLevel).toBe(2);
   });
 });

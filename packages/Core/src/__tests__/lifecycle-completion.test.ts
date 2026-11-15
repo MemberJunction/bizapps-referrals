@@ -212,14 +212,14 @@ describe('CascadeRoutingService.CompleteReferral', () => {
     expect(store.profile.ActiveReferralCount).toBe(0);
   });
 
-  it('is idempotent when already Completed (zero additional writes)', async () => {
+  it('throws InvalidLifecycleStateError (zero writes) on a second CompleteReferral call for an already-Completed assignment', async () => {
     store = freshStore('Completed', 'Completed');
     const existingOutcomeData: Record<string, FieldValue> = { ID: 'existing-outcome', ReferralAssignmentID: ASSIGN_ID };
     store.outcomes.set('existing-outcome', existingOutcomeData as ReferralOutcomeEntity);
     const provider = new MockLifecycleProvider(store);
-    const result = await CascadeRoutingService.CompleteReferral({ ReferralAssignmentID: ASSIGN_ID }, makeUser(OWNER_USER_ID), provider);
-    expect(result.AssignmentStatus).toBe('Completed');
-    expect(result.ReferralOutcomeID).toBe('existing-outcome');
+    await expect(
+      CascadeRoutingService.CompleteReferral({ ReferralAssignmentID: ASSIGN_ID }, makeUser(OWNER_USER_ID), provider),
+    ).rejects.toBeInstanceOf(InvalidLifecycleStateError);
     expect(store.saveCount).toBe(0);
   });
 

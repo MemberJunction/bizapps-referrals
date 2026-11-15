@@ -122,12 +122,42 @@ function toJSONSafe<T>(value: T): Record<string, PromptDataValue> {
   return JSON.parse(JSON.stringify(value)) as Record<string, PromptDataValue>;
 }
 
+const SAFE_DISQUALIFICATION_REASONS: ReadonlyArray<RegExp> = [
+  /^Profile is inactive\.$/,
+  /^Verification status is \w+\.$/,
+  /^Availability status is \w+\.$/,
+  /^Professional is outside their configured availability window\.$/,
+  /^Professional is at maximum concurrent referral capacity\.$/,
+  /^Professional does not cover the requested practice area\.$/,
+  /^Professional is not in good standing in the requested jurisdiction\.$/,
+  /^Professional does not accept pro bono matters\.$/,
+  /^Conflict screening unavailable\.$/,
+  /^Required professional credential is expired, revoked, or unverified\.$/,
+];
+
+/**
+ * Reduces a free-text disqualification reason to an AI-safe category label. Conflict-screening
+ * reasons embed adverse-party/organization names (e.g. "Conflict of interest: Rival Corp LLP")
+ * and must never reach the AI prompt verbatim; everything outside the known-safe static reason
+ * set is redacted to the same generic category as a conservative default.
+ */
+function safeDisqualificationCategory(reason: string | null): string | null {
+  if (!reason) return null;
+  if (SAFE_DISQUALIFICATION_REASONS.some((pattern) => pattern.test(reason))) {
+    return reason;
+  }
+  return 'Conflict of interest or disqualification detected (details withheld for confidentiality).';
+}
+
 function deterministicAssignmentRationale(candidate: RationaleCandidateInput, now: string): AssignmentRationale {
   const topReasons = candidate.ExplainableMatchReasons.slice(0, 3);
   return {
     Source: 'Deterministic',
     Summary: `${Math.round(candidate.MatchScore)}% match based on ${topReasons.length > 0 ? topReasons.join('; ') : 'practice area and jurisdiction fit'}.`,
-    Rationale: candidate.ExplainableMatchReasons.join(' '),
+    Rationale:
+      candidate.ExplainableMatchReasons.length > 0
+        ? candidate.ExplainableMatchReasons.join(' ')
+        : `Matched on practice area and jurisdiction fit with a score of ${Math.round(candidate.MatchScore)}%.`,
     Risks: candidate.DisqualificationReason ? [candidate.DisqualificationReason] : [],
     GeneratedAt: now,
   };
@@ -209,7 +239,7 @@ export class ReferralAIRationaleService {
         readinessScore: c.ReadinessScore,
         reciprocityIndex: c.ReciprocityIndex,
         eligible: c.Eligible,
-        disqualificationReason: c.DisqualificationReason,
+        disqualificationReason: safeDisqualificationCategory(c.DisqualificationReason),
       })),
     };
   }
@@ -334,7 +364,9 @@ export class ReferralAIRationaleService {
               typeof entry.professionalProfileId === 'string' &&
               knownIds.has(entry.professionalProfileId.toLowerCase()) &&
               typeof entry.summary === 'string' &&
-              typeof entry.rationale === 'string'
+              entry.summary.trim().length > 0 &&
+              typeof entry.rationale === 'string' &&
+              entry.rationale.trim().length > 0
             ) {
               aiEntriesByProfileId.set(entry.professionalProfileId.toLowerCase(), entry);
             }
@@ -498,13 +530,17 @@ export class ReferralAIRationaleService {
         execResult.Success &&
         execResult.Result &&
         typeof execResult.Result.recommendedAction === 'string' &&
-        RECOMMENDED_ACTIONS.includes(execResult.Result.recommendedAction as EscalationRecommendedAction)
+        RECOMMENDED_ACTIONS.includes(execResult.Result.recommendedAction as EscalationRecommendedAction) &&
+        typeof execResult.Result.summary === 'string' &&
+        execResult.Result.summary.trim().length > 0 &&
+        typeof execResult.Result.rationale === 'string' &&
+        execResult.Result.rationale.trim().length > 0
       ) {
         recommendedAction = execResult.Result.recommendedAction as EscalationRecommendedAction;
         rationale = {
           Source: 'AI',
-          Summary: execResult.Result.summary ?? '',
-          Rationale: execResult.Result.rationale ?? '',
+          Summary: execResult.Result.summary,
+          Rationale: execResult.Result.rationale,
           GeneratedAt: now,
         };
       }

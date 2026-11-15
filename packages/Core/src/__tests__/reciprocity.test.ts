@@ -28,8 +28,8 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
         { ID: 'a5', ReferralRequestID: 'x5', ProfessionalProfileID: PROFILE_ID, Status: 'ConflictRejected', ResponseHours: null, OfferedAt: withinPeriod(5), RespondedAt: null },
       ],
       outcomes: [
-        { ID: 'o1', ReferralAssignmentID: 'a2', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Completed', CompletedAt: withinPeriod(6), FeeAmount: 1500 },
-        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Cancelled', CompletedAt: withinPeriod(7), FeeAmount: 0 },
+        { ID: 'o1', ReferralAssignmentID: 'a2', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', CompletedAt: withinPeriod(6), FeeAmount: 1500 },
+        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Withdrawn', CompletedAt: withinPeriod(7), FeeAmount: 0 },
       ],
     };
 
@@ -43,16 +43,45 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
     expect(scorecard.Accepted).toBe(2);
     // SLABreachCount: Expired -> a3
     expect(scorecard.SLABreachCount).toBe(1);
-    // Resolved: outcomes with OutcomeStatus='Completed' -> o1
+    // Resolved: outcomes with OutcomeStatus='Resolved' -> o1
     expect(scorecard.Resolved).toBe(1);
-    // AcceptanceRate: 2/4 * 100
-    expect(scorecard.AcceptanceRate).toBe(50);
+    // AcceptanceRate is a 0..1 fraction: 2/4
+    expect(scorecard.AcceptanceRate).toBe(0.5);
     // MedianResponseHours: median([1.5, 2.5, 0.5]) = 1.5
     expect(scorecard.MedianResponseHours).toBe(1.5);
     // AttributedFeeTotal: sum of FeeAmount across this profile's completed outcomes -> 1500 + 0
     expect(scorecard.AttributedFeeTotal).toBe(1500);
     // ReciprocityIndex = round((Sent + 1) / (Accepted + 1), 3) = round(3/3, 3) = 1
     expect(scorecard.ReciprocityIndex).toBe(1);
+  });
+
+  it('AC-26: exact fixture - Accepted=4/Received=5 yields AcceptanceRate=0.8000, MedianResponseHours=2.50, ReciprocityIndex=0.800, SLABreachCount=1', () => {
+    const data: ReciprocityScorecardData = {
+      requests: [
+        { ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(1) },
+        { ID: 'r2', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(2) },
+        { ID: 'r3', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(3) },
+      ],
+      assignments: [
+        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: withinPeriod(1), RespondedAt: null },
+        { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: PROFILE_ID, Status: 'InProgress', ResponseHours: 2, OfferedAt: withinPeriod(2), RespondedAt: null },
+        { ID: 'a3', ReferralRequestID: 'x3', ProfessionalProfileID: PROFILE_ID, Status: 'Completed', ResponseHours: 3, OfferedAt: withinPeriod(3), RespondedAt: null },
+        { ID: 'a4', ReferralRequestID: 'x4', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 3, OfferedAt: withinPeriod(4), RespondedAt: null },
+        { ID: 'a5', ReferralRequestID: 'x5', ProfessionalProfileID: PROFILE_ID, Status: 'Expired', ResponseHours: null, OfferedAt: withinPeriod(5), RespondedAt: null },
+      ],
+      outcomes: [],
+    };
+
+    const scorecard = ReciprocityScorecardService.ComputeScorecard(PROFILE_ID, PERIOD, data);
+
+    expect(scorecard.Sent).toBe(3);
+    expect(scorecard.Received).toBe(5);
+    expect(scorecard.Accepted).toBe(4);
+    expect(scorecard.SLABreachCount).toBe(1);
+    expect(scorecard.AcceptanceRate).toBe(0.8);
+    expect(scorecard.MedianResponseHours).toBe(2.5);
+    // ReciprocityIndex = round((Sent=3 + 1) / (Accepted=4 + 1), 3) = round(4/5, 3) = 0.8
+    expect(scorecard.ReciprocityIndex).toBe(0.8);
   });
 
   it('returns zeroed AcceptanceRate and a ReciprocityIndex > 1 for a pure net-giver with zero received referrals', () => {
@@ -81,7 +110,7 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
         { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: outOfPeriod, RespondedAt: null },
       ],
       outcomes: [
-        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Completed', CompletedAt: outOfPeriod, FeeAmount: 500 },
+        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', CompletedAt: outOfPeriod, FeeAmount: 500 },
       ],
     };
 
