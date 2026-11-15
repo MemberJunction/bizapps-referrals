@@ -906,7 +906,7 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
   }
 
   public OpenIntake(): void {
-    this.navService.OpenNewEntityRecord('MJ_BizApps_Referrals: Referral Requests');
+    void this.navService.OpenNavItemByName('Seeker Intake');
   }
 }
 
