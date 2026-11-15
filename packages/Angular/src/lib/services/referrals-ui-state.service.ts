@@ -22,10 +22,16 @@ export interface DirectoryPreferences {
   ShowVerificationQueue: boolean;
 }
 
+export interface ReciprocityScorecardPreferences {
+  /** ISO date string for the start of the selected period (UTC quarter boundary). */
+  SelectedPeriodStartIso: string;
+}
+
 const SEEKER_PREFS_KEY = 'Referrals.SeekerIntake.Preferences';
 const PRO_INBOX_PREFS_KEY = 'Referrals.ProInbox.Preferences';
 const OPS_PREFS_KEY = 'Referrals.OpsTelemetry.Preferences';
 const DIRECTORY_PREFS_KEY = 'Referrals.Directory.Preferences';
+const RECIPROCITY_PREFS_KEY = 'Referrals.ReciprocityScorecard.Preferences';
 
 export class ReferralsUiStateHelper {
   public static LoadSeekerPreferences(): SeekerFilterPreferences {
@@ -106,5 +112,22 @@ export class ReferralsUiStateHelper {
 
   public static async SaveDirectoryPreferences(prefs: DirectoryPreferences): Promise<void> {
     await UserInfoEngine.Instance.SetSetting(DIRECTORY_PREFS_KEY, JSON.stringify(prefs));
+  }
+
+  public static LoadReciprocityScorecardPreferences(): ReciprocityScorecardPreferences {
+    const raw = UserInfoEngine.Instance.GetSetting(RECIPROCITY_PREFS_KEY);
+    if (!raw) {
+      return { SelectedPeriodStartIso: '' };
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<ReciprocityScorecardPreferences>;
+      return { SelectedPeriodStartIso: typeof parsed.SelectedPeriodStartIso === 'string' ? parsed.SelectedPeriodStartIso : '' };
+    } catch {
+      return { SelectedPeriodStartIso: '' };
+    }
+  }
+
+  public static async SaveReciprocityScorecardPreferences(prefs: ReciprocityScorecardPreferences): Promise<void> {
+    await UserInfoEngine.Instance.SetSetting(RECIPROCITY_PREFS_KEY, JSON.stringify(prefs));
   }
 }

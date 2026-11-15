@@ -33,6 +33,11 @@ export interface ResolveEscalationInput {
   Notes?: string;
 }
 
+export interface DismissEscalationInput {
+  ReferralEscalationID: string;
+  Notes?: string;
+}
+
 export interface ReopenExhaustedReferralInput {
   ReferralRequestID: string;
   ExpandToAncestorPracticeArea?: boolean;
@@ -282,7 +287,72 @@ export class ResolveEscalationAction extends BaseAction {
 }
 
 // =============================================================================
-// 4. ReopenExhaustedReferral (BaseRemotableOperation + BaseAction)
+// 4. DismissEscalation (BaseRemotableOperation + BaseAction)
+// =============================================================================
+@RegisterClass(BaseRemotableOperation, 'Referrals.DismissEscalation')
+export class DismissEscalationOperation extends BaseRemotableOperation<
+  DismissEscalationInput,
+  { ReferralEscalationID: string; Status: string; RequestEscalationLevelReset: boolean }
+> {
+  public readonly OperationKey = 'Referrals.DismissEscalation';
+  public readonly ExposeAsAgentTool = true;
+  public readonly ExposeAsMCPTool = true;
+  public readonly ToolDescription = 'Coordinator/admin dismissal of an Open or Acknowledged referral escalation (no action required).';
+
+  protected override async InternalExecute(
+    input: DismissEscalationInput,
+    provider: IMetadataProvider,
+    user: UserInfo,
+    context: RemoteOpServerContext,
+  ): Promise<{ ReferralEscalationID: string; Status: string; RequestEscalationLevelReset: boolean }> {
+    const startMs = Date.now();
+    if (!input.ReferralEscalationID) {
+      throw new RemoteOperationError('INVALID_INPUT', 'ReferralEscalationID is required.');
+    }
+    const result = await SlaEscalationService.DismissEscalation(
+      AssertValidUUID(input.ReferralEscalationID, 'ReferralEscalationID'),
+      user,
+      requireProvider(resolveProvider(provider, context)),
+      input.Notes,
+    );
+    recordTelemetry('DismissEscalation', startMs, user, { referralEscalationId: result.ReferralEscalationID });
+    return result;
+  }
+}
+
+@RegisterClass(BaseAction, 'Referrals.DismissEscalation')
+export class DismissEscalationAction extends BaseAction {
+  protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
+    const startMs = Date.now();
+    const referralEscalationId = getStringParam(params, 'ReferralEscalationID');
+    if (!referralEscalationId) {
+      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ReferralEscalationID is required.' };
+    }
+    try {
+      const validId = AssertValidUUID(referralEscalationId, 'ReferralEscalationID');
+      const result = await SlaEscalationService.DismissEscalation(
+        validId,
+        params.ContextUser,
+        requireProvider(resolveActionProvider()),
+        getStringParam(params, 'Notes'),
+      );
+      recordTelemetry('DismissEscalation', startMs, params.ContextUser, { referralEscalationId: result.ReferralEscalationID });
+      return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(result) };
+    } catch (error) {
+      if (error instanceof InvalidUUIDError) {
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
+      }
+      return {
+        Success: false,
+        ResultCode: error instanceof Error ? error.name : 'DISMISS_ESCALATION_ERROR',
+        Message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+}
+
+// =============================================================================
+// 5. ReopenExhaustedReferral (BaseRemotableOperation + BaseAction)
 // =============================================================================
 @RegisterClass(BaseRemotableOperation, 'Referrals.ReopenExhaustedReferral')
 export class ReopenExhaustedReferralOperation extends BaseRemotableOperation<

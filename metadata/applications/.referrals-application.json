@@ -36,6 +36,18 @@
           "Icon": "fa-solid fa-address-book",
           "ResourceType": "Custom",
           "DriverClass": "ReferralsCredentialDirectoryResource"
+        },
+        {
+          "Label": "Escalations",
+          "Icon": "fa-solid fa-triangle-exclamation",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsEscalationConsoleResource"
+        },
+        {
+          "Label": "Reciprocity",
+          "Icon": "fa-solid fa-arrows-rotate",
+          "ResourceType": "Custom",
+          "DriverClass": "ReferralsReciprocityScorecardResource"
         }
       ]
     },

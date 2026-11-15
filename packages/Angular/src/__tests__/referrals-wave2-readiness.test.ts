@@ -30,7 +30,7 @@ function walkFiles(dir: string, exts: string[]): string[] {
 }
 
 describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
-  it('registers all 15 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
+  it('registers all 15 BaseFormComponent classes, form panels, and all 7 DefaultNavItems resources in ClassFactory', () => {
     LoadBizAppsReferralsClient();
 
     const entitiesJsonPath = path.join(repoRoot, 'metadata/entities/.entities.json');
@@ -52,14 +52,14 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     // BaseFormComponent forms with no dedicated hero panel), so this asserts a
     // stable floor rather than parity with the entity count.
     const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
-    expect(panelRegs.length).toBeGreaterThanOrEqual(14);
+    expect(panelRegs.length).toBeGreaterThanOrEqual(17);
 
     const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
     const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{
       fields: { DefaultNavItems: Array<{ Label: string; DriverClass: string; Icon: string }> };
     }>;
     const navItems = parsed[0].fields.DefaultNavItems;
-    expect(navItems).toHaveLength(5);
+    expect(navItems).toHaveLength(7);
     for (const item of navItems) {
       expect(
         MJGlobal.Instance.ClassFactory.GetRegistration(BaseResourceComponent, item.DriverClass),

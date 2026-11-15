@@ -909,6 +909,45 @@
   },
   {
     "fields": {
+      "Name": "Referrals.DismissEscalation",
+      "Description": "Coordinator/admin dismissal of an Open or Acknowledged referral escalation (no action required).",
+      "Type": "Custom",
+      "DriverClass": "Referrals.DismissEscalation",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000014"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralEscalationID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Open or Acknowledged ReferralEscalation to dismiss."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Notes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text dismissal notes."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
       "Name": "Referrals.ReopenExhaustedReferral",
       "Description": "Admin-only reopen of an Exhausted referral: re-runs matching excluding previously assigned professionals, optionally expanding to the parent PracticeArea.",
       "Type": "Custom",

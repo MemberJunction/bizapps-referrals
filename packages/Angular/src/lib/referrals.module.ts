@@ -7,8 +7,10 @@ import { LinkDirectivesModule } from '@memberjunction/ng-link-directives';
 import { loadModule as loadReferralsEntitiesModule } from '@mj-biz-apps/referrals-entities';
 
 import { ReferralsCredentialDirectoryComponent } from './components/credential-directory.component.js';
+import { ReferralsEscalationConsoleComponent } from './components/escalation-console.component.js';
 import { ReferralsOpsTelemetryComponent } from './components/ops-telemetry.component.js';
 import { ReferralsProInboxComponent } from './components/pro-inbox.component.js';
+import { ReferralsReciprocityScorecardComponent } from './components/reciprocity-scorecard.component.js';
 import { ReferralsReportGalleryComponent } from './components/report-gallery.component.js';
 import { ReferralsSeekerIntakeComponent } from './components/seeker-intake.component.js';
 import { ReferralsFinderWidgetComponent } from './finder-widget/referrals-finder-widget.component.js';
@@ -18,12 +20,15 @@ import {
   OrganizationReferralsOverviewPanel,
   PersonReferralsOverviewPanel,
   PracticeAreaHeroPanel,
+  ProfessionalAvailabilityWindowHeroPanel,
   ProfessionalCredentialHeroPanel,
   ProfessionalJurisdictionHeroPanel,
   ProfessionalPracticeAreaHeroPanel,
   ProfessionalProfileHeroPanel,
   ReferralAssignmentHeroPanel,
+  ReferralEscalationHeroPanel,
   ReferralFeedbackHeroPanel,
+  ReferralOutcomeHeroPanel,
   ReferralRequestHeroPanel,
   ReferralTierHeroPanel,
   UserReferralsOverviewPanel,
@@ -60,6 +65,8 @@ import {
     ReferralsReportGalleryComponent,
     ReferralsCredentialDirectoryComponent,
     ReferralsFinderWidgetComponent,
+    ReferralsEscalationConsoleComponent,
+    ReferralsReciprocityScorecardComponent,
     ReferralRequestHeroPanel,
     ProfessionalProfileHeroPanel,
     ProfessionalCredentialHeroPanel,
@@ -74,6 +81,9 @@ import {
     PersonReferralsOverviewPanel,
     OrganizationReferralsOverviewPanel,
     UserReferralsOverviewPanel,
+    ReferralEscalationHeroPanel,
+    ReferralOutcomeHeroPanel,
+    ProfessionalAvailabilityWindowHeroPanel,
   ],
   declarations: [
     ...REFERRALS_ENTITY_FORM_COMPONENTS,
@@ -85,6 +95,8 @@ import {
     ReferralsReportGalleryComponent,
     ReferralsCredentialDirectoryComponent,
     ReferralsFinderWidgetComponent,
+    ReferralsEscalationConsoleComponent,
+    ReferralsReciprocityScorecardComponent,
     ReferralRequestHeroPanel,
     ProfessionalProfileHeroPanel,
     ProfessionalCredentialHeroPanel,
@@ -99,6 +111,9 @@ import {
     PersonReferralsOverviewPanel,
     OrganizationReferralsOverviewPanel,
     UserReferralsOverviewPanel,
+    ReferralEscalationHeroPanel,
+    ReferralOutcomeHeroPanel,
+    ProfessionalAvailabilityWindowHeroPanel,
     ...REFERRALS_ENTITY_FORM_COMPONENTS,
   ],
 })
@@ -115,6 +130,8 @@ export function LoadBizAppsReferralsClient(): void {
   void ReferralsReportGalleryComponent;
   void ReferralsCredentialDirectoryComponent;
   void ReferralsFinderWidgetComponent;
+  void ReferralsEscalationConsoleComponent;
+  void ReferralsReciprocityScorecardComponent;
   void ReferralRequestHeroPanel;
   void ProfessionalProfileHeroPanel;
   void ProfessionalCredentialHeroPanel;
@@ -129,6 +146,9 @@ export function LoadBizAppsReferralsClient(): void {
   void PersonReferralsOverviewPanel;
   void OrganizationReferralsOverviewPanel;
   void UserReferralsOverviewPanel;
+  void ReferralEscalationHeroPanel;
+  void ReferralOutcomeHeroPanel;
+  void ProfessionalAvailabilityWindowHeroPanel;
   void REFERRALS_ENTITY_FORM_COMPONENTS;
   void ReferralRequestFormComponent;
   void ProfessionalProfileFormComponent;

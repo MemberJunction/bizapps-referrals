@@ -5,6 +5,8 @@ export * from './lib/components/pro-inbox.component.js';
 export * from './lib/components/ops-telemetry.component.js';
 export * from './lib/components/report-gallery.component.js';
 export * from './lib/components/credential-directory.component.js';
+export * from './lib/components/escalation-console.component.js';
+export * from './lib/components/reciprocity-scorecard.component.js';
 export * from './lib/finder-widget/referrals-finder-widget.component.js';
 export * from './lib/form-panels/referrals-form-panels.js';
 export * from './lib/forms/referrals-entity-forms.js';
