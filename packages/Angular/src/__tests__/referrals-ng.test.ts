@@ -10,13 +10,17 @@ import {
   JurisdictionFormComponent,
   LoadBizAppsReferralsClient,
   PracticeAreaFormComponent,
+  ProfessionalAvailabilityWindowFormComponent,
   ProfessionalJurisdictionFormComponent,
   ProfessionalPracticeAreaFormComponent,
   ProfessionalProfileFormComponent,
   ProfessionalProfileHeroPanel,
   REFERRALS_ENTITY_FORM_COMPONENTS,
+  ReciprocitySnapshotFormComponent,
   ReferralAssignmentFormComponent,
+  ReferralEscalationFormComponent,
   ReferralFeedbackFormComponent,
+  ReferralOutcomeFormComponent,
   ReferralRequestFormComponent,
   ReferralRequestHeroPanel,
   ReferralTierFormComponent,
@@ -39,8 +43,8 @@ describe('@mj-biz-apps/referrals-ng', () => {
     expect(ProfessionalProfileHeroPanel).toBeDefined();
   });
 
-  it('exports all 11 left-rail BaseFormComponent classes and bundles them in REFERRALS_ENTITY_FORM_COMPONENTS', () => {
-    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(11);
+  it('exports all 15 left-rail BaseFormComponent classes and bundles them in REFERRALS_ENTITY_FORM_COMPONENTS', () => {
+    expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(15);
     expect(ReferralRequestFormComponent).toBeDefined();
     expect(ProfessionalProfileFormComponent).toBeDefined();
     expect(ReferralAssignmentFormComponent).toBeDefined();
@@ -51,6 +55,10 @@ describe('@mj-biz-apps/referrals-ng', () => {
     expect(ProfessionalPracticeAreaFormComponent).toBeDefined();
     expect(ProfessionalJurisdictionFormComponent).toBeDefined();
     expect(ReferralFeedbackFormComponent).toBeDefined();
+    expect(ReferralEscalationFormComponent).toBeDefined();
+    expect(ReferralOutcomeFormComponent).toBeDefined();
+    expect(ProfessionalAvailabilityWindowFormComponent).toBeDefined();
+    expect(ReciprocitySnapshotFormComponent).toBeDefined();
 
     for (const FormClass of REFERRALS_ENTITY_FORM_COMPONENTS) {
       expect(typeof FormClass).toBe('function');

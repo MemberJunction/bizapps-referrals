@@ -30,7 +30,7 @@ function walkFiles(dir: string, exts: string[]): string[] {
 }
 
 describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
-  it('registers all 11 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
+  it('registers all 15 BaseFormComponent classes, form panels, and all 5 DefaultNavItems resources in ClassFactory', () => {
     LoadBizAppsReferralsClient();
 
     const entitiesJsonPath = path.join(repoRoot, 'metadata/entities/.entities.json');
@@ -38,7 +38,7 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       fields: { Name: string };
     }>;
     const expectedEntities = entityRecords.map((r) => r.fields.Name);
-    expect(expectedEntities).toHaveLength(11);
+    expect(expectedEntities).toHaveLength(15);
     expect(REFERRALS_ENTITY_FORM_COMPONENTS).toHaveLength(expectedEntities.length);
     for (const entityName of expectedEntities) {
       expect(
@@ -47,8 +47,12 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       ).toBeDefined();
     }
 
+    // BaseFormPanel hero panels are a deliberately smaller, curated subset (not
+    // one-per-entity — e.g. the 4 Wave 3 Slice 1 entities use plain
+    // BaseFormComponent forms with no dedicated hero panel), so this asserts a
+    // stable floor rather than parity with the entity count.
     const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
-    expect(panelRegs.length).toBeGreaterThanOrEqual(expectedEntities.length);
+    expect(panelRegs.length).toBeGreaterThanOrEqual(14);
 
     const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
     const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{

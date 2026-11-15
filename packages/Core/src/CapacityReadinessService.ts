@@ -22,7 +22,7 @@ type ProfileLike = Pick<
 >;
 
 function minutesSinceMidnight(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
+  return date.getUTCHours() * 60 + date.getUTCMinutes();
 }
 
 /**
