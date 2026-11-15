@@ -5,10 +5,17 @@ import {
   type IntegrationCheckContext,
   type NamedCheck,
 } from '@memberjunction/testing-integration';
-import { ConflictScreeningService, MatchingEngine } from '@mj-biz-apps/referrals-core';
+import { IMetadataProvider, IRunViewProvider, RunView } from '@memberjunction/core';
+import {
+  ConflictScreeningService,
+  MatchingEngine,
+  ReciprocityScorecardService,
+  SlaEscalationService,
+} from '@mj-biz-apps/referrals-core';
 import type {
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
+  ReciprocitySnapshotEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { ensureReferralsWorld } from '../referrals-fixture.js';
 
@@ -89,6 +96,85 @@ export const ReferralsWorldChecks: NamedCheck[] = [
       Assert(statuses.has('Accepted'), 'World includes Accepted assignment');
       Assert(statuses.has('ConflictRejected'), 'World includes ConflictRejected assignment');
       Assert(statuses.has('Expired'), 'World includes Expired assignment');
+    },
+  },
+  {
+    Id: `${BUNDLE}.RW4`,
+    Name: 'RW4: Escalation lifecycle - raise is idempotent by DedupKey, and coordinator-gated resolve clears the escalation',
+    Fn: async (ctx: IntegrationCheckContext) => {
+      const world = await ensureReferralsWorld(ctx);
+      const dp = ctx.Provider as IMetadataProvider & IRunViewProvider;
+      const request = world.Requests['ACME_MA'];
+      const assignment = world.Assignments.find(
+        (a) => a.ReferralRequestID.toLowerCase() === request.ID.toLowerCase() && a.Status === 'Offered',
+      );
+      Assert(!!assignment, 'ACME_MA has an Offered assignment to escalate against');
+
+      const dedupKey = `RW4:${assignment!.ID}`;
+      const first = await SlaEscalationService.RaiseEscalation(
+        {
+          ReferralRequestID: request.ID,
+          ReferralAssignmentID: assignment!.ID,
+          TriggerType: 'ManualEscalation',
+          EscalationLevel: 1,
+          RecommendedAction: 'Notify',
+          Notes: 'RW4 integration check escalation.',
+          DedupKey: dedupKey,
+        },
+        ctx.User,
+        dp,
+      );
+      Assert(first.Raised, 'First RaiseEscalation call creates a new Open escalation');
+
+      const second = await SlaEscalationService.RaiseEscalation(
+        {
+          ReferralRequestID: request.ID,
+          ReferralAssignmentID: assignment!.ID,
+          TriggerType: 'ManualEscalation',
+          EscalationLevel: 1,
+          DedupKey: dedupKey,
+        },
+        ctx.User,
+        dp,
+      );
+      AssertEqual(second.Raised, false, 'Second RaiseEscalation call with the same DedupKey is a no-op');
+      AssertEqual(second.ReferralEscalationID, first.ReferralEscalationID, 'Idempotent re-raise returns the same escalation ID');
+
+      const resolved = await SlaEscalationService.ResolveEscalation(
+        first.ReferralEscalationID,
+        ctx.User,
+        dp,
+        'Resolved by RW4 integration check.',
+      );
+      AssertEqual(resolved.Status, 'Resolved', 'Escalation transitions to Resolved');
+    },
+  },
+  {
+    Id: `${BUNDLE}.RW5`,
+    Name: 'RW5: Reciprocity recompute produces a well-formed ReciprocitySnapshot for a seeded professional',
+    Fn: async (ctx: IntegrationCheckContext) => {
+      const world = await ensureReferralsWorld(ctx);
+      const dp = ctx.Provider as IMetadataProvider & IRunViewProvider;
+      const vance = world.Professionals['VANCE'];
+
+      const result = await ReciprocityScorecardService.RecomputeSnapshots(ctx.User, dp);
+      Assert(result.ProcessedCount >= 1, 'RecomputeSnapshots processes at least one active professional');
+
+      const rv = new RunView();
+      const snapRes = await rv.RunView<ReciprocitySnapshotEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
+          ExtraFilter: `ProfessionalProfileID='${vance.ID}'`,
+          OrderBy: 'SnapshotDate DESC',
+          MaxRows: 1,
+          ResultType: 'entity_object',
+        },
+        ctx.User,
+      );
+      Assert(snapRes.Success && snapRes.Results.length === 1, 'A ReciprocitySnapshot exists for the seeded professional after recompute');
+      const snapshot = snapRes.Results[0];
+      Assert(snapshot.ReciprocityIndex >= 0, 'ReciprocityIndex is a non-negative number');
+      Assert(snapshot.AcceptanceRate >= 0 && snapshot.AcceptanceRate <= 100, 'AcceptanceRate is a valid percentage');
     },
   },
 ];
