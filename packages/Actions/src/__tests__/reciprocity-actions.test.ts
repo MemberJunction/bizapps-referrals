@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActionParam, RunActionParams } from '@memberjunction/actions-base';
 import { UserInfo } from '@memberjunction/core';
+import { ReferralTelemetry } from '@mj-biz-apps/referrals-core';
 import { GetReciprocityScorecardAction, RecomputeReciprocityAction } from '../index.js';
 
 const testUser = new UserInfo(undefined, {
@@ -23,10 +24,23 @@ function makeParams(pairs: Array<[string, string]>): RunActionParams {
 }
 
 describe('Reciprocity Scorecard MJ Actions', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('RecomputeReciprocityAction fails closed when no metadata provider is configured', async () => {
     const action = new RecomputeReciprocityAction();
     const res = await action.Run(makeParams([]));
     expect(res.Success).toBe(false);
+  });
+
+  it('AC-28: RecomputeReciprocityAction records telemetry exactly once on the no-provider error path', async () => {
+    const recordSpy = vi.spyOn(ReferralTelemetry, 'RecordOperation').mockImplementation(() => {});
+    const action = new RecomputeReciprocityAction();
+    const res = await action.Run(makeParams([]));
+    expect(res.Success).toBe(false);
+    expect(recordSpy).toHaveBeenCalledTimes(1);
+    expect(recordSpy).toHaveBeenCalledWith(expect.objectContaining({ Operation: 'RecomputeReciprocity', Metrics: expect.objectContaining({ outcome: 'error' }) }));
   });
 
   it('GetReciprocityScorecardAction requires ProfessionalProfileID', async () => {

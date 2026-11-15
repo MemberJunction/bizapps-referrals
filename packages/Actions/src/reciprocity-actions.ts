@@ -125,14 +125,21 @@ export class RecomputeReciprocityOperation extends BaseRemotableOperation<
     context: RemoteOpServerContext,
   ): Promise<{ ProcessedCount: number; PeriodStart: string; PeriodEnd: string }> {
     const startMs = Date.now();
-    const period = input?.PeriodStartIso && input?.PeriodEndIso ? resolvePeriod(input.PeriodStartIso, input.PeriodEndIso) : undefined;
-    const result = await ReciprocityScorecardService.RecomputeSnapshots(user, requireProvider(resolveProvider(provider, context)), period);
-    recordTelemetry('RecomputeReciprocity', startMs, user, { processedCount: result.ProcessedCount });
-    return {
-      ProcessedCount: result.ProcessedCount,
-      PeriodStart: result.Period.Start.toISOString(),
-      PeriodEnd: result.Period.End.toISOString(),
-    };
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      const period = input?.PeriodStartIso && input?.PeriodEndIso ? resolvePeriod(input.PeriodStartIso, input.PeriodEndIso) : undefined;
+      const result = await ReciprocityScorecardService.RecomputeSnapshots(user, requireProvider(resolveProvider(provider, context)), period);
+      return {
+        ProcessedCount: result.ProcessedCount,
+        PeriodStart: result.Period.Start.toISOString(),
+        PeriodEnd: result.Period.End.toISOString(),
+      };
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('RecomputeReciprocity', startMs, user, { outcome });
+    }
   }
 }
 
@@ -140,6 +147,7 @@ export class RecomputeReciprocityOperation extends BaseRemotableOperation<
 export class RecomputeReciprocityAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
     const startMs = Date.now();
+    let outcome: 'success' | 'error' = 'success';
     try {
       const periodStartIso = getStringParam(params, 'PeriodStartIso');
       const periodEndIso = getStringParam(params, 'PeriodEndIso');
@@ -149,7 +157,6 @@ export class RecomputeReciprocityAction extends BaseAction {
         requireProvider(resolveActionProvider()),
         period,
       );
-      recordTelemetry('RecomputeReciprocity', startMs, params.ContextUser, { processedCount: result.ProcessedCount });
       return {
         Success: true,
         ResultCode: 'SUCCESS',
@@ -160,11 +167,14 @@ export class RecomputeReciprocityAction extends BaseAction {
         }),
       };
     } catch (error) {
+      outcome = 'error';
       return {
         Success: false,
         ResultCode: error instanceof Error ? error.name : 'RECOMPUTE_RECIPROCITY_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('RecomputeReciprocity', startMs, params.ContextUser, { outcome });
     }
   }
 }

@@ -1,6 +1,5 @@
 import { IMetadataProvider, IRunViewProvider, RunView, UserInfo } from '@memberjunction/core';
 import {
-  AIRationaleSource,
   AssertValidUUID,
   EscalationRecommendedAction,
   ExplainMatchOutput,
@@ -76,7 +75,7 @@ export interface RationalePromptContext {
 }
 
 export interface AssignmentRationale {
-  Source: AIRationaleSource;
+  Source: string;
   Summary: string;
   Rationale: string;
   Risks: string[];
@@ -84,7 +83,7 @@ export interface AssignmentRationale {
 }
 
 export interface EscalationRationale {
-  Source: AIRationaleSource;
+  Source: string;
   Summary: string;
   Rationale: string;
   GeneratedAt: string;
