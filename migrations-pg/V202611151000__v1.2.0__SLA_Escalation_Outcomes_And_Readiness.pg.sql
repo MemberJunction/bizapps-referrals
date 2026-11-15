@@ -1,6 +1,10 @@
 -- ============================================================================
 -- MemberJunction PostgreSQL Migration
--- BizApps Referrals - Wave 3 Slice 1: SLA Escalation, Outcomes & Readiness (v1.2.0)
+-- BizApps Referrals - Wave 3: SLA Escalation, Outcomes & Readiness (v1.2.0)
+-- Consolidated per Spec SS2.1 (exactly one migration per dialect): sections 8a-8d
+-- below were folded in from the former v1.2.1 migration
+-- (V202611152000__v1.2.1__Escalation_Lifecycle_And_Reciprocity_Fields.pg.sql),
+-- which has been removed.
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -229,6 +233,85 @@ CREATE INDEX IF NOT EXISTS "IX_ReciprocitySnapshot_Profile_Date" ON __mj_BizApps
 COMMENT ON TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" IS
     'Periodic snapshot of a ProfessionalProfile referral give/receive balance used to compute ReciprocityIndex.';
 
+-- -----------------------------------------------------------------------------
+-- 8a. Additive columns on "ReferralEscalation": dedup, notifier linkage, resolution
+--     audit (consolidated from the former v1.2.1 migration per Spec SS2.1 - exactly
+--     one migration per dialect).
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "DedupKey" VARCHAR(200) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "LinkedTaskID" UUID NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "AcknowledgedByPersonID" UUID NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "ResolvedByPersonID" UUID NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+    ADD COLUMN IF NOT EXISTS "ResolutionNotes" TEXT NULL;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ReferralEscalation_AcknowledgedByPerson') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+            ADD CONSTRAINT "FK_ReferralEscalation_AcknowledgedByPerson" FOREIGN KEY ("AcknowledgedByPersonID")
+                REFERENCES __mj_BizAppsCommon."Person" ("ID");
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ReferralEscalation_ResolvedByPerson') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation"
+            ADD CONSTRAINT "FK_ReferralEscalation_ResolvedByPerson" FOREIGN KEY ("ResolvedByPersonID")
+                REFERENCES __mj_BizAppsCommon."Person" ("ID");
+    END IF;
+
+    -- Widen CK_ReferralEscalation_TriggerType to add 'UrgentUnassigned' and 'CascadeExhausted' (6 total)
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralEscalation_TriggerType') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" DROP CONSTRAINT "CK_ReferralEscalation_TriggerType";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD CONSTRAINT "CK_ReferralEscalation_TriggerType" CHECK ("TriggerType" IN (
+        'SLAWarning', 'SLABreach', 'ManualEscalation', 'CapacityExhausted', 'UrgentUnassigned', 'CascadeExhausted'
+    ));
+
+    -- Widen CK_ReferralEscalation_Status to add 'Dismissed' (4 total)
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralEscalation_Status') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" DROP CONSTRAINT "CK_ReferralEscalation_Status";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD CONSTRAINT "CK_ReferralEscalation_Status" CHECK ("Status" IN (
+        'Open', 'Acknowledged', 'Resolved', 'Dismissed'
+    ));
+END $$;
+
+CREATE INDEX IF NOT EXISTS "IX_ReferralEscalation_DedupKey"
+    ON __mj_BizAppsReferrals."ReferralEscalation" ("DedupKey")
+    WHERE "DedupKey" IS NOT NULL;
+
+-- -----------------------------------------------------------------------------
+-- 8b. Additive column on "ReferralOutcome": attributed fee value for reciprocity scorecards
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "FeeAmount" NUMERIC(10,2) NULL;
+
+-- -----------------------------------------------------------------------------
+-- 8c. Additive columns on "ReciprocitySnapshot": full scorecard metrics
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "AcceptedCount" INT NOT NULL DEFAULT 0;
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "ResolvedCount" INT NOT NULL DEFAULT 0;
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "SLABreachCount" INT NOT NULL DEFAULT 0;
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "AcceptanceRate" NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "MedianResponseHours" NUMERIC(6,2) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot"
+    ADD COLUMN IF NOT EXISTS "AttributedFeeTotal" NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UQ_ReciprocitySnapshot_Profile_Period"
+    ON __mj_BizAppsReferrals."ReciprocitySnapshot" ("ProfessionalProfileID", "PeriodStartDate", "PeriodEndDate");
+
+-- -----------------------------------------------------------------------------
+-- 8d. Additive column on "ProfessionalProfile": readiness computation timestamp
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalProfile"
+    ADD COLUMN IF NOT EXISTS "ReadinessComputedAt" TIMESTAMPTZ NULL;
 
 -- -----------------------------------------------------------------------------
 -- 9. Base views & CRUD functions for the 4 new Wave 3 Slice 1 tables
