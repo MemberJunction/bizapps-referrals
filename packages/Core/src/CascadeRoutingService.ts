@@ -37,9 +37,12 @@ import {
   ConcurrencyConflictError,
   ConflictScreeningUnavailableError,
   InvalidLifecycleStateError,
+  IsAssociationAdmin,
   PersistenceError,
   UUIDsEqual,
 } from './validation.js';
+
+export { IsAssociationAdmin } from './validation.js';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -82,13 +85,6 @@ const TERMINAL_REQUEST_STATUSES: ReadonlySet<ReferralRequestStatus> = new Set([
   'Completed',
   'Cancelled',
   'Exhausted',
-]);
-
-const ADMIN_ROLE_NAMES = new Set([
-  'administrator',
-  'referrals admin',
-  'association admin',
-  'sysadmin',
 ]);
 
 function hasTransactionSupport(provider: object | null | undefined): provider is ActiveTransactionalProvider {
@@ -289,17 +285,48 @@ async function atomicIncrementProCapacity(
   await saveOrThrow(pro, 'ProfessionalProfile capacity update');
 }
 
+/**
+ * Atomically decrements `ActiveReferralCount` (floored at 0 via a `CASE WHEN` guard - never
+ * negative) and increments `TotalCompletedCount` on referral completion, using a single
+ * dual-dialect conditional SQL statement when the provider supports raw SQL, falling back to
+ * an in-memory guarded update otherwise.
+ */
+async function atomicDecrementProCapacityOnCompletion(
+  provider: TransactionalProvider,
+  pro: ProfessionalProfileEntity,
+  contextUser: UserInfo,
+): Promise<void> {
+  if (hasSqlSupport(provider)) {
+    const isPostgres = provider.PlatformKey === 'postgresql';
+    const sql = isPostgres
+      ? `UPDATE __mj_BizAppsReferrals."ProfessionalProfile"
+         SET "ActiveReferralCount" = CASE WHEN "ActiveReferralCount" > 0 THEN "ActiveReferralCount" - 1 ELSE 0 END,
+             "TotalCompletedCount" = "TotalCompletedCount" + 1
+         WHERE "ID" = $1
+         RETURNING "ID"`
+      : `UPDATE [__mj_BizAppsReferrals].[ProfessionalProfile]
+         SET [ActiveReferralCount] = CASE WHEN [ActiveReferralCount] > 0 THEN [ActiveReferralCount] - 1 ELSE 0 END,
+             [TotalCompletedCount] = [TotalCompletedCount] + 1
+         OUTPUT INSERTED.[ID]
+         WHERE [ID] = @p0`;
+    const rows = await provider.ExecuteSQL<{ ID: string }>(sql, [pro.ID], undefined, contextUser);
+    if (rows.length !== 1) {
+      throw new PersistenceError(`Failed to update completion counters for ProfessionalProfile '${pro.ID}'.`);
+    }
+    return;
+  }
+
+  pro.ActiveReferralCount = Math.max(0, pro.ActiveReferralCount - 1);
+  pro.TotalCompletedCount = pro.TotalCompletedCount + 1;
+  await saveOrThrow(pro, 'ProfessionalProfile completion counters');
+}
+
 async function saveOrThrow(entity: BaseEntity, label: string): Promise<void> {
   const saved = await entity.Save();
   if (!saved) {
     const detail = entity.LatestResult?.CompleteMessage ?? 'Save returned false';
     throw new PersistenceError(`Failed to save ${label}: ${detail}`);
   }
-}
-
-export function IsAssociationAdmin(contextUser: UserInfo): boolean {
-  const roles = contextUser.UserRoles ?? [];
-  return roles.some((r) => ADMIN_ROLE_NAMES.has((r.Role ?? '').trim().toLowerCase()));
 }
 
 export class CascadeRoutingService {
@@ -539,7 +566,7 @@ export class CascadeRoutingService {
             ReferralRequestID: validRequestId,
             TriggerType: 'CascadeExhausted',
             EscalationLevel: 2,
-            RecommendedAction: 'AdminAlert',
+            RecommendedAction: 'ExpandPracticeArea',
             Notes: 'Cascade exhausted during initial routing: no eligible candidates remained after conflict screening.',
             DedupKey: `CascadeExhausted:${validRequestId}`,
           },
@@ -570,8 +597,7 @@ export class CascadeRoutingService {
       }
 
       const now = new Date();
-      const isUrgent = request.UrgencyLevel === 'Urgent';
-      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
+      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, request.UrgencyLevel);
       let activeAssignmentId: string | null = null;
       let activeProfessionalId: string | null = null;
 
@@ -882,6 +908,11 @@ export class CascadeRoutingService {
       const nextStatus: ReferralAssignmentEntity['Status'] =
         params.Action === 'ConflictReject' ? 'ConflictRejected' : 'Declined';
 
+      const declineResponseHours =
+        assignment.OfferedAt != null
+          ? roundTo2((now.getTime() - new Date(assignment.OfferedAt).getTime()) / (60 * 60 * 1000))
+          : null;
+
       await atomicClaimAssignmentOffer(
         txProvider,
         assignment,
@@ -889,17 +920,36 @@ export class CascadeRoutingService {
         now,
         params.Notes ?? null,
         contextUser,
+        declineResponseHours,
       );
 
       if (params.Action === 'ConflictReject') {
         assignment.Status = 'ConflictRejected';
         assignment.ConflictStatus = 'ConflictFound';
         assignment.ConflictReason = params.DeclineReason ?? params.Notes ?? 'Self-reported conflict of interest.';
+        if (declineResponseHours != null) {
+          assignment.ResponseHours = declineResponseHours;
+        }
         await saveOrThrow(assignment, 'ConflictRejected ReferralAssignment metadata');
       } else {
         assignment.Status = 'Declined';
         assignment.DeclineReason = params.DeclineReason ?? 'Declined by professional.';
+        if (declineResponseHours != null) {
+          assignment.ResponseHours = declineResponseHours;
+        }
         await saveOrThrow(assignment, 'Declined ReferralAssignment metadata');
+      }
+
+      if (hasSqlSupport(txProvider) && 'RunView' in txProvider) {
+        const newAverage = await recompute90DayAverageResponseHours(
+          txProvider as TransactionalProvider & IRunViewProvider,
+          pro.ID,
+          contextUser,
+        );
+        if (newAverage != null) {
+          pro.AverageResponseHours = newAverage;
+          await saveOrThrow(pro, 'ProfessionalProfile AverageResponseHours update');
+        }
       }
 
       const nextOffer = await CascadeRoutingService.AdvanceCascade(request, contextUser, txProvider);
@@ -1006,8 +1056,6 @@ export class CascadeRoutingService {
     if (!(await tier.Load(request.ReferralTierID))) {
       throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
     }
-    const isUrgent = request.UrgencyLevel === 'Urgent';
-
     for (const candidateAssignment of queuedList) {
       const validProId = AssertValidUUID(candidateAssignment.ProfessionalProfileID, 'ProfessionalProfileID');
       const pro = await md.GetEntityObject<ProfessionalProfileEntity>(
@@ -1070,7 +1118,7 @@ export class CascadeRoutingService {
       const now = new Date();
       candidateAssignment.Status = 'Offered';
       candidateAssignment.OfferedAt = now;
-      candidateAssignment.SLADeadlineAt = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
+      candidateAssignment.SLADeadlineAt = CapacityReadinessService.ComputeSLADeadline(now, tier, request.UrgencyLevel);
       await saveOrThrow(candidateAssignment, 'Promoted ReferralAssignment');
 
       request.Status = 'Routed';
@@ -1087,7 +1135,7 @@ export class CascadeRoutingService {
         ReferralRequestID: validRequestId,
         TriggerType: 'CascadeExhausted',
         EscalationLevel: 2,
-        RecommendedAction: 'AdminAlert',
+        RecommendedAction: 'ExpandPracticeArea',
         Notes: 'Cascade exhausted: no further eligible queued candidates after revalidation.',
         DedupKey: `CascadeExhausted:${validRequestId}`,
       },
@@ -1202,7 +1250,7 @@ export class CascadeRoutingService {
             ReferralAssignmentID: assignment.ID,
             TriggerType: 'SLABreach',
             EscalationLevel: 1,
-            RecommendedAction: 'Reassign',
+            RecommendedAction: 'AdvanceCascade',
             Notes: `SLA deadline breached at ${asOfDate.toISOString()} for assignment offered to professional; cascading to next candidate.`,
             DedupKey: `SLABreach:${assignment.ID}`,
           },
@@ -1360,9 +1408,8 @@ export class CascadeRoutingService {
   }> {
     const validAssignmentId = AssertValidUUID(params.ReferralAssignmentID, 'ReferralAssignmentID');
     const txProvider = resolveTransactionalProvider(provider);
-    const rv = new RunView(txProvider);
 
-    return withEntityTransaction(txProvider, async (md) => {
+    return withEntityTransaction(txProvider, async (md, compensation) => {
       const assignment = await md.GetEntityObject<ReferralAssignmentEntity>(
         'MJ_BizApps_Referrals: Referral Assignments',
         contextUser,
@@ -1393,26 +1440,8 @@ export class CascadeRoutingService {
         throw new PersistenceError(`ReferralRequest '${assignment.ReferralRequestID}' not found.`);
       }
 
-      // Idempotent: already Completed -> return existing outcome, zero additional writes
-      if (assignment.Status === 'Completed') {
-        const existingRes = await rv.RunView<ReferralOutcomeEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Referral Outcomes',
-            ExtraFilter: `ReferralAssignmentID = '${assignment.ID}'`,
-            ResultType: 'entity_object',
-          },
-          contextUser,
-        );
-        const existingOutcome = existingRes.Success ? existingRes.Results[0] : undefined;
-        return {
-          ReferralAssignmentID: assignment.ID,
-          ReferralRequestID: request.ID,
-          ReferralOutcomeID: existingOutcome?.ID ?? '',
-          AssignmentStatus: assignment.Status,
-          RequestStatus: request.Status,
-        };
-      }
-
+      // Not idempotent: a second completion attempt is a caller bug (double-report), not a
+      // no-op - fail loudly with zero writes rather than silently re-returning stale state.
       if (assignment.Status !== 'Accepted' && assignment.Status !== 'InProgress') {
         throw new InvalidLifecycleStateError(
           `Cannot complete ReferralAssignment '${validAssignmentId}' from status '${assignment.Status}' (expected 'Accepted' or 'InProgress').`,
@@ -1426,13 +1455,8 @@ export class CascadeRoutingService {
           ? roundTo2((now.getTime() - new Date(assignment.OfferedAt).getTime()) / (60 * 60 * 1000))
           : null);
 
-      assignment.Status = 'Completed';
-      assignment.CompletedAt = now;
-      if (responseHours != null) {
-        assignment.ResponseHours = responseHours;
-      }
-      await saveOrThrow(assignment, 'Completed ReferralAssignment');
-
+      // Save the ReferralOutcome FIRST: if any later step fails, compensation deletes this
+      // row so a partially-completed referral never leaves behind an orphaned outcome record.
       const outcome = await md.GetEntityObject<ReferralOutcomeEntity>(
         'MJ_BizApps_Referrals: Referral Outcomes',
         contextUser,
@@ -1440,7 +1464,7 @@ export class CascadeRoutingService {
       outcome.ReferralRequestID = request.ID;
       outcome.ReferralAssignmentID = assignment.ID;
       outcome.ProfessionalProfileID = pro.ID;
-      outcome.OutcomeStatus = params.OutcomeStatus ?? 'Completed';
+      outcome.OutcomeStatus = params.OutcomeStatus ?? 'Resolved';
       if (responseHours != null) {
         outcome.ResponseHours = responseHours;
       }
@@ -1452,10 +1476,24 @@ export class CascadeRoutingService {
       }
       outcome.CompletedAt = now;
       await saveOrThrow(outcome, 'ReferralOutcome');
+      compensation?.registerCompensation(async () => {
+        await outcome.Delete();
+      });
 
-      pro.ActiveReferralCount = Math.max(0, pro.ActiveReferralCount - 1);
-      pro.TotalCompletedCount = pro.TotalCompletedCount + 1;
-      await saveOrThrow(pro, 'ProfessionalProfile completion counters');
+      const previousAssignmentStatus = assignment.Status;
+      assignment.Status = 'Completed';
+      assignment.CompletedAt = now;
+      if (responseHours != null) {
+        assignment.ResponseHours = responseHours;
+      }
+      await saveOrThrow(assignment, 'Completed ReferralAssignment');
+      compensation?.registerCompensation(async () => {
+        assignment.Status = previousAssignmentStatus;
+        assignment.CompletedAt = null;
+        await assignment.Save();
+      });
+
+      await atomicDecrementProCapacityOnCompletion(txProvider, pro, contextUser);
 
       if (hasSqlSupport(txProvider)) {
         const newAverage = await recompute90DayAverageResponseHours(
@@ -1578,8 +1616,7 @@ export class CascadeRoutingService {
       }
 
       const now = new Date();
-      const isUrgent = request.UrgencyLevel === 'Urgent';
-      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
+      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, request.UrgencyLevel);
 
       const assignment = await md.GetEntityObject<ReferralAssignmentEntity>('MJ_BizApps_Referrals: Referral Assignments', contextUser);
       assignment.ReferralRequestID = validRequestId;
@@ -1600,7 +1637,7 @@ export class CascadeRoutingService {
       const openEscalationRes = await rv.RunView<ReferralEscalationEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
-          ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Open' AND TriggerType = 'CascadeExhausted'`,
+          ExtraFilter: `ReferralRequestID = '${validRequestId}' AND (Status = 'Open' OR Status = 'Acknowledged') AND TriggerType = 'CascadeExhausted'`,
           ResultType: 'entity_object',
         },
         contextUser,

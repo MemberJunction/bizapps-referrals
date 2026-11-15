@@ -490,6 +490,300 @@ END
 GO
 
 -- -----------------------------------------------------------------------------
+-- 8e. Code Review Remediation Round 1: additive columns on [ReferralOutcome]
+--     per Spec SS2.2/SS2.3 (engaged-fee tracking, attribution, reporter audit).
+-- -----------------------------------------------------------------------------
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'EngagedFeeAmount') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [EngagedFeeAmount] DECIMAL(18,2) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'FeeCurrency') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [FeeCurrency] NVARCHAR(10) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'AttributedFeeAmount') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [AttributedFeeAmount] DECIMAL(18,2) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'ReportedByPersonID') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [ReportedByPersonID] UNIQUEIDENTIFIER NULL
+            CONSTRAINT [FK_ReferralOutcome_ReportedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]);
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'OutcomeNotes') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [OutcomeNotes] NVARCHAR(MAX) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'OutcomeDate') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [OutcomeDate] DATETIMEOFFSET NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'ReportedAt') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+        ADD [ReportedAt] DATETIMEOFFSET NULL;
+END
+GO
+
+-- Widen CK_ReferralOutcome_OutcomeStatus to the Spec SS2.2 5-value vocabulary
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ReferralOutcome_OutcomeStatus'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome] DROP CONSTRAINT [CK_ReferralOutcome_OutcomeStatus];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+    ADD CONSTRAINT [CK_ReferralOutcome_OutcomeStatus] CHECK ([OutcomeStatus] IN (
+        N'Engaged', N'Resolved', N'Withdrawn', N'NoEngagement', N'Lost'
+    ));
+GO
+
+-- Enforce at most one ReferralOutcome per ReferralRequest (Spec SS2.2)
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE [name] = 'UQ_ReferralOutcome_ReferralRequestID'
+      AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
+)
+BEGIN
+    CREATE UNIQUE INDEX [UQ_ReferralOutcome_ReferralRequestID] ON [__mj_BizAppsReferrals].[ReferralOutcome] ([ReferralRequestID]);
+END
+GO
+
+-- -----------------------------------------------------------------------------
+-- 8f. Code Review Remediation Round 1: additive columns on [ProfessionalAvailabilityWindow]
+--     per Spec SS2.2 (coordinator-facing capacity override + active toggle).
+-- -----------------------------------------------------------------------------
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'CapacityOverride') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+        ADD [CapacityOverride] INT NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'Reason') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+        ADD [Reason] NVARCHAR(255) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'IsActive') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+        ADD [IsActive] BIT NOT NULL
+            CONSTRAINT [DF_ProfessionalAvailabilityWindow_IsActive] DEFAULT (1);
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'StartsAt') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+        ADD [StartsAt] DATETIMEOFFSET NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'EndsAt') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+        ADD [EndsAt] DATETIMEOFFSET NULL;
+END
+GO
+
+-- Widen CK_ProfessionalAvailabilityWindow_WindowType to the Spec SS2.2 vocabulary.
+-- [StartDate]/[EndDate]/[IsAvailable]/[Notes] remain the actively-read columns for
+-- CapacityReadinessService.SetAvailabilityWindow; [StartsAt]/[EndsAt]/[Reason]/[IsActive]
+-- are additive Spec-aligned columns kept in sync by the same code path (see
+-- CapacityReadinessService.SetAvailabilityWindow) rather than a destructive rename,
+-- since a live-DB column rename could not be rehearsed/validated in this environment.
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ProfessionalAvailabilityWindow_WindowType'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] DROP CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+    ADD CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType] CHECK ([WindowType] IN (
+        N'OnLeave', N'Paused', N'ReducedCapacity'
+    ));
+GO
+
+-- -----------------------------------------------------------------------------
+-- 8g. Code Review Remediation Round 1: decimal-scale alignment for reciprocity
+--     fractional rates (Spec SS2.3: AcceptanceRate as a 0..1 fraction, ReciprocityIndex
+--     to 3 decimal places).
+-- -----------------------------------------------------------------------------
+ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot] ALTER COLUMN [AcceptanceRate] DECIMAL(5,4) NOT NULL;
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot] ALTER COLUMN [ReciprocityIndex] DECIMAL(8,3) NOT NULL;
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile] ALTER COLUMN [ReciprocityIndex] DECIMAL(8,3) NULL;
+GO
+
+-- -----------------------------------------------------------------------------
+-- 8h. Code Review Remediation Round 1: CHECK value-set realignments on
+--     [ReferralTier], [ReferralRequest], [ReferralEscalation] per Spec SS2.2.
+-- -----------------------------------------------------------------------------
+IF EXISTS (
+    SELECT 1 FROM sys.default_constraints
+    WHERE [name] = 'DF_ReferralTier_EscalationActionType'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [DF_ReferralTier_EscalationActionType];
+END
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
+    ADD CONSTRAINT [DF_ReferralTier_EscalationActionType] DEFAULT (N'NotifyCoordinator') FOR [EscalationActionType];
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ReferralTier_EscalationActionType'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [CK_ReferralTier_EscalationActionType];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
+    ADD CONSTRAINT [CK_ReferralTier_EscalationActionType] CHECK ([EscalationActionType] IN (
+        N'NotifyCoordinator', N'AutoAdvanceCascade', N'CreateFollowUpTask', N'PauseRouting'
+    ));
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.default_constraints
+    WHERE [name] = 'DF_ReferralRequest_SourceChannel'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralRequest]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest] DROP CONSTRAINT [DF_ReferralRequest_SourceChannel];
+END
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest]
+    ADD CONSTRAINT [DF_ReferralRequest_SourceChannel] DEFAULT (N'SeekerPortal') FOR [SourceChannel];
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ReferralRequest_SourceChannel'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralRequest]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest] DROP CONSTRAINT [CK_ReferralRequest_SourceChannel];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest]
+    ADD CONSTRAINT [CK_ReferralRequest_SourceChannel] CHECK ([SourceChannel] IN (
+        N'SeekerPortal', N'FinderWidget', N'ProfessionalReferral', N'ConciergeAgent', N'PartnerImport'
+    ));
+GO
+
+-- Realign CK_ReferralEscalation_TriggerType to the Spec SS2.2 vocabulary (drops
+-- 'ManualEscalation'/'CapacityExhausted', adds 'ConflictDeadlock'/'ManualOverride';
+-- still 6 total). Existing operational TriggerType fires ('SLAWarning', 'SLABreach',
+-- 'UrgentUnassigned', 'CascadeExhausted') are unaffected.
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ReferralEscalation_TriggerType'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_TriggerType];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
+    ADD CONSTRAINT [CK_ReferralEscalation_TriggerType] CHECK ([TriggerType] IN (
+        N'SLAWarning', N'SLABreach', N'CascadeExhausted', N'UrgentUnassigned', N'ConflictDeadlock', N'ManualOverride'
+    ));
+GO
+
+-- Realign CK_ReferralEscalation_RecommendedAction to the Spec SS2.2 vocabulary.
+IF EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE [name] = 'CK_ReferralEscalation_RecommendedAction'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_RecommendedAction];
+END
+GO
+
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
+    ADD CONSTRAINT [CK_ReferralEscalation_RecommendedAction] CHECK ([RecommendedAction] IN (
+        N'ExtendSLA', N'AdvanceCascade', N'ReassignTier', N'ExpandPracticeArea', N'ContactProfessional', N'CloseUnfulfilled'
+    ));
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.default_constraints
+    WHERE [name] = 'DF_ReferralEscalation_RecommendedAction'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [DF_ReferralEscalation_RecommendedAction];
+END
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
+    ADD CONSTRAINT [DF_ReferralEscalation_RecommendedAction] DEFAULT (N'ContactProfessional') FOR [RecommendedAction];
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.default_constraints
+    WHERE [name] = 'DF_ReferralOutcome_OutcomeStatus'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome] DROP CONSTRAINT [DF_ReferralOutcome_OutcomeStatus];
+END
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
+    ADD CONSTRAINT [DF_ReferralOutcome_OutcomeStatus] DEFAULT (N'Resolved') FOR [OutcomeStatus];
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.default_constraints
+    WHERE [name] = 'DF_ProfessionalAvailabilityWindow_WindowType'
+      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]')
+)
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] DROP CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType];
+END
+GO
+ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
+    ADD CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType] DEFAULT (N'Paused') FOR [WindowType];
+GO
+
+-- -----------------------------------------------------------------------------
 -- 9. Base views & CRUD procedures for the 4 new Wave 3 Slice 1 tables
 -- -----------------------------------------------------------------------------
 

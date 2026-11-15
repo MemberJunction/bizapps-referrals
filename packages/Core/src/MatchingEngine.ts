@@ -51,7 +51,7 @@ export class MatchingEngine {
     conflictParties: ReadonlyArray<Pick<ConflictCheckPartyEntity, 'PartyName' | 'PartyRole' | 'OrganizationName' | 'NormalizedName'>>;
     activeMatterParties: ReadonlyArray<ActiveMatterPartyRecord>;
     credentials?: ReadonlyArray<Pick<ProfessionalCredentialEntity, 'ProfessionalProfileID' | 'JurisdictionID' | 'VerificationStatus' | 'ExpiresAt' | 'IsPrimary'>>;
-    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'DayOfWeek' | 'StartTimeMinutes' | 'EndTimeMinutes' | 'StartDate' | 'EndDate' | 'IsAvailable'>>;
+    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'StartDate' | 'EndDate' | 'IsAvailable' | 'IsActive' | 'CapacityOverride'>>;
     asOfDate?: Date;
   }): MatchCandidateScore {
     const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials, availabilityWindows, asOfDate } = params;

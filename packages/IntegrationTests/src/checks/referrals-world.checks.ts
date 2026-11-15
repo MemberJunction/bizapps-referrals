@@ -115,9 +115,9 @@ export const ReferralsWorldChecks: NamedCheck[] = [
         {
           ReferralRequestID: request.ID,
           ReferralAssignmentID: assignment!.ID,
-          TriggerType: 'ManualEscalation',
+          TriggerType: 'ManualOverride',
           EscalationLevel: 1,
-          RecommendedAction: 'Notify',
+          RecommendedAction: 'ContactProfessional',
           Notes: 'RW4 integration check escalation.',
           DedupKey: dedupKey,
         },
@@ -130,7 +130,7 @@ export const ReferralsWorldChecks: NamedCheck[] = [
         {
           ReferralRequestID: request.ID,
           ReferralAssignmentID: assignment!.ID,
-          TriggerType: 'ManualEscalation',
+          TriggerType: 'ManualOverride',
           EscalationLevel: 1,
           DedupKey: dedupKey,
         },

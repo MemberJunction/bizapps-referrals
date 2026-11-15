@@ -1,9 +1,10 @@
-import { BaseEntity, EntitySaveOptions, IMetadataProvider, IRunViewProvider, ValidationResult } from '@memberjunction/core';
+import { BaseEntity, EntitySaveOptions, IMetadataProvider, IRunViewProvider, RunView, ValidationResult } from '@memberjunction/core';
 import { RegisterClass, ValidationErrorInfo, ValidationErrorType } from '@memberjunction/global';
 import {
   AuthorizationError,
   IsCoordinatorOrAdmin,
   NormalizePartyName,
+  PersistenceError,
   ResolvePersonIdForUser,
 } from '@mj-biz-apps/referrals-core';
 import {
@@ -182,41 +183,61 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
   public override Validate(): ValidationResult {
     const result = super.Validate();
 
-    if (this.WindowType === 'Recurring') {
-      if (this.DayOfWeek == null) {
-        result.Success = false;
-        result.Errors.push(
-          new ValidationErrorInfo('DayOfWeek', 'DayOfWeek is required for Recurring availability windows.', this.DayOfWeek, ValidationErrorType.Failure),
-        );
-      }
-      if (this.StartTimeMinutes == null || this.EndTimeMinutes == null) {
-        result.Success = false;
-        result.Errors.push(
-          new ValidationErrorInfo('StartTimeMinutes', 'StartTimeMinutes and EndTimeMinutes are required for Recurring availability windows.', this.StartTimeMinutes, ValidationErrorType.Failure),
-        );
-      } else if (this.EndTimeMinutes <= this.StartTimeMinutes) {
-        result.Success = false;
-        result.Errors.push(
-          new ValidationErrorInfo('EndTimeMinutes', 'EndTimeMinutes must be greater than StartTimeMinutes.', this.EndTimeMinutes, ValidationErrorType.Failure),
-        );
-      }
-    }
-
-    if (this.WindowType === 'DateRange' || this.WindowType === 'Blackout') {
-      if (!this.StartDate || !this.EndDate) {
-        result.Success = false;
-        result.Errors.push(
-          new ValidationErrorInfo('StartDate', `StartDate and EndDate are required for ${this.WindowType} availability windows.`, this.StartDate, ValidationErrorType.Failure),
-        );
-      } else if (new Date(this.EndDate).getTime() < new Date(this.StartDate).getTime()) {
-        result.Success = false;
-        result.Errors.push(
-          new ValidationErrorInfo('EndDate', 'EndDate must be on or after StartDate.', this.EndDate, ValidationErrorType.Failure),
-        );
-      }
+    if (!this.StartDate || !this.EndDate) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('StartDate', `StartDate and EndDate are required for ${this.WindowType} availability windows.`, this.StartDate, ValidationErrorType.Failure),
+      );
+    } else if (new Date(this.EndDate).getTime() < new Date(this.StartDate).getTime()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('EndDate', 'EndDate must be on or after StartDate.', this.EndDate, ValidationErrorType.Failure),
+      );
     }
 
     return result;
+  }
+
+  /**
+   * Rejects overlapping active windows of the same `WindowType` for the same
+   * `ProfessionalProfileID` (`StartDate < existing.EndDate && EndDate > existing.StartDate`)
+   * before delegating to the base `Save()`.
+   */
+  public override async Save(options?: EntitySaveOptions): Promise<boolean> {
+    if (this.IsActive !== false && this.StartDate && this.EndDate && this.ProfessionalProfileID) {
+      const rawProvider: object | undefined = this.ProviderToUse;
+      const isMetadataAndRunView = (
+        p: object | undefined,
+      ): p is IMetadataProvider & IRunViewProvider =>
+        Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
+      if (isMetadataAndRunView(rawProvider) && this.ContextCurrentUser) {
+        const rv = new RunView(rawProvider);
+        const siblingsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+            ExtraFilter: `ProfessionalProfileID = '${this.ProfessionalProfileID}' AND WindowType = '${this.WindowType}' AND IsActive = 1${this.ID ? ` AND ID <> '${this.ID}'` : ''}`,
+            ResultType: 'entity_object',
+          },
+          this.ContextCurrentUser,
+        );
+        if (siblingsRes.Success) {
+          const newStart = new Date(this.StartDate).getTime();
+          const newEnd = new Date(this.EndDate).getTime();
+          const overlapping = siblingsRes.Results.find((w) => {
+            if (!w.StartDate || !w.EndDate) return false;
+            const existingStart = new Date(w.StartDate).getTime();
+            const existingEnd = new Date(w.EndDate).getTime();
+            return newStart < existingEnd && newEnd > existingStart;
+          });
+          if (overlapping) {
+            throw new PersistenceError(
+              `ProfessionalAvailabilityWindow overlaps an existing active '${this.WindowType}' window ('${overlapping.ID}') for ProfessionalProfile '${this.ProfessionalProfileID}'.`,
+            );
+          }
+        }
+      }
+    }
+    return super.Save(options);
   }
 }
 

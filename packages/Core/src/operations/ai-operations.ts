@@ -2,7 +2,8 @@ import { BaseRemotableOperation } from '@memberjunction/core';
 import { RegisterClass } from '@memberjunction/global';
 import type { EscalationRecommendedAction } from '../types.js';
 
-export type AIRationaleSource = 'AI' | 'Deterministic';
+/** Where an AI/rules rationale came from: a live AI advisor call, or the deterministic fallback. */
+export type AIRationaleSource = ExplainMatchRationaleEntry['Source'];
 
 /**
  * Per-candidate rationale returned by `Referrals.ExplainMatch`, persisted onto
@@ -10,7 +11,7 @@ export type AIRationaleSource = 'AI' | 'Deterministic';
  */
 export interface ExplainMatchRationaleEntry {
   ProfessionalProfileID: string;
-  Source: AIRationaleSource;
+  Source: 'AI' | 'Deterministic';
   Summary: string;
   Rationale: string;
   Risks: string[];
@@ -36,7 +37,7 @@ export interface RecommendEscalationInput {
 export interface RecommendEscalationOutput {
   ReferralEscalationID: string;
   RecommendedAction: EscalationRecommendedAction;
-  Source: AIRationaleSource;
+  Source: ExplainMatchRationaleEntry['Source'];
   Summary: string;
   Rationale: string;
   GeneratedAt: string;

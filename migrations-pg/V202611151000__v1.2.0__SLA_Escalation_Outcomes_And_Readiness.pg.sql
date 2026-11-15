@@ -321,6 +321,129 @@ ALTER TABLE __mj_BizAppsReferrals."ProfessionalProfile"
     ADD COLUMN IF NOT EXISTS "ReadinessComputedAt" TIMESTAMPTZ NULL;
 
 -- -----------------------------------------------------------------------------
+-- 8e. Code Review Remediation Round 1: additive columns on "ReferralOutcome"
+--     per Spec SS2.2/SS2.3 (engaged-fee tracking, attribution, reporter audit).
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "EngagedFeeAmount" NUMERIC(18,2) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "FeeCurrency" VARCHAR(10) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "AttributedFeeAmount" NUMERIC(18,2) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "ReportedByPersonID" UUID NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "OutcomeNotes" TEXT NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "OutcomeDate" TIMESTAMPTZ NULL;
+ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+    ADD COLUMN IF NOT EXISTS "ReportedAt" TIMESTAMPTZ NULL;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ReferralOutcome_ReportedByPerson') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome"
+            ADD CONSTRAINT "FK_ReferralOutcome_ReportedByPerson" FOREIGN KEY ("ReportedByPersonID")
+                REFERENCES __mj_BizAppsCommon."Person" ("ID");
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralOutcome_OutcomeStatus') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" DROP CONSTRAINT "CK_ReferralOutcome_OutcomeStatus";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD CONSTRAINT "CK_ReferralOutcome_OutcomeStatus" CHECK ("OutcomeStatus" IN (
+        'Engaged', 'Resolved', 'Withdrawn', 'NoEngagement', 'Lost'
+    ));
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UQ_ReferralOutcome_ReferralRequestID"
+    ON __mj_BizAppsReferrals."ReferralOutcome" ("ReferralRequestID");
+
+-- -----------------------------------------------------------------------------
+-- 8f. Code Review Remediation Round 1: additive columns on "ProfessionalAvailabilityWindow"
+--     per Spec SS2.2 (coordinator-facing capacity override + active toggle).
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow"
+    ADD COLUMN IF NOT EXISTS "CapacityOverride" INT NULL;
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow"
+    ADD COLUMN IF NOT EXISTS "Reason" VARCHAR(255) NULL;
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow"
+    ADD COLUMN IF NOT EXISTS "IsActive" BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow"
+    ADD COLUMN IF NOT EXISTS "StartsAt" TIMESTAMPTZ NULL;
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow"
+    ADD COLUMN IF NOT EXISTS "EndsAt" TIMESTAMPTZ NULL;
+
+-- [StartDate]/[EndDate]/[IsAvailable]/[Notes] remain the actively-read columns for
+-- CapacityReadinessService.SetAvailabilityWindow; [StartsAt]/[EndsAt]/[Reason]/[IsActive]
+-- are additive Spec-aligned columns kept in sync by the same code path rather than a
+-- destructive rename, since a live-DB column rename could not be rehearsed/validated
+-- in this environment.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ProfessionalAvailabilityWindow_WindowType') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" DROP CONSTRAINT "CK_ProfessionalAvailabilityWindow_WindowType";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD CONSTRAINT "CK_ProfessionalAvailabilityWindow_WindowType" CHECK ("WindowType" IN (
+        'OnLeave', 'Paused', 'ReducedCapacity'
+    ));
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- 8g. Code Review Remediation Round 1: decimal-scale alignment for reciprocity
+--     fractional rates (Spec SS2.3: AcceptanceRate as a 0..1 fraction, ReciprocityIndex
+--     to 3 decimal places).
+-- -----------------------------------------------------------------------------
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ALTER COLUMN "AcceptanceRate" TYPE NUMERIC(5,4);
+ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ALTER COLUMN "ReciprocityIndex" TYPE NUMERIC(8,3);
+ALTER TABLE __mj_BizAppsReferrals."ProfessionalProfile" ALTER COLUMN "ReciprocityIndex" TYPE NUMERIC(8,3);
+
+-- -----------------------------------------------------------------------------
+-- 8h. Code Review Remediation Round 1: CHECK value-set realignments on
+--     "ReferralTier", "ReferralRequest", "ReferralEscalation" per Spec SS2.2.
+-- -----------------------------------------------------------------------------
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralTier_EscalationActionType') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralTier" DROP CONSTRAINT "CK_ReferralTier_EscalationActionType";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralTier" ADD CONSTRAINT "CK_ReferralTier_EscalationActionType" CHECK ("EscalationActionType" IN (
+        'NotifyCoordinator', 'AutoAdvanceCascade', 'CreateFollowUpTask', 'PauseRouting'
+    ));
+    ALTER TABLE __mj_BizAppsReferrals."ReferralTier" ALTER COLUMN "EscalationActionType" SET DEFAULT 'NotifyCoordinator';
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralRequest_SourceChannel') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralRequest" DROP CONSTRAINT "CK_ReferralRequest_SourceChannel";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralRequest" ADD CONSTRAINT "CK_ReferralRequest_SourceChannel" CHECK ("SourceChannel" IN (
+        'SeekerPortal', 'FinderWidget', 'ProfessionalReferral', 'ConciergeAgent', 'PartnerImport'
+    ));
+    ALTER TABLE __mj_BizAppsReferrals."ReferralRequest" ALTER COLUMN "SourceChannel" SET DEFAULT 'SeekerPortal';
+
+    -- Realign CK_ReferralEscalation_TriggerType to the Spec SS2.2 vocabulary (drops
+    -- 'ManualEscalation'/'CapacityExhausted', adds 'ConflictDeadlock'/'ManualOverride';
+    -- still 6 total). Existing operational TriggerType fires ('SLAWarning', 'SLABreach',
+    -- 'UrgentUnassigned', 'CascadeExhausted') are unaffected.
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralEscalation_TriggerType') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" DROP CONSTRAINT "CK_ReferralEscalation_TriggerType";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD CONSTRAINT "CK_ReferralEscalation_TriggerType" CHECK ("TriggerType" IN (
+        'SLAWarning', 'SLABreach', 'CascadeExhausted', 'UrgentUnassigned', 'ConflictDeadlock', 'ManualOverride'
+    ));
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralEscalation_RecommendedAction') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" DROP CONSTRAINT "CK_ReferralEscalation_RecommendedAction";
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD CONSTRAINT "CK_ReferralEscalation_RecommendedAction" CHECK ("RecommendedAction" IN (
+        'ExtendSLA', 'AdvanceCascade', 'ReassignTier', 'ExpandPracticeArea', 'ContactProfessional', 'CloseUnfulfilled'
+    ));
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ALTER COLUMN "RecommendedAction" SET DEFAULT 'ContactProfessional';
+
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CK_ReferralOutcome_OutcomeStatus') THEN
+        NULL; -- already realigned in section 8e above
+    END IF;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ALTER COLUMN "OutcomeStatus" SET DEFAULT 'Resolved';
+
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ALTER COLUMN "WindowType" SET DEFAULT 'Paused';
+END $$;
+
+-- -----------------------------------------------------------------------------
 -- 9. Base views & CRUD functions for the 4 new Wave 3 Slice 1 tables
 --    (Hand-authored to mirror the exact MJ CodeGen PostgreSQL output pattern,
 --    consistent with the Wave 2 "ProfessionalCredential" precedent in this file.)

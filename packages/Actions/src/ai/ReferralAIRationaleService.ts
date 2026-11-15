@@ -28,7 +28,14 @@ import {
 export const MATCH_RATIONALE_PROMPT_NAME = 'Referrals Match Rationale';
 export const ESCALATION_ADVISOR_PROMPT_NAME = 'Referrals Escalation Advisor';
 
-const RECOMMENDED_ACTIONS: ReadonlyArray<EscalationRecommendedAction> = ['Notify', 'Reassign', 'AdminAlert', 'EscalateToTier'];
+const RECOMMENDED_ACTIONS: ReadonlyArray<EscalationRecommendedAction> = [
+  'ExtendSLA',
+  'AdvanceCascade',
+  'ReassignTier',
+  'ExpandPracticeArea',
+  'ContactProfessional',
+  'CloseUnfulfilled',
+];
 
 export interface RationaleRequestInput {
   PracticeAreaName: string;
@@ -127,16 +134,22 @@ function deterministicAssignmentRationale(candidate: RationaleCandidateInput, no
 }
 
 function deterministicRecommendedAction(escalation: ReferralEscalationEntity): EscalationRecommendedAction {
-  if (escalation.EscalationLevel >= 3 || escalation.TriggerType === 'CascadeExhausted') {
-    return 'EscalateToTier';
+  if (escalation.TriggerType === 'CascadeExhausted') {
+    return 'ExpandPracticeArea';
   }
-  if (escalation.TriggerType === 'CapacityExhausted') {
-    return 'Reassign';
+  if (escalation.EscalationLevel >= 3) {
+    return 'ReassignTier';
   }
   if (escalation.TriggerType === 'UrgentUnassigned') {
-    return 'AdminAlert';
+    return 'ReassignTier';
   }
-  return 'Notify';
+  if (escalation.TriggerType === 'SLABreach') {
+    return 'AdvanceCascade';
+  }
+  if (escalation.TriggerType === 'ConflictDeadlock' || escalation.TriggerType === 'ManualOverride') {
+    return 'ContactProfessional';
+  }
+  return 'ContactProfessional';
 }
 
 function parseEscalationRationale(json: string): EscalationRationale | null {
@@ -370,6 +383,77 @@ export class ReferralAIRationaleService {
    * `options.Force` is set (1 executor call). Never mutates `Status`, `EscalationLevel`,
    * `CascadeOrder`, or any assignment row.
    */
+  /**
+   * Builds the allowlisted, PII-free prompt context for the escalation advisor: TriggerType,
+   * EscalationLevel, Status, PracticeArea name, Urgency, Tier name, elapsed hours since
+   * trigger, and the request's current cascade candidate count. Never includes
+   * `escalation.Notes`/`ResolutionNotes`, seeker name/email/phone/company, or matter text.
+   */
+  public static async buildSafeEscalationAdvisorContext(
+    escalation: ReferralEscalationEntity,
+    contextUser: UserInfo,
+    provider: IMetadataProvider & IRunViewProvider,
+  ): Promise<Record<string, PromptDataValue>> {
+    const elapsedHours = Math.round(((Date.now() - new Date(escalation.TriggeredAt).getTime()) / (60 * 60 * 1000)) * 10) / 10;
+    const base: Record<string, PromptDataValue> = {
+      escalationLevel: escalation.EscalationLevel,
+      triggerType: escalation.TriggerType,
+      status: escalation.Status,
+      elapsedHours,
+      practiceAreaName: '',
+      urgencyLevel: '',
+      tierName: '',
+      cascadeCandidateCount: 0,
+    };
+
+    const rv = new RunView(provider);
+    const requestRes = await rv.RunView<ReferralRequestEntity>(
+      {
+        EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+        ExtraFilter: `ID = '${AssertValidUUID(escalation.ReferralRequestID, 'ReferralRequestID')}'`,
+        ResultType: 'entity_object',
+      },
+      contextUser,
+    );
+    const request = requestRes.Success ? requestRes.Results[0] : undefined;
+    if (!request) {
+      return base;
+    }
+    base.urgencyLevel = request.UrgencyLevel;
+
+    const [practiceAreaRes, tierRes, candidatesRes] = await rv.RunViews(
+      [
+        {
+          EntityName: 'MJ_BizApps_Referrals: Practice Areas',
+          ExtraFilter: `ID = '${request.PracticeAreaID}'`,
+          ResultType: 'entity_object',
+        },
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Tiers',
+          ExtraFilter: `ID = '${request.ReferralTierID}'`,
+          ResultType: 'entity_object',
+        },
+        {
+          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+          ExtraFilter: `ReferralRequestID = '${request.ID}' AND (Status = 'Queued' OR Status = 'Offered')`,
+          ResultType: 'entity_object',
+        },
+      ],
+      contextUser,
+    );
+    if (practiceAreaRes?.Success && practiceAreaRes.Results.length > 0) {
+      base.practiceAreaName = (practiceAreaRes.Results[0] as PracticeAreaEntity).Name;
+    }
+    if (tierRes?.Success && tierRes.Results.length > 0) {
+      base.tierName = (tierRes.Results[0] as ReferralTierEntity).Name;
+    }
+    if (candidatesRes?.Success) {
+      base.cascadeCandidateCount = candidatesRes.Results.length;
+    }
+
+    return base;
+  }
+
   public static async RecommendEscalationAction(
     referralEscalationId: string,
     options: RecommendEscalationOptions,
@@ -396,15 +480,18 @@ export class ReferralAIRationaleService {
     let recommendedAction: EscalationRecommendedAction | null = null;
     let rationale: EscalationRationale | null = null;
 
+    // Never pass escalation.Notes/ResolutionNotes (coordinator free text, may contain seeker
+    // PII or matter details) to the LLM - only structured, allowlisted fields.
+    const safeContext = await ReferralAIRationaleService.buildSafeEscalationAdvisorContext(
+      escalation,
+      contextUser,
+      provider,
+    );
+
     try {
       const execResult = await ReferralAIRationaleService.executor.ExecutePrompt<RawEscalationAdvisorOutput>(
         ESCALATION_ADVISOR_PROMPT_NAME,
-        {
-          escalationLevel: escalation.EscalationLevel,
-          triggerType: escalation.TriggerType,
-          status: escalation.Status,
-          notes: escalation.Notes ?? '',
-        },
+        safeContext,
         contextUser,
       );
       if (

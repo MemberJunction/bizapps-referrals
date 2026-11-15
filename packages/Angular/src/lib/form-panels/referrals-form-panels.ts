@@ -729,7 +729,7 @@ export class ReferralEscalationHeroPanel extends BaseFormPanel {
             <div class="hero-sub">Completed: {{ outcome.CompletedAt | date:'medium' }}</div>
           </div>
           <div class="hero-actions">
-            <span class="status-pill" [attr.data-tone]="outcome.OutcomeStatus === 'Completed' ? 'success' : 'warning'">
+            <span class="status-pill" [attr.data-tone]="(outcome.OutcomeStatus === 'Resolved' || outcome.OutcomeStatus === 'Engaged') ? 'success' : 'warning'">
               {{ outcome.OutcomeStatus }}
             </span>
           </div>

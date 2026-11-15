@@ -124,13 +124,14 @@ export class ReciprocityScorecardService {
     const myOutcomes = data.outcomes.filter(
       (o) => UUIDsEqual(o.ProfessionalProfileID, validProfileId) && inPeriod(o.CompletedAt, period),
     );
-    const Resolved = myOutcomes.filter((o) => o.OutcomeStatus === 'Completed').length;
+    const Resolved = myOutcomes.filter((o) => o.OutcomeStatus === 'Resolved').length;
     const AttributedFeeTotal = roundTo(
       myOutcomes.reduce((sum, o) => sum + (o.FeeAmount ?? 0), 0),
       2,
     );
 
-    const AcceptanceRate = Received > 0 ? roundTo((Accepted / Received) * 100, 2) : 0;
+    // AcceptanceRate is a 0..1 fraction per Spec SS2.3 (e.g. 0.8000), not a percentage.
+    const AcceptanceRate = Received > 0 ? roundTo(Accepted / Received, 4) : 0;
     const ReciprocityIndex = roundTo((Sent + 1) / (Accepted + 1), 3);
 
     return {
@@ -228,7 +229,7 @@ export class ReciprocityScorecardService {
 
       profile.ReciprocityIndex = scorecard.ReciprocityIndex;
       const readiness = CapacityReadinessService.ComputeReadinessScore(profile, []);
-      profile.ReadinessScore = readiness.TotalScore;
+      profile.ReadinessScore = readiness.Score;
       profile.ReadinessComputedAt = new Date();
       const profileSaved = await profile.Save();
       if (!profileSaved) {

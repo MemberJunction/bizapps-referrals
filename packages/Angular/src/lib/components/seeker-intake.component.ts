@@ -525,9 +525,8 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     if (!tier) {
       return '';
     }
-    const isUrgent = this.UrgencyLevel === 'Urgent';
     const now = new Date();
-    const deadline = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
+    const deadline = CapacityReadinessService.ComputeSLADeadline(now, tier, this.UrgencyLevel);
     const effectiveHours = Math.round(((deadline.getTime() - now.getTime()) / (60 * 60 * 1000)) * 10) / 10;
     return `Expected first response within ~${effectiveHours}h`;
   }

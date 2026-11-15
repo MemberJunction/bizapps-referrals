@@ -454,7 +454,7 @@ export const mjBizAppsReferralsProfessionalProfileSchema = z.object({
     ReciprocityIndex: z.number().nullable().describe(`
         * * Field Name: ReciprocityIndex
         * * Display Name: Reciprocity Index
-        * * SQL Data Type: decimal(5, 2)`),
+        * * SQL Data Type: decimal(8, 3)`),
     ReadinessComputedAt: z.date().nullable().describe(`
         * * Field Name: ReadinessComputedAt
         * * Display Name: Readiness Computed At
@@ -792,18 +792,18 @@ export const mjBizAppsReferralsReferralRequestSchema = z.object({
         * * Field Name: CompletedAt
         * * Display Name: Completed At
         * * SQL Data Type: datetimeoffset`),
-    SourceChannel: z.union([z.literal('API'), z.literal('Email'), z.literal('Phone'), z.literal('Referral'), z.literal('Web')]).describe(`
+    SourceChannel: z.union([z.literal('ConciergeAgent'), z.literal('FinderWidget'), z.literal('PartnerImport'), z.literal('ProfessionalReferral'), z.literal('SeekerPortal')]).describe(`
         * * Field Name: SourceChannel
         * * Display Name: Source Channel
         * * SQL Data Type: nvarchar(30)
-        * * Default Value: Web
+        * * Default Value: SeekerPortal
     * * Value List Type: List
     * * Possible Values
-    *   * API
-    *   * Email
-    *   * Phone
-    *   * Referral
-    *   * Web`),
+    *   * ConciergeAgent
+    *   * FinderWidget
+    *   * PartnerImport
+    *   * ProfessionalReferral
+    *   * SeekerPortal`),
     ReferringProfessionalID: z.string().nullable().describe(`
         * * Field Name: ReferringProfessionalID
         * * Display Name: Referring Professional
@@ -909,16 +909,17 @@ export const mjBizAppsReferralsReferralTierSchema = z.object({
         * * Display Name: Urgent SLA Multiplier
         * * SQL Data Type: decimal(4, 2)
         * * Default Value: 0.50`),
-    EscalationActionType: z.union([z.literal('AdminAlert'), z.literal('Notify'), z.literal('Reassign')]).describe(`
+    EscalationActionType: z.union([z.literal('AutoAdvanceCascade'), z.literal('CreateFollowUpTask'), z.literal('NotifyCoordinator'), z.literal('PauseRouting')]).describe(`
         * * Field Name: EscalationActionType
         * * Display Name: Escalation Action Type
         * * SQL Data Type: nvarchar(30)
-        * * Default Value: Notify
+        * * Default Value: NotifyCoordinator
     * * Value List Type: List
     * * Possible Values
-    *   * AdminAlert
-    *   * Notify
-    *   * Reassign`),
+    *   * AutoAdvanceCascade
+    *   * CreateFollowUpTask
+    *   * NotifyCoordinator
+    *   * PauseRouting`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -2236,7 +2237,7 @@ export class mjBizAppsReferralsProfessionalProfileEntity extends BaseEntity<mjBi
     /**
     * * Field Name: ReciprocityIndex
     * * Display Name: Reciprocity Index
-    * * SQL Data Type: decimal(5, 2)
+    * * SQL Data Type: decimal(8, 3)
     */
     get ReciprocityIndex(): number | null {
         return this.Get('ReciprocityIndex');
@@ -3165,19 +3166,19 @@ export class mjBizAppsReferralsReferralRequestEntity extends BaseEntity<mjBizApp
     * * Field Name: SourceChannel
     * * Display Name: Source Channel
     * * SQL Data Type: nvarchar(30)
-    * * Default Value: Web
+    * * Default Value: SeekerPortal
     * * Value List Type: List
     * * Possible Values
-    *   * API
-    *   * Email
-    *   * Phone
-    *   * Referral
-    *   * Web
+    *   * ConciergeAgent
+    *   * FinderWidget
+    *   * PartnerImport
+    *   * ProfessionalReferral
+    *   * SeekerPortal
     */
-    get SourceChannel(): 'API' | 'Email' | 'Phone' | 'Referral' | 'Web' {
+    get SourceChannel(): 'ConciergeAgent' | 'FinderWidget' | 'PartnerImport' | 'ProfessionalReferral' | 'SeekerPortal' {
         return this.Get('SourceChannel');
     }
-    set SourceChannel(value: 'API' | 'Email' | 'Phone' | 'Referral' | 'Web') {
+    set SourceChannel(value: 'ConciergeAgent' | 'FinderWidget' | 'PartnerImport' | 'ProfessionalReferral' | 'SeekerPortal') {
         this.Set('SourceChannel', value);
     }
 
@@ -3515,17 +3516,18 @@ export class mjBizAppsReferralsReferralTierEntity extends BaseEntity<mjBizAppsRe
     * * Field Name: EscalationActionType
     * * Display Name: Escalation Action Type
     * * SQL Data Type: nvarchar(30)
-    * * Default Value: Notify
+    * * Default Value: NotifyCoordinator
     * * Value List Type: List
     * * Possible Values
-    *   * AdminAlert
-    *   * Notify
-    *   * Reassign
+    *   * AutoAdvanceCascade
+    *   * CreateFollowUpTask
+    *   * NotifyCoordinator
+    *   * PauseRouting
     */
-    get EscalationActionType(): 'AdminAlert' | 'Notify' | 'Reassign' {
+    get EscalationActionType(): 'AutoAdvanceCascade' | 'CreateFollowUpTask' | 'NotifyCoordinator' | 'PauseRouting' {
         return this.Get('EscalationActionType');
     }
-    set EscalationActionType(value: 'AdminAlert' | 'Notify' | 'Reassign') {
+    set EscalationActionType(value: 'AutoAdvanceCascade' | 'CreateFollowUpTask' | 'NotifyCoordinator' | 'PauseRouting') {
         this.Set('EscalationActionType', value);
     }
 
@@ -3935,16 +3937,16 @@ export const mjBizAppsReferralsReferralEscalationSchema = z.object({
         * * Display Name: Escalation Level
     * * SQL Data Type: int
     * * Default Value: 1`),
-    TriggerType: z.union([z.literal('CapacityExhausted'), z.literal('CascadeExhausted'), z.literal('ManualEscalation'), z.literal('SLABreach'), z.literal('SLAWarning'), z.literal('UrgentUnassigned')]).describe(`
+    TriggerType: z.union([z.literal('CascadeExhausted'), z.literal('ConflictDeadlock'), z.literal('ManualOverride'), z.literal('SLABreach'), z.literal('SLAWarning'), z.literal('UrgentUnassigned')]).describe(`
         * * Field Name: TriggerType
         * * Display Name: Trigger Type
     * * SQL Data Type: nvarchar(60)
     * * Default Value: SLAWarning
     * * Value List Type: List
     * * Possible Values
-    *   * CapacityExhausted
     *   * CascadeExhausted
-    *   * ManualEscalation
+    *   * ConflictDeadlock
+    *   * ManualOverride
     *   * SLABreach
     *   * SLAWarning
     *   * UrgentUnassigned`),
@@ -3959,17 +3961,19 @@ export const mjBizAppsReferralsReferralEscalationSchema = z.object({
     *   * Dismissed
     *   * Open
     *   * Resolved`),
-    RecommendedAction: z.union([z.literal('AdminAlert'), z.literal('EscalateToTier'), z.literal('Notify'), z.literal('Reassign')]).describe(`
+    RecommendedAction: z.union([z.literal('AdvanceCascade'), z.literal('CloseUnfulfilled'), z.literal('ContactProfessional'), z.literal('ExpandPracticeArea'), z.literal('ExtendSLA'), z.literal('ReassignTier')]).describe(`
         * * Field Name: RecommendedAction
         * * Display Name: Recommended Action
     * * SQL Data Type: nvarchar(60)
-    * * Default Value: Notify
+    * * Default Value: ContactProfessional
     * * Value List Type: List
-    * * Possible Values 
-    *   * AdminAlert
-    *   * EscalateToTier
-    *   * Notify
-    *   * Reassign`),
+    * * Possible Values
+    *   * AdvanceCascade
+    *   * CloseUnfulfilled
+    *   * ContactProfessional
+    *   * ExpandPracticeArea
+    *   * ExtendSLA
+    *   * ReassignTier`),
     Notes: z.string().nullable().describe(`
         * * Field Name: Notes
         * * Display Name: Notes
@@ -4051,16 +4055,18 @@ export const mjBizAppsReferralsReferralOutcomeSchema = z.object({
         * * Display Name: Professional Profile
     * * SQL Data Type: uniqueidentifier
     * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
-    OutcomeStatus: z.union([z.literal('Cancelled'), z.literal('Completed'), z.literal('NoEngagement')]).describe(`
+    OutcomeStatus: z.union([z.literal('Engaged'), z.literal('Lost'), z.literal('NoEngagement'), z.literal('Resolved'), z.literal('Withdrawn')]).describe(`
         * * Field Name: OutcomeStatus
         * * Display Name: Outcome Status
     * * SQL Data Type: nvarchar(60)
-    * * Default Value: Completed
+    * * Default Value: Resolved
     * * Value List Type: List
-    * * Possible Values 
-    *   * Cancelled
-    *   * Completed
-    *   * NoEngagement`),
+    * * Possible Values
+    *   * Engaged
+    *   * Lost
+    *   * NoEngagement
+    *   * Resolved
+    *   * Withdrawn`),
     ResponseHours: z.number().nullable().describe(`
         * * Field Name: ResponseHours
         * * Display Name: Response Hours
@@ -4078,6 +4084,35 @@ export const mjBizAppsReferralsReferralOutcomeSchema = z.object({
         * * Field Name: FeeAmount
         * * Display Name: Fee Amount
     * * SQL Data Type: decimal(10, 2)`),
+    EngagedFeeAmount: z.number().nullable().describe(`
+        * * Field Name: EngagedFeeAmount
+        * * Display Name: Engaged Fee Amount
+    * * SQL Data Type: decimal(18, 2)`),
+    FeeCurrency: z.string().nullable().describe(`
+        * * Field Name: FeeCurrency
+        * * Display Name: Fee Currency
+    * * SQL Data Type: nvarchar(10)`),
+    AttributedFeeAmount: z.number().nullable().describe(`
+        * * Field Name: AttributedFeeAmount
+        * * Display Name: Attributed Fee Amount
+    * * SQL Data Type: decimal(18, 2)`),
+    ReportedByPersonID: z.string().nullable().describe(`
+        * * Field Name: ReportedByPersonID
+        * * Display Name: Reported By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)`),
+    OutcomeNotes: z.string().nullable().describe(`
+        * * Field Name: OutcomeNotes
+        * * Display Name: Outcome Notes
+    * * SQL Data Type: nvarchar(MAX)`),
+    OutcomeDate: z.date().nullable().describe(`
+        * * Field Name: OutcomeDate
+        * * Display Name: Outcome Date
+    * * SQL Data Type: datetimeoffset`),
+    ReportedAt: z.date().nullable().describe(`
+        * * Field Name: ReportedAt
+        * * Display Name: Reported At
+    * * SQL Data Type: datetimeoffset`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4106,16 +4141,16 @@ export const mjBizAppsReferralsProfessionalAvailabilityWindowSchema = z.object({
         * * Display Name: Professional Profile
     * * SQL Data Type: uniqueidentifier
     * * Related Entity/Foreign Key: MJ_BizApps_Referrals: Professional Profiles (vwProfessionalProfiles.ID)`),
-    WindowType: z.union([z.literal('Blackout'), z.literal('DateRange'), z.literal('Recurring')]).describe(`
+    WindowType: z.union([z.literal('OnLeave'), z.literal('Paused'), z.literal('ReducedCapacity')]).describe(`
         * * Field Name: WindowType
         * * Display Name: Window Type
     * * SQL Data Type: nvarchar(40)
-    * * Default Value: Recurring
+    * * Default Value: Paused
     * * Value List Type: List
-    * * Possible Values 
-    *   * Blackout
-    *   * DateRange
-    *   * Recurring`),
+    * * Possible Values
+    *   * OnLeave
+    *   * Paused
+    *   * ReducedCapacity`),
     DayOfWeek: z.number().nullable().describe(`
         * * Field Name: DayOfWeek
         * * Display Name: Day Of Week
@@ -4150,6 +4185,27 @@ export const mjBizAppsReferralsProfessionalAvailabilityWindowSchema = z.object({
         * * Field Name: Notes
         * * Display Name: Notes
     * * SQL Data Type: nvarchar(255)`),
+    CapacityOverride: z.number().nullable().describe(`
+        * * Field Name: CapacityOverride
+        * * Display Name: Capacity Override
+    * * SQL Data Type: int`),
+    Reason: z.string().nullable().describe(`
+        * * Field Name: Reason
+        * * Display Name: Reason
+    * * SQL Data Type: nvarchar(255)`),
+    IsActive: z.boolean().describe(`
+        * * Field Name: IsActive
+        * * Display Name: Is Active
+    * * SQL Data Type: bit
+    * * Default Value: 1`),
+    StartsAt: z.date().nullable().describe(`
+        * * Field Name: StartsAt
+        * * Display Name: Starts At
+    * * SQL Data Type: datetimeoffset`),
+    EndsAt: z.date().nullable().describe(`
+        * * Field Name: EndsAt
+        * * Display Name: Ends At
+    * * SQL Data Type: datetimeoffset`),
     __mj_CreatedAt: z.date().describe(`
         * * Field Name: __mj_CreatedAt
         * * Display Name: Created At
@@ -4204,7 +4260,7 @@ export const mjBizAppsReferralsReciprocitySnapshotSchema = z.object({
     ReciprocityIndex: z.number().describe(`
         * * Field Name: ReciprocityIndex
         * * Display Name: Reciprocity Index
-    * * SQL Data Type: decimal(5, 2)
+    * * SQL Data Type: decimal(8, 3)
     * * Default Value: 0.00`),
     AcceptedCount: z.number().describe(`
         * * Field Name: AcceptedCount
@@ -4224,7 +4280,7 @@ export const mjBizAppsReferralsReciprocitySnapshotSchema = z.object({
     AcceptanceRate: z.number().describe(`
         * * Field Name: AcceptanceRate
         * * Display Name: Acceptance Rate
-    * * SQL Data Type: decimal(5, 2)
+    * * SQL Data Type: decimal(5, 4)
     * * Default Value: 0`),
     MedianResponseHours: z.number().nullable().describe(`
         * * Field Name: MedianResponseHours
@@ -4338,17 +4394,17 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     * * Default Value: SLAWarning
     * * Value List Type: List
     * * Possible Values
-    *   * CapacityExhausted
     *   * CascadeExhausted
-    *   * ManualEscalation
+    *   * ConflictDeadlock
+    *   * ManualOverride
     *   * SLABreach
     *   * SLAWarning
     *   * UrgentUnassigned
     */
-    get TriggerType(): 'CapacityExhausted' | 'CascadeExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned' {
+    get TriggerType(): 'CascadeExhausted' | 'ConflictDeadlock' | 'ManualOverride' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned' {
         return this.Get('TriggerType');
     }
-    set TriggerType(value: 'CapacityExhausted' | 'CascadeExhausted' | 'ManualEscalation' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned') {
+    set TriggerType(value: 'CascadeExhausted' | 'ConflictDeadlock' | 'ManualOverride' | 'SLABreach' | 'SLAWarning' | 'UrgentUnassigned') {
         this.Set('TriggerType', value);
     }
 
@@ -4375,18 +4431,20 @@ export class mjBizAppsReferralsReferralEscalationEntity extends BaseEntity<mjBiz
     * * Field Name: RecommendedAction
     * * Display Name: Recommended Action
     * * SQL Data Type: nvarchar(60)
-    * * Default Value: Notify
+    * * Default Value: ContactProfessional
     * * Value List Type: List
-    * * Possible Values 
-    *   * AdminAlert
-    *   * EscalateToTier
-    *   * Notify
-    *   * Reassign
+    * * Possible Values
+    *   * AdvanceCascade
+    *   * CloseUnfulfilled
+    *   * ContactProfessional
+    *   * ExpandPracticeArea
+    *   * ExtendSLA
+    *   * ReassignTier
     */
-    get RecommendedAction(): 'AdminAlert' | 'EscalateToTier' | 'Notify' | 'Reassign' {
+    get RecommendedAction(): 'AdvanceCascade' | 'CloseUnfulfilled' | 'ContactProfessional' | 'ExpandPracticeArea' | 'ExtendSLA' | 'ReassignTier' {
         return this.Get('RecommendedAction');
     }
-    set RecommendedAction(value: 'AdminAlert' | 'EscalateToTier' | 'Notify' | 'Reassign') {
+    set RecommendedAction(value: 'AdvanceCascade' | 'CloseUnfulfilled' | 'ContactProfessional' | 'ExpandPracticeArea' | 'ExtendSLA' | 'ReassignTier') {
         this.Set('RecommendedAction', value);
     }
 
@@ -4621,17 +4679,19 @@ export class mjBizAppsReferralsReferralOutcomeEntity extends BaseEntity<mjBizApp
     * * Field Name: OutcomeStatus
     * * Display Name: Outcome Status
     * * SQL Data Type: nvarchar(60)
-    * * Default Value: Completed
+    * * Default Value: Resolved
     * * Value List Type: List
-    * * Possible Values 
-    *   * Cancelled
-    *   * Completed
+    * * Possible Values
+    *   * Engaged
+    *   * Lost
     *   * NoEngagement
+    *   * Resolved
+    *   * Withdrawn
     */
-    get OutcomeStatus(): 'Cancelled' | 'Completed' | 'NoEngagement' {
+    get OutcomeStatus(): 'Engaged' | 'Lost' | 'NoEngagement' | 'Resolved' | 'Withdrawn' {
         return this.Get('OutcomeStatus');
     }
-    set OutcomeStatus(value: 'Cancelled' | 'Completed' | 'NoEngagement') {
+    set OutcomeStatus(value: 'Engaged' | 'Lost' | 'NoEngagement' | 'Resolved' | 'Withdrawn') {
         this.Set('OutcomeStatus', value);
     }
 
@@ -4682,6 +4742,91 @@ export class mjBizAppsReferralsReferralOutcomeEntity extends BaseEntity<mjBizApp
     }
     set FeeAmount(value: number | null) {
         this.Set('FeeAmount', value);
+    }
+
+    /**
+    * * Field Name: EngagedFeeAmount
+    * * Display Name: Engaged Fee Amount
+    * * SQL Data Type: decimal(18, 2)
+    */
+    get EngagedFeeAmount(): number | null {
+        return this.Get('EngagedFeeAmount');
+    }
+    set EngagedFeeAmount(value: number | null) {
+        this.Set('EngagedFeeAmount', value);
+    }
+
+    /**
+    * * Field Name: FeeCurrency
+    * * Display Name: Fee Currency
+    * * SQL Data Type: nvarchar(10)
+    */
+    get FeeCurrency(): string | null {
+        return this.Get('FeeCurrency');
+    }
+    set FeeCurrency(value: string | null) {
+        this.Set('FeeCurrency', value);
+    }
+
+    /**
+    * * Field Name: AttributedFeeAmount
+    * * Display Name: Attributed Fee Amount
+    * * SQL Data Type: decimal(18, 2)
+    */
+    get AttributedFeeAmount(): number | null {
+        return this.Get('AttributedFeeAmount');
+    }
+    set AttributedFeeAmount(value: number | null) {
+        this.Set('AttributedFeeAmount', value);
+    }
+
+    /**
+    * * Field Name: ReportedByPersonID
+    * * Display Name: Reported By Person
+    * * SQL Data Type: uniqueidentifier
+    * * Related Entity/Foreign Key: MJ_BizApps_Common: People (vwPeople.ID)
+    */
+    get ReportedByPersonID(): string | null {
+        return this.Get('ReportedByPersonID');
+    }
+    set ReportedByPersonID(value: string | null) {
+        this.Set('ReportedByPersonID', value);
+    }
+
+    /**
+    * * Field Name: OutcomeNotes
+    * * Display Name: Outcome Notes
+    * * SQL Data Type: nvarchar(MAX)
+    */
+    get OutcomeNotes(): string | null {
+        return this.Get('OutcomeNotes');
+    }
+    set OutcomeNotes(value: string | null) {
+        this.Set('OutcomeNotes', value);
+    }
+
+    /**
+    * * Field Name: OutcomeDate
+    * * Display Name: Outcome Date
+    * * SQL Data Type: datetimeoffset
+    */
+    get OutcomeDate(): Date | null {
+        return this.Get('OutcomeDate');
+    }
+    set OutcomeDate(value: Date | null) {
+        this.Set('OutcomeDate', value);
+    }
+
+    /**
+    * * Field Name: ReportedAt
+    * * Display Name: Reported At
+    * * SQL Data Type: datetimeoffset
+    */
+    get ReportedAt(): Date | null {
+        return this.Get('ReportedAt');
+    }
+    set ReportedAt(value: Date | null) {
+        this.Set('ReportedAt', value);
     }
 
     /**
@@ -4766,17 +4911,17 @@ export class mjBizAppsReferralsProfessionalAvailabilityWindowEntity extends Base
     * * Field Name: WindowType
     * * Display Name: Window Type
     * * SQL Data Type: nvarchar(40)
-    * * Default Value: Recurring
+    * * Default Value: Paused
     * * Value List Type: List
-    * * Possible Values 
-    *   * Blackout
-    *   * DateRange
-    *   * Recurring
+    * * Possible Values
+    *   * OnLeave
+    *   * Paused
+    *   * ReducedCapacity
     */
-    get WindowType(): 'Blackout' | 'DateRange' | 'Recurring' {
+    get WindowType(): 'OnLeave' | 'Paused' | 'ReducedCapacity' {
         return this.Get('WindowType');
     }
-    set WindowType(value: 'Blackout' | 'DateRange' | 'Recurring') {
+    set WindowType(value: 'OnLeave' | 'Paused' | 'ReducedCapacity') {
         this.Set('WindowType', value);
     }
 
@@ -4876,6 +5021,67 @@ export class mjBizAppsReferralsProfessionalAvailabilityWindowEntity extends Base
     }
     set Notes(value: string | null) {
         this.Set('Notes', value);
+    }
+
+    /**
+    * * Field Name: CapacityOverride
+    * * Display Name: Capacity Override
+    * * SQL Data Type: int
+    */
+    get CapacityOverride(): number | null {
+        return this.Get('CapacityOverride');
+    }
+    set CapacityOverride(value: number | null) {
+        this.Set('CapacityOverride', value);
+    }
+
+    /**
+    * * Field Name: Reason
+    * * Display Name: Reason
+    * * SQL Data Type: nvarchar(255)
+    */
+    get Reason(): string | null {
+        return this.Get('Reason');
+    }
+    set Reason(value: string | null) {
+        this.Set('Reason', value);
+    }
+
+    /**
+    * * Field Name: IsActive
+    * * Display Name: Is Active
+    * * SQL Data Type: bit
+    * * Default Value: 1
+    */
+    get IsActive(): boolean {
+        return this.Get('IsActive');
+    }
+    set IsActive(value: boolean) {
+        this.Set('IsActive', value);
+    }
+
+    /**
+    * * Field Name: StartsAt
+    * * Display Name: Starts At
+    * * SQL Data Type: datetimeoffset
+    */
+    get StartsAt(): Date | null {
+        return this.Get('StartsAt');
+    }
+    set StartsAt(value: Date | null) {
+        this.Set('StartsAt', value);
+    }
+
+    /**
+    * * Field Name: EndsAt
+    * * Display Name: Ends At
+    * * SQL Data Type: datetimeoffset
+    */
+    get EndsAt(): Date | null {
+        return this.Get('EndsAt');
+    }
+    set EndsAt(value: Date | null) {
+        this.Set('EndsAt', value);
     }
 
     /**
@@ -5022,7 +5228,7 @@ export class mjBizAppsReferralsReciprocitySnapshotEntity extends BaseEntity<mjBi
     /**
     * * Field Name: ReciprocityIndex
     * * Display Name: Reciprocity Index
-    * * SQL Data Type: decimal(5, 2)
+    * * SQL Data Type: decimal(8, 3)
     * * Default Value: 0.00
     */
     get ReciprocityIndex(): number {
@@ -5074,7 +5280,7 @@ export class mjBizAppsReferralsReciprocitySnapshotEntity extends BaseEntity<mjBi
     /**
     * * Field Name: AcceptanceRate
     * * Display Name: Acceptance Rate
-    * * SQL Data Type: decimal(5, 2)
+    * * SQL Data Type: decimal(5, 4)
     * * Default Value: 0
     */
     get AcceptanceRate(): number {

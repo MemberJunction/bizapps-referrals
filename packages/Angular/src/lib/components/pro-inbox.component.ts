@@ -25,13 +25,12 @@ import {
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralFeedbackEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
-
-type AvailabilityMode = 'Pause' | 'Leave' | 'ReduceCapacity';
 import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
 
 /**
@@ -102,9 +101,9 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
               <label class="cap-label">
                 <span>Mode</span>
                 <select [(ngModel)]="AvailabilityMode" aria-label="Availability Mode">
-                  <option value="Pause">Pause (short break)</option>
-                  <option value="Leave">Take Leave</option>
-                  <option value="ReduceCapacity">Reduce Capacity</option>
+                  <option value="Paused">Pause (short break)</option>
+                  <option value="OnLeave">Take Leave</option>
+                  <option value="ReducedCapacity">Reduce Capacity</option>
                 </select>
               </label>
               <label class="cap-label">
@@ -216,9 +215,11 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
                     <label class="cap-label">
                       <span>Outcome Status</span>
                       <select [(ngModel)]="CompletionOutcomeStatus" aria-label="Completion Outcome Status">
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Engaged">Engaged</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Withdrawn">Withdrawn</option>
                         <option value="NoEngagement">No Engagement</option>
+                        <option value="Lost">Lost</option>
                       </select>
                     </label>
                     <label class="cap-label">
@@ -507,12 +508,12 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
   public IsActing = false;
   public NowMs = Date.now();
   public ShowAvailabilityManager = false;
-  public AvailabilityMode: AvailabilityMode = 'Pause';
+  public AvailabilityMode: ProfessionalAvailabilityWindowEntity['WindowType'] = 'Paused';
   public AvailabilityStartsAt = '';
   public AvailabilityEndsAt = '';
   public IsSavingAvailability = false;
   public AvailabilityError = '';
-  public CompletionOutcomeStatus: OutcomeStatus = 'Completed';
+  public CompletionOutcomeStatus: OutcomeStatus = 'Resolved';
   public CompletionFeeAmount: number | null = null;
   public CompletionNotes = '';
   public IsCompleting = false;
@@ -668,7 +669,7 @@ export class ReferralsProInboxComponent extends BaseResourceComponent implements
       await CapacityReadinessService.SetAvailabilityWindow(
         {
           ProfessionalProfileID: this.CurrentProfile.ID,
-          WindowType: 'Blackout',
+          WindowType: this.AvailabilityMode,
           StartDate: startsAt,
           EndDate: endsAt,
           IsAvailable: false,

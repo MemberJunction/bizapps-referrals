@@ -284,13 +284,13 @@ export class SlaEscalationService {
             if (!saved) {
               throw new PersistenceError(`Failed to stamp SLAWarningSentAt on ReferralAssignment '${assignment.ID}'.`);
             }
-            await SlaEscalationService.RaiseEscalation(
+            const warningResult = await SlaEscalationService.RaiseEscalation(
               {
                 ReferralRequestID: request.ID,
                 ReferralAssignmentID: assignment.ID,
                 TriggerType: 'SLAWarning',
                 EscalationLevel: 1,
-                RecommendedAction: 'Notify',
+                RecommendedAction: 'ContactProfessional',
                 Notes: `SLA warning threshold (${tier.EscalationWarningPercent}%) crossed for assignment offered to professional on ${new Date(assignment.OfferedAt).toISOString()}.`,
                 DedupKey: `SLAWarning:${assignment.ID}`,
               },
@@ -298,7 +298,9 @@ export class SlaEscalationService {
               dp,
               notifierKey,
             );
-            warningsRaised++;
+            if (warningResult.Raised) {
+              warningsRaised++;
+            }
           } else {
             skipped++;
           }
@@ -340,12 +342,12 @@ export class SlaEscalationService {
         const effectiveSlaHours = tier.SLAResponseHours * (tier.UrgentSLAMultiplier > 0 ? tier.UrgentSLAMultiplier : 1);
         const elapsedHours = (asOf.getTime() - new Date(request.SubmittedAt).getTime()) / (60 * 60 * 1000);
         if (elapsedHours >= 2 * effectiveSlaHours) {
-          await SlaEscalationService.RaiseEscalation(
+          const urgentResult = await SlaEscalationService.RaiseEscalation(
             {
               ReferralRequestID: request.ID,
               TriggerType: 'UrgentUnassigned',
               EscalationLevel: 2,
-              RecommendedAction: 'AdminAlert',
+              RecommendedAction: 'ReassignTier',
               Notes: `Urgent referral unassigned ${elapsedHours.toFixed(1)}h after submission (2x effective SLA of ${effectiveSlaHours.toFixed(1)}h).`,
               DedupKey: `UrgentUnassigned:${request.ID}`,
             },
@@ -353,7 +355,9 @@ export class SlaEscalationService {
             dp,
             notifierKey,
           );
-          urgentRaised++;
+          if (urgentResult.Raised) {
+            urgentRaised++;
+          }
         } else {
           skipped++;
         }
@@ -379,10 +383,12 @@ export class SlaEscalationService {
     const validRequestId = AssertValidUUID(input.ReferralRequestID, 'ReferralRequestID');
     const rv = new RunView(provider);
 
+    // Dedup across ALL existing rows for this DedupKey (any status) - once an escalation has
+    // been raised (even if later Acknowledged/Resolved/Dismissed), it must never be re-raised.
     const existingRes = await rv.RunView<ReferralEscalationEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
-        ExtraFilter: `DedupKey = '${input.DedupKey.replace(/'/g, "''")}' AND Status = 'Open'`,
+        ExtraFilter: `DedupKey = '${input.DedupKey.replace(/'/g, "''")}'`,
         ResultType: 'entity_object',
       },
       contextUser,
@@ -407,7 +413,7 @@ export class SlaEscalationService {
     escalation.EscalationLevel = cappedLevel;
     escalation.TriggerType = input.TriggerType;
     escalation.Status = 'Open';
-    escalation.RecommendedAction = input.RecommendedAction ?? 'Notify';
+    escalation.RecommendedAction = input.RecommendedAction ?? 'ContactProfessional';
     escalation.Notes = input.Notes ?? null;
     escalation.TriggeredAt = new Date();
     escalation.DedupKey = input.DedupKey;
@@ -516,20 +522,25 @@ export class SlaEscalationService {
     let requestEscalationLevelReset = false;
     if (nextStatus === 'Resolved' || nextStatus === 'Dismissed') {
       const rv = new RunView(provider);
-      const remainingOpenRes = await rv.RunView<ReferralEscalationEntity>(
+      // Recompute ReferralRequest.EscalationLevel as the max level across whatever Open/
+      // Acknowledged escalations remain for this request (0 when none remain), rather than
+      // only resetting to 0 when the Open set is empty - an Acknowledged escalation at a
+      // higher level must still hold the request's EscalationLevel up.
+      const remainingActiveRes = await rv.RunView<ReferralEscalationEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
-          ExtraFilter: `ReferralRequestID = '${escalation.ReferralRequestID}' AND Status = 'Open'`,
+          ExtraFilter: `ReferralRequestID = '${escalation.ReferralRequestID}' AND (Status = 'Open' OR Status = 'Acknowledged')`,
           ResultType: 'entity_object',
         },
         contextUser,
       );
-      if (remainingOpenRes.Success && remainingOpenRes.Results.length === 0) {
+      if (remainingActiveRes.Success) {
+        const recomputedLevel = remainingActiveRes.Results.reduce((max, e) => Math.max(max, e.EscalationLevel), 0);
         const request = await provider.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests', contextUser);
         if (await request.Load(escalation.ReferralRequestID)) {
-          request.EscalationLevel = 0;
+          request.EscalationLevel = recomputedLevel;
           await request.Save();
-          requestEscalationLevelReset = true;
+          requestEscalationLevelReset = recomputedLevel === 0;
         }
       }
     }
