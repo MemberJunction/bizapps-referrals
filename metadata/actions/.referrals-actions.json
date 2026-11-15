@@ -694,96 +694,63 @@
             "ValueType": "Scalar",
             "IsArray": false,
             "IsRequired": true,
-            "Description": "Recurring, DateRange, or Blackout."
+            "Description": "OnLeave, Paused, or ReducedCapacity."
           }
         },
         {
           "fields": {
             "ActionID": "@parent:ID",
-            "Name": "DayOfWeek",
+            "Name": "StartsAt",
             "Type": "Input",
             "ValueType": "Scalar",
             "IsArray": false,
-            "IsRequired": false,
-            "Description": "0 (Sunday) through 6 (Saturday); required for Recurring windows."
+            "IsRequired": true,
+            "Description": "ISO-8601 start timestamp for the window."
           }
         },
         {
           "fields": {
             "ActionID": "@parent:ID",
-            "Name": "StartTimeMinutes",
+            "Name": "EndsAt",
             "Type": "Input",
             "ValueType": "Scalar",
             "IsArray": false,
-            "IsRequired": false,
-            "Description": "Minutes since midnight marking the start of a Recurring window."
+            "IsRequired": true,
+            "Description": "ISO-8601 end timestamp for the window; must be strictly after StartsAt."
           }
         },
         {
           "fields": {
             "ActionID": "@parent:ID",
-            "Name": "EndTimeMinutes",
+            "Name": "CapacityOverride",
             "Type": "Input",
             "ValueType": "Scalar",
             "IsArray": false,
             "IsRequired": false,
-            "Description": "Minutes since midnight marking the end of a Recurring window."
+            "Description": "Non-negative concurrent-referral cap override; required for ReducedCapacity windows."
           }
         },
         {
           "fields": {
             "ActionID": "@parent:ID",
-            "Name": "StartDate",
+            "Name": "Reason",
             "Type": "Input",
             "ValueType": "Scalar",
             "IsArray": false,
             "IsRequired": false,
-            "Description": "ISO-8601 start timestamp for DateRange/Blackout windows."
+            "Description": "Optional free-text reason for the window."
           }
         },
         {
           "fields": {
             "ActionID": "@parent:ID",
-            "Name": "EndDate",
+            "Name": "IsActive",
             "Type": "Input",
             "ValueType": "Scalar",
             "IsArray": false,
             "IsRequired": false,
-            "Description": "ISO-8601 end timestamp for DateRange/Blackout windows."
-          }
-        },
-        {
-          "fields": {
-            "ActionID": "@parent:ID",
-            "Name": "IsAvailable",
-            "Type": "Input",
-            "ValueType": "Scalar",
-            "IsArray": false,
-            "IsRequired": false,
-            "Description": "Whether this window marks availability (true) or unavailability (false)."
-          }
-        },
-        {
-          "fields": {
-            "ActionID": "@parent:ID",
-            "Name": "TimeZone",
-            "Type": "Input",
-            "ValueType": "Scalar",
-            "IsArray": false,
-            "IsRequired": false,
-            "DefaultValue": "UTC",
-            "Description": "IANA time zone identifier for the window."
-          }
-        },
-        {
-          "fields": {
-            "ActionID": "@parent:ID",
-            "Name": "Notes",
-            "Type": "Input",
-            "ValueType": "Scalar",
-            "IsArray": false,
-            "IsRequired": false,
-            "Description": "Optional free-text notes."
+            "DefaultValue": "true",
+            "Description": "Whether the window is active; defaults to true."
           }
         }
       ]

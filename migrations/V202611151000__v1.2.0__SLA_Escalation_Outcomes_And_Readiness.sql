@@ -5,7 +5,9 @@
 -- Consolidated per Spec SS2.1 (exactly one migration per dialect): sections 8a-8d
 -- below were folded in from the former v1.2.1 migration
 -- (V202611152000__v1.2.1__Escalation_Lifecycle_And_Reciprocity_Fields.sql), which
--- has been removed.
+-- has been removed. Remediation Round 2 (Spec SS2.2/SS2.3) further consolidated
+-- every two-step "add then widen" ALTER sequence into a single final-shape
+-- statement, since no deployed database has applied this migration yet.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -16,7 +18,7 @@ BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
         ADD [EscalationWarningPercent] INT NOT NULL
             CONSTRAINT [DF_ReferralTier_EscalationWarningPercent] DEFAULT (75)
-            CONSTRAINT [CK_ReferralTier_EscalationWarningPercent] CHECK ([EscalationWarningPercent] BETWEEN 1 AND 100);
+            CONSTRAINT [CK_ReferralTier_EscalationWarningPercent] CHECK ([EscalationWarningPercent] BETWEEN 1 AND 99);
 END
 GO
 
@@ -24,8 +26,8 @@ IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralTier]', N'MaxEscalationLevel') 
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
         ADD [MaxEscalationLevel] INT NOT NULL
-            CONSTRAINT [DF_ReferralTier_MaxEscalationLevel] DEFAULT (3)
-            CONSTRAINT [CK_ReferralTier_MaxEscalationLevel] CHECK ([MaxEscalationLevel] > 0);
+            CONSTRAINT [DF_ReferralTier_MaxEscalationLevel] DEFAULT (2)
+            CONSTRAINT [CK_ReferralTier_MaxEscalationLevel] CHECK ([MaxEscalationLevel] BETWEEN 1 AND 3);
 END
 GO
 
@@ -38,13 +40,21 @@ BEGIN
 END
 GO
 
+-- [EscalationActionType] is intentionally kept nullable with NO CHECK constraint
+-- (non-spec/optional per Spec SS2.2) so that pre-existing seed metadata
+-- (metadata/referral-tiers/.referrals-tiers.json) using legacy values is never
+-- rejected by a constraint violation.
 IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralTier]', N'EscalationActionType') IS NULL
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
-        ADD [EscalationActionType] NVARCHAR(30) NOT NULL
-            CONSTRAINT [DF_ReferralTier_EscalationActionType] DEFAULT (N'Notify')
-            CONSTRAINT [CK_ReferralTier_EscalationActionType] CHECK ([EscalationActionType] IN (N'Notify', N'Reassign', N'AdminAlert'));
+        ADD [EscalationActionType] NVARCHAR(30) NULL;
 END
+GO
+IF EXISTS (SELECT 1 FROM sys.default_constraints WHERE [name] = 'DF_ReferralTier_EscalationActionType' AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]'))
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [DF_ReferralTier_EscalationActionType];
+GO
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = 'CK_ReferralTier_EscalationActionType' AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]'))
+    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [CK_ReferralTier_EscalationActionType];
 GO
 
 -- -----------------------------------------------------------------------------
@@ -55,8 +65,8 @@ IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralRequest]', N'SourceChannel') IS
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest]
         ADD [SourceChannel] NVARCHAR(30) NOT NULL
-            CONSTRAINT [DF_ReferralRequest_SourceChannel] DEFAULT (N'Web')
-            CONSTRAINT [CK_ReferralRequest_SourceChannel] CHECK ([SourceChannel] IN (N'Web', N'Phone', N'Email', N'Referral', N'API'));
+            CONSTRAINT [DF_ReferralRequest_SourceChannel] DEFAULT (N'SeekerIntake')
+            CONSTRAINT [CK_ReferralRequest_SourceChannel] CHECK ([SourceChannel] IN (N'SeekerIntake', N'FinderWidget', N'ProReferral', N'Concierge', N'OperatorManual'));
 END
 GO
 
@@ -103,7 +113,7 @@ GO
 IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralAssignment]', N'ResponseHours') IS NULL
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ReferralAssignment]
-        ADD [ResponseHours] DECIMAL(6,2) NULL;
+        ADD [ResponseHours] DECIMAL(8,2) NULL;
 END
 GO
 
@@ -146,21 +156,26 @@ GO
 IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalProfile]', N'ReadinessScore') IS NULL
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile]
-        ADD [ReadinessScore] DECIMAL(5,2) NOT NULL
-            CONSTRAINT [DF_ProfessionalProfile_ReadinessScore] DEFAULT (100.00)
-            CONSTRAINT [CK_ProfessionalProfile_ReadinessScore] CHECK ([ReadinessScore] BETWEEN 0 AND 100);
+        ADD [ReadinessScore] DECIMAL(5,2) NULL;
 END
 GO
 
 IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalProfile]', N'ReciprocityIndex') IS NULL
 BEGIN
     ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile]
-        ADD [ReciprocityIndex] DECIMAL(5,2) NULL;
+        ADD [ReciprocityIndex] DECIMAL(6,3) NULL;
+END
+GO
+
+IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalProfile]', N'ReadinessComputedAt') IS NULL
+BEGIN
+    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile]
+        ADD [ReadinessComputedAt] DATETIMEOFFSET NULL;
 END
 GO
 
 -- -----------------------------------------------------------------------------
--- 5. New table: [ReferralEscalation]
+-- 5. New table: [ReferralEscalation] (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
 IF OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'U') IS NULL
 BEGIN
@@ -174,21 +189,30 @@ BEGIN
             CONSTRAINT [FK_ReferralEscalation_Assignment] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ReferralAssignment]([ID]),
         [EscalationLevel] INT NOT NULL
             CONSTRAINT [DF_ReferralEscalation_EscalationLevel] DEFAULT (1)
-            CONSTRAINT [CK_ReferralEscalation_EscalationLevel] CHECK ([EscalationLevel] > 0),
-        [TriggerType] NVARCHAR(60) NOT NULL
+            CONSTRAINT [CK_ReferralEscalation_EscalationLevel] CHECK ([EscalationLevel] BETWEEN 1 AND 3),
+        [TriggerType] NVARCHAR(30) NOT NULL
             CONSTRAINT [DF_ReferralEscalation_TriggerType] DEFAULT (N'SLAWarning')
-            CONSTRAINT [CK_ReferralEscalation_TriggerType] CHECK ([TriggerType] IN (N'SLAWarning', N'SLABreach', N'ManualEscalation', N'CapacityExhausted')),
+            CONSTRAINT [CK_ReferralEscalation_TriggerType] CHECK ([TriggerType] IN (N'SLAWarning', N'SLABreach', N'CascadeExhausted', N'UrgentUnassigned', N'Manual', N'AIRecommended')),
         [Status] NVARCHAR(40) NOT NULL
             CONSTRAINT [DF_ReferralEscalation_Status] DEFAULT (N'Open')
-            CONSTRAINT [CK_ReferralEscalation_Status] CHECK ([Status] IN (N'Open', N'Acknowledged', N'Resolved')),
-        [RecommendedAction] NVARCHAR(60) NOT NULL
-            CONSTRAINT [DF_ReferralEscalation_RecommendedAction] DEFAULT (N'Notify')
-            CONSTRAINT [CK_ReferralEscalation_RecommendedAction] CHECK ([RecommendedAction] IN (N'Notify', N'Reassign', N'AdminAlert', N'EscalateToTier')),
+            CONSTRAINT [CK_ReferralEscalation_Status] CHECK ([Status] IN (N'Open', N'Acknowledged', N'Resolved', N'Dismissed')),
+        [DedupKey] NVARCHAR(200) NOT NULL
+            CONSTRAINT [UQ_ReferralEscalation_DedupKey] UNIQUE,
+        [RecommendedAction] NVARCHAR(40) NULL
+            CONSTRAINT [CK_ReferralEscalation_RecommendedAction] CHECK ([RecommendedAction] IS NULL OR [RecommendedAction] IN (N'ReassignNextCandidate', N'ExpandPracticeArea', N'ExtendSLA', N'ContactSeeker', N'CloseAsExhausted')),
+        [NotifierKey] NVARCHAR(50) NULL,
         [Notes] NVARCHAR(MAX) NULL,
-        [TriggeredAt] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ReferralEscalation_TriggeredAt] DEFAULT (SYSDATETIMEOFFSET()),
+        [RaisedAt] DATETIMEOFFSET NOT NULL
+            CONSTRAINT [DF_ReferralEscalation_RaisedAt] DEFAULT (SYSDATETIMEOFFSET()),
         [AcknowledgedAt] DATETIMEOFFSET NULL,
         [ResolvedAt] DATETIMEOFFSET NULL,
+        [LinkedTaskID] UNIQUEIDENTIFIER NULL,
+        [AcknowledgedByPersonID] UNIQUEIDENTIFIER NULL
+            CONSTRAINT [FK_ReferralEscalation_AcknowledgedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]),
+        [ResolvedByPersonID] UNIQUEIDENTIFIER NULL
+            CONSTRAINT [FK_ReferralEscalation_ResolvedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]),
+        [ResolutionNotes] NVARCHAR(MAX) NULL,
+        [AIRationaleJSON] NVARCHAR(MAX) NULL,
         [__mj_CreatedAt] DATETIMEOFFSET NOT NULL
             CONSTRAINT [DF_ReferralEscalation___mj_CreatedAt] DEFAULT (GETUTCDATE()),
         [__mj_UpdatedAt] DATETIMEOFFSET NOT NULL
@@ -206,7 +230,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReferralEscalation_S
 GO
 
 -- -----------------------------------------------------------------------------
--- 6. New table: [ReferralOutcome]
+-- 6. New table: [ReferralOutcome] (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
 IF OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'U') IS NULL
 BEGIN
@@ -215,23 +239,33 @@ BEGIN
             CONSTRAINT [PK_ReferralOutcome] PRIMARY KEY
             CONSTRAINT [DF_ReferralOutcome_ID] DEFAULT (NEWSEQUENTIALID()),
         [ReferralRequestID] UNIQUEIDENTIFIER NOT NULL
-            CONSTRAINT [FK_ReferralOutcome_Request] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ReferralRequest]([ID]),
+            CONSTRAINT [FK_ReferralOutcome_Request] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ReferralRequest]([ID])
+            CONSTRAINT [UQ_ReferralOutcome_ReferralRequest] UNIQUE,
         [ReferralAssignmentID] UNIQUEIDENTIFIER NOT NULL
-            CONSTRAINT [FK_ReferralOutcome_Assignment] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ReferralAssignment]([ID])
-            CONSTRAINT [UQ_ReferralOutcome_Assignment] UNIQUE,
+            CONSTRAINT [FK_ReferralOutcome_Assignment] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ReferralAssignment]([ID]),
         [ProfessionalProfileID] UNIQUEIDENTIFIER NOT NULL
             CONSTRAINT [FK_ReferralOutcome_Profile] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ProfessionalProfile]([ID]),
         [OutcomeStatus] NVARCHAR(60) NOT NULL
-            CONSTRAINT [DF_ReferralOutcome_OutcomeStatus] DEFAULT (N'Completed')
-            CONSTRAINT [CK_ReferralOutcome_OutcomeStatus] CHECK ([OutcomeStatus] IN (N'Completed', N'Cancelled', N'NoEngagement')),
-        [ResponseHours] DECIMAL(6,2) NULL,
-        [CompletionNotes] NVARCHAR(MAX) NULL,
-        [CompletedAt] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ReferralOutcome_CompletedAt] DEFAULT (SYSDATETIMEOFFSET()),
+            CONSTRAINT [DF_ReferralOutcome_OutcomeStatus] DEFAULT (N'Resolved')
+            CONSTRAINT [CK_ReferralOutcome_OutcomeStatus] CHECK ([OutcomeStatus] IN (N'Engaged', N'Resolved', N'Withdrawn', N'NoEngagement', N'Lost')),
+        [EngagedAt] DATETIMEOFFSET NULL,
+        [ClosedAt] DATETIMEOFFSET NULL,
+        [EstimatedFeeAmount] DECIMAL(12,2) NULL
+            CONSTRAINT [CK_ReferralOutcome_EstimatedFeeAmount] CHECK ([EstimatedFeeAmount] IS NULL OR [EstimatedFeeAmount] >= 0),
+        [ReportedFeeAmount] DECIMAL(12,2) NULL
+            CONSTRAINT [CK_ReferralOutcome_ReportedFeeAmount] CHECK ([ReportedFeeAmount] IS NULL OR [ReportedFeeAmount] >= 0),
+        [CurrencyCode] NVARCHAR(3) NOT NULL
+            CONSTRAINT [DF_ReferralOutcome_CurrencyCode] DEFAULT (N'USD'),
+        [ReportedByType] NVARCHAR(20) NULL
+            CONSTRAINT [CK_ReferralOutcome_ReportedByType] CHECK ([ReportedByType] IS NULL OR [ReportedByType] IN (N'Professional', N'Operator', N'Seeker')),
+        [ReportedAt] DATETIMEOFFSET NOT NULL
+            CONSTRAINT [DF_ReferralOutcome_ReportedAt] DEFAULT (SYSDATETIMEOFFSET()),
+        [AttributionNotes] NVARCHAR(MAX) NULL,
         [__mj_CreatedAt] DATETIMEOFFSET NOT NULL
             CONSTRAINT [DF_ReferralOutcome___mj_CreatedAt] DEFAULT (GETUTCDATE()),
         [__mj_UpdatedAt] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ReferralOutcome___mj_UpdatedAt] DEFAULT (GETUTCDATE())
+            CONSTRAINT [DF_ReferralOutcome___mj_UpdatedAt] DEFAULT (GETUTCDATE()),
+        CONSTRAINT [CK_ReferralOutcome_Dates] CHECK ([ClosedAt] IS NULL OR [EngagedAt] IS NULL OR [ClosedAt] >= [EngagedAt])
     );
 END
 GO
@@ -243,7 +277,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReferralOutcome_Prof
 GO
 
 -- -----------------------------------------------------------------------------
--- 7. New table: [ProfessionalAvailabilityWindow]
+-- 7. New table: [ProfessionalAvailabilityWindow] (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
 IF OBJECT_ID(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'U') IS NULL
 BEGIN
@@ -254,25 +288,20 @@ BEGIN
         [ProfessionalProfileID] UNIQUEIDENTIFIER NOT NULL
             CONSTRAINT [FK_ProfessionalAvailabilityWindow_Profile] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ProfessionalProfile]([ID]),
         [WindowType] NVARCHAR(40) NOT NULL
-            CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType] DEFAULT (N'Recurring')
-            CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType] CHECK ([WindowType] IN (N'Recurring', N'DateRange', N'Blackout')),
-        [DayOfWeek] INT NULL
-            CONSTRAINT [CK_ProfessionalAvailabilityWindow_DayOfWeek] CHECK ([DayOfWeek] IS NULL OR [DayOfWeek] BETWEEN 0 AND 6),
-        [StartTimeMinutes] INT NULL
-            CONSTRAINT [CK_ProfessionalAvailabilityWindow_StartTimeMinutes] CHECK ([StartTimeMinutes] IS NULL OR [StartTimeMinutes] BETWEEN 0 AND 1440),
-        [EndTimeMinutes] INT NULL
-            CONSTRAINT [CK_ProfessionalAvailabilityWindow_EndTimeMinutes] CHECK ([EndTimeMinutes] IS NULL OR [EndTimeMinutes] BETWEEN 0 AND 1440),
-        [StartDate] DATETIMEOFFSET NULL,
-        [EndDate] DATETIMEOFFSET NULL,
-        [IsAvailable] BIT NOT NULL
-            CONSTRAINT [DF_ProfessionalAvailabilityWindow_IsAvailable] DEFAULT (1),
-        [TimeZone] NVARCHAR(100) NOT NULL
-            CONSTRAINT [DF_ProfessionalAvailabilityWindow_TimeZone] DEFAULT (N'UTC'),
-        [Notes] NVARCHAR(255) NULL,
+            CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType] DEFAULT (N'Paused')
+            CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType] CHECK ([WindowType] IN (N'OnLeave', N'Paused', N'ReducedCapacity')),
+        [StartsAt] DATETIMEOFFSET NOT NULL,
+        [EndsAt] DATETIMEOFFSET NOT NULL,
+        [CapacityOverride] INT NULL
+            CONSTRAINT [CK_ProfessionalAvailabilityWindow_CapacityOverride] CHECK ([CapacityOverride] IS NULL OR [CapacityOverride] >= 0),
+        [Reason] NVARCHAR(500) NULL,
+        [IsActive] BIT NOT NULL
+            CONSTRAINT [DF_ProfessionalAvailabilityWindow_IsActive] DEFAULT (1),
         [__mj_CreatedAt] DATETIMEOFFSET NOT NULL
             CONSTRAINT [DF_ProfessionalAvailabilityWindow___mj_CreatedAt] DEFAULT (GETUTCDATE()),
         [__mj_UpdatedAt] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ProfessionalAvailabilityWindow___mj_UpdatedAt] DEFAULT (GETUTCDATE())
+            CONSTRAINT [DF_ProfessionalAvailabilityWindow___mj_UpdatedAt] DEFAULT (GETUTCDATE()),
+        CONSTRAINT [CK_ProfessionalAvailabilityWindow_Dates] CHECK ([EndsAt] > [StartsAt])
     );
 END
 GO
@@ -282,7 +311,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ProfessionalAvailabi
 GO
 
 -- -----------------------------------------------------------------------------
--- 8. New table: [ReciprocitySnapshot]
+-- 8. New table: [ReciprocitySnapshot] (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
 IF OBJECT_ID(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'U') IS NULL
 BEGIN
@@ -292,495 +321,40 @@ BEGIN
             CONSTRAINT [DF_ReciprocitySnapshot_ID] DEFAULT (NEWSEQUENTIALID()),
         [ProfessionalProfileID] UNIQUEIDENTIFIER NOT NULL
             CONSTRAINT [FK_ReciprocitySnapshot_Profile] FOREIGN KEY REFERENCES [__mj_BizAppsReferrals].[ProfessionalProfile]([ID]),
-        [SnapshotDate] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_SnapshotDate] DEFAULT (SYSDATETIMEOFFSET()),
-        [PeriodStartDate] DATETIMEOFFSET NOT NULL,
-        [PeriodEndDate] DATETIMEOFFSET NOT NULL,
-        [ReferralsGivenCount] INT NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsGivenCount] DEFAULT (0)
-            CONSTRAINT [CK_ReciprocitySnapshot_ReferralsGivenCount] CHECK ([ReferralsGivenCount] >= 0),
-        [ReferralsReceivedCount] INT NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsReceivedCount] DEFAULT (0)
-            CONSTRAINT [CK_ReciprocitySnapshot_ReferralsReceivedCount] CHECK ([ReferralsReceivedCount] >= 0),
-        [ReciprocityIndex] DECIMAL(5,2) NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_ReciprocityIndex] DEFAULT (0.00),
+        [ComputedAt] DATETIMEOFFSET NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ComputedAt] DEFAULT (SYSDATETIMEOFFSET()),
+        [PeriodStart] DATE NOT NULL,
+        [PeriodEnd] DATE NOT NULL,
+        [ReferralsSent] INT NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsSent] DEFAULT (0)
+            CONSTRAINT [CK_ReciprocitySnapshot_ReferralsSent] CHECK ([ReferralsSent] >= 0),
+        [ReferralsReceived] INT NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsReceived] DEFAULT (0)
+            CONSTRAINT [CK_ReciprocitySnapshot_ReferralsReceived] CHECK ([ReferralsReceived] >= 0),
+        [ReferralsAccepted] INT NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsAccepted] DEFAULT (0),
+        [ReferralsResolved] INT NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ReferralsResolved] DEFAULT (0),
+        [SLABreachCount] INT NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_SLABreachCount] DEFAULT (0),
+        [AcceptanceRate] DECIMAL(5,4) NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_AcceptanceRate] DEFAULT (0),
+        [MedianResponseHours] DECIMAL(8,2) NULL,
+        [ReciprocityIndex] DECIMAL(6,3) NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_ReciprocityIndex] DEFAULT (0),
+        [AttributedFeeTotal] DECIMAL(14,2) NOT NULL
+            CONSTRAINT [DF_ReciprocitySnapshot_AttributedFeeTotal] DEFAULT (0),
         [__mj_CreatedAt] DATETIMEOFFSET NOT NULL
             CONSTRAINT [DF_ReciprocitySnapshot___mj_CreatedAt] DEFAULT (GETUTCDATE()),
         [__mj_UpdatedAt] DATETIMEOFFSET NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot___mj_UpdatedAt] DEFAULT (GETUTCDATE())
+            CONSTRAINT [DF_ReciprocitySnapshot___mj_UpdatedAt] DEFAULT (GETUTCDATE()),
+        CONSTRAINT [UQ_ReciprocitySnapshot_Period] UNIQUE ([ProfessionalProfileID], [PeriodStart], [PeriodEnd])
     );
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReciprocitySnapshot_Profile_Date' AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]'))
-    CREATE INDEX [IX_ReciprocitySnapshot_Profile_Date] ON [__mj_BizAppsReferrals].[ReciprocitySnapshot] ([ProfessionalProfileID], [SnapshotDate]);
-GO
-
--- -----------------------------------------------------------------------------
--- 8a. Additive columns on [ReferralEscalation]: dedup, notifier linkage, resolution
---     audit (consolidated from the former v1.2.1 migration per Spec SS2.1 - exactly
---     one migration per dialect).
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'DedupKey') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [DedupKey] NVARCHAR(200) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'LinkedTaskID') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [LinkedTaskID] UNIQUEIDENTIFIER NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'AcknowledgedByPersonID') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [AcknowledgedByPersonID] UNIQUEIDENTIFIER NULL
-            CONSTRAINT [FK_ReferralEscalation_AcknowledgedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'ResolvedByPersonID') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [ResolvedByPersonID] UNIQUEIDENTIFIER NULL
-            CONSTRAINT [FK_ReferralEscalation_ResolvedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'ResolutionNotes') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [ResolutionNotes] NVARCHAR(MAX) NULL;
-END
-GO
-
--- Widen CK_ReferralEscalation_TriggerType to add 'UrgentUnassigned' and 'CascadeExhausted' (6 total)
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralEscalation_TriggerType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_TriggerType];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-    ADD CONSTRAINT [CK_ReferralEscalation_TriggerType] CHECK ([TriggerType] IN (
-        N'SLAWarning', N'SLABreach', N'ManualEscalation', N'CapacityExhausted', N'UrgentUnassigned', N'CascadeExhausted'
-    ));
-GO
-
--- Widen CK_ReferralEscalation_Status to add 'Dismissed' (4 total)
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralEscalation_Status'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_Status];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-    ADD CONSTRAINT [CK_ReferralEscalation_Status] CHECK ([Status] IN (
-        N'Open', N'Acknowledged', N'Resolved', N'Dismissed'
-    ));
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReferralEscalation_DedupKey' AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]'))
-    CREATE INDEX [IX_ReferralEscalation_DedupKey] ON [__mj_BizAppsReferrals].[ReferralEscalation] ([DedupKey]) WHERE [DedupKey] IS NOT NULL;
-GO
-
--- -----------------------------------------------------------------------------
--- 8a-ii. Additive column on [ReferralEscalation]: AI escalation-advisor rationale
---        (Wave 3 Slice 3 - Referrals.RecommendEscalationAction).
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralEscalation]', N'AIRationaleJSON') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-        ADD [AIRationaleJSON] NVARCHAR(MAX) NULL;
-END
-GO
-
--- -----------------------------------------------------------------------------
--- 8b. Additive column on [ReferralOutcome]: attributed fee value for reciprocity scorecards
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'FeeAmount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [FeeAmount] DECIMAL(10,2) NULL;
-END
-GO
-
--- -----------------------------------------------------------------------------
--- 8c. Additive columns on [ReciprocitySnapshot]: full scorecard metrics
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'AcceptedCount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [AcceptedCount] INT NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_AcceptedCount] DEFAULT (0);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'ResolvedCount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [ResolvedCount] INT NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_ResolvedCount] DEFAULT (0);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'SLABreachCount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [SLABreachCount] INT NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_SLABreachCount] DEFAULT (0);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'AcceptanceRate') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [AcceptanceRate] DECIMAL(5,2) NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_AcceptanceRate] DEFAULT (0);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'MedianResponseHours') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [MedianResponseHours] DECIMAL(6,2) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]', N'AttributedFeeTotal') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot]
-        ADD [AttributedFeeTotal] DECIMAL(12,2) NOT NULL
-            CONSTRAINT [DF_ReciprocitySnapshot_AttributedFeeTotal] DEFAULT (0);
-END
-GO
-
--- Upsert key for RecomputeSnapshots: one snapshot per (Professional, PeriodStart, PeriodEnd)
-IF NOT EXISTS (
-    SELECT 1 FROM sys.indexes
-    WHERE [name] = 'UQ_ReciprocitySnapshot_Profile_Period'
-      AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]')
-)
-BEGIN
-    CREATE UNIQUE INDEX [UQ_ReciprocitySnapshot_Profile_Period]
-        ON [__mj_BizAppsReferrals].[ReciprocitySnapshot] ([ProfessionalProfileID], [PeriodStartDate], [PeriodEndDate]);
-END
-GO
-
--- -----------------------------------------------------------------------------
--- 8d. Additive column on [ProfessionalProfile]: readiness computation timestamp
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalProfile]', N'ReadinessComputedAt') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile]
-        ADD [ReadinessComputedAt] DATETIMEOFFSET NULL;
-END
-GO
-
--- -----------------------------------------------------------------------------
--- 8e. Code Review Remediation Round 1: additive columns on [ReferralOutcome]
---     per Spec SS2.2/SS2.3 (engaged-fee tracking, attribution, reporter audit).
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'EngagedFeeAmount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [EngagedFeeAmount] DECIMAL(18,2) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'FeeCurrency') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [FeeCurrency] NVARCHAR(10) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'AttributedFeeAmount') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [AttributedFeeAmount] DECIMAL(18,2) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'ReportedByPersonID') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [ReportedByPersonID] UNIQUEIDENTIFIER NULL
-            CONSTRAINT [FK_ReferralOutcome_ReportedByPerson] FOREIGN KEY REFERENCES [__mj_BizAppsCommon].[Person]([ID]);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'OutcomeNotes') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [OutcomeNotes] NVARCHAR(MAX) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'OutcomeDate') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [OutcomeDate] DATETIMEOFFSET NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ReferralOutcome]', N'ReportedAt') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-        ADD [ReportedAt] DATETIMEOFFSET NULL;
-END
-GO
-
--- Widen CK_ReferralOutcome_OutcomeStatus to the Spec SS2.2 5-value vocabulary
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralOutcome_OutcomeStatus'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome] DROP CONSTRAINT [CK_ReferralOutcome_OutcomeStatus];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-    ADD CONSTRAINT [CK_ReferralOutcome_OutcomeStatus] CHECK ([OutcomeStatus] IN (
-        N'Engaged', N'Resolved', N'Withdrawn', N'NoEngagement', N'Lost'
-    ));
-GO
-
--- Enforce at most one ReferralOutcome per ReferralRequest (Spec SS2.2)
-IF NOT EXISTS (
-    SELECT 1 FROM sys.indexes
-    WHERE [name] = 'UQ_ReferralOutcome_ReferralRequestID'
-      AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
-)
-BEGIN
-    CREATE UNIQUE INDEX [UQ_ReferralOutcome_ReferralRequestID] ON [__mj_BizAppsReferrals].[ReferralOutcome] ([ReferralRequestID]);
-END
-GO
-
--- -----------------------------------------------------------------------------
--- 8f. Code Review Remediation Round 1: additive columns on [ProfessionalAvailabilityWindow]
---     per Spec SS2.2 (coordinator-facing capacity override + active toggle).
--- -----------------------------------------------------------------------------
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'CapacityOverride') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-        ADD [CapacityOverride] INT NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'Reason') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-        ADD [Reason] NVARCHAR(255) NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'IsActive') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-        ADD [IsActive] BIT NOT NULL
-            CONSTRAINT [DF_ProfessionalAvailabilityWindow_IsActive] DEFAULT (1);
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'StartsAt') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-        ADD [StartsAt] DATETIMEOFFSET NULL;
-END
-GO
-
-IF COL_LENGTH(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]', N'EndsAt') IS NULL
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-        ADD [EndsAt] DATETIMEOFFSET NULL;
-END
-GO
-
--- Widen CK_ProfessionalAvailabilityWindow_WindowType to the Spec SS2.2 vocabulary.
--- [StartDate]/[EndDate]/[IsAvailable]/[Notes] remain the actively-read columns for
--- CapacityReadinessService.SetAvailabilityWindow; [StartsAt]/[EndsAt]/[Reason]/[IsActive]
--- are additive Spec-aligned columns kept in sync by the same code path (see
--- CapacityReadinessService.SetAvailabilityWindow) rather than a destructive rename,
--- since a live-DB column rename could not be rehearsed/validated in this environment.
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ProfessionalAvailabilityWindow_WindowType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] DROP CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ADD CONSTRAINT [CK_ProfessionalAvailabilityWindow_WindowType] CHECK ([WindowType] IN (
-        N'OnLeave', N'Paused', N'ReducedCapacity'
-    ));
-GO
-
--- -----------------------------------------------------------------------------
--- 8g. Code Review Remediation Round 1: decimal-scale alignment for reciprocity
---     fractional rates (Spec SS2.3: AcceptanceRate as a 0..1 fraction, ReciprocityIndex
---     to 3 decimal places).
--- -----------------------------------------------------------------------------
-ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot] ALTER COLUMN [AcceptanceRate] DECIMAL(5,4) NOT NULL;
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ReciprocitySnapshot] ALTER COLUMN [ReciprocityIndex] DECIMAL(8,3) NOT NULL;
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalProfile] ALTER COLUMN [ReciprocityIndex] DECIMAL(8,3) NULL;
-GO
-
--- -----------------------------------------------------------------------------
--- 8h. Code Review Remediation Round 1: CHECK value-set realignments on
---     [ReferralTier], [ReferralRequest], [ReferralEscalation] per Spec SS2.2.
--- -----------------------------------------------------------------------------
-IF EXISTS (
-    SELECT 1 FROM sys.default_constraints
-    WHERE [name] = 'DF_ReferralTier_EscalationActionType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [DF_ReferralTier_EscalationActionType];
-END
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
-    ADD CONSTRAINT [DF_ReferralTier_EscalationActionType] DEFAULT (N'NotifyCoordinator') FOR [EscalationActionType];
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralTier_EscalationActionType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralTier]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier] DROP CONSTRAINT [CK_ReferralTier_EscalationActionType];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralTier]
-    ADD CONSTRAINT [CK_ReferralTier_EscalationActionType] CHECK ([EscalationActionType] IN (
-        N'NotifyCoordinator', N'AutoAdvanceCascade', N'CreateFollowUpTask', N'PauseRouting'
-    ));
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.default_constraints
-    WHERE [name] = 'DF_ReferralRequest_SourceChannel'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralRequest]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest] DROP CONSTRAINT [DF_ReferralRequest_SourceChannel];
-END
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest]
-    ADD CONSTRAINT [DF_ReferralRequest_SourceChannel] DEFAULT (N'SeekerPortal') FOR [SourceChannel];
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralRequest_SourceChannel'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralRequest]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest] DROP CONSTRAINT [CK_ReferralRequest_SourceChannel];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralRequest]
-    ADD CONSTRAINT [CK_ReferralRequest_SourceChannel] CHECK ([SourceChannel] IN (
-        N'SeekerPortal', N'FinderWidget', N'ProfessionalReferral', N'ConciergeAgent', N'PartnerImport'
-    ));
-GO
-
--- Realign CK_ReferralEscalation_TriggerType to the Spec SS2.2 vocabulary (drops
--- 'ManualEscalation'/'CapacityExhausted', adds 'ConflictDeadlock'/'ManualOverride';
--- still 6 total). Existing operational TriggerType fires ('SLAWarning', 'SLABreach',
--- 'UrgentUnassigned', 'CascadeExhausted') are unaffected.
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralEscalation_TriggerType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_TriggerType];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-    ADD CONSTRAINT [CK_ReferralEscalation_TriggerType] CHECK ([TriggerType] IN (
-        N'SLAWarning', N'SLABreach', N'CascadeExhausted', N'UrgentUnassigned', N'ConflictDeadlock', N'ManualOverride'
-    ));
-GO
-
--- Realign CK_ReferralEscalation_RecommendedAction to the Spec SS2.2 vocabulary.
-IF EXISTS (
-    SELECT 1 FROM sys.check_constraints
-    WHERE [name] = 'CK_ReferralEscalation_RecommendedAction'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [CK_ReferralEscalation_RecommendedAction];
-END
-GO
-
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-    ADD CONSTRAINT [CK_ReferralEscalation_RecommendedAction] CHECK ([RecommendedAction] IN (
-        N'ExtendSLA', N'AdvanceCascade', N'ReassignTier', N'ExpandPracticeArea', N'ContactProfessional', N'CloseUnfulfilled'
-    ));
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.default_constraints
-    WHERE [name] = 'DF_ReferralEscalation_RecommendedAction'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralEscalation]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation] DROP CONSTRAINT [DF_ReferralEscalation_RecommendedAction];
-END
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralEscalation]
-    ADD CONSTRAINT [DF_ReferralEscalation_RecommendedAction] DEFAULT (N'ContactProfessional') FOR [RecommendedAction];
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.default_constraints
-    WHERE [name] = 'DF_ReferralOutcome_OutcomeStatus'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReferralOutcome]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome] DROP CONSTRAINT [DF_ReferralOutcome_OutcomeStatus];
-END
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ReferralOutcome]
-    ADD CONSTRAINT [DF_ReferralOutcome_OutcomeStatus] DEFAULT (N'Resolved') FOR [OutcomeStatus];
-GO
-
-IF EXISTS (
-    SELECT 1 FROM sys.default_constraints
-    WHERE [name] = 'DF_ProfessionalAvailabilityWindow_WindowType'
-      AND [parent_object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]')
-)
-BEGIN
-    ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] DROP CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType];
-END
-GO
-ALTER TABLE [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ADD CONSTRAINT [DF_ProfessionalAvailabilityWindow_WindowType] DEFAULT (N'Paused') FOR [WindowType];
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = 'IX_ReciprocitySnapshot_Profile_Period' AND [object_id] = OBJECT_ID(N'[__mj_BizAppsReferrals].[ReciprocitySnapshot]'))
+    CREATE INDEX [IX_ReciprocitySnapshot_Profile_Period] ON [__mj_BizAppsReferrals].[ReciprocitySnapshot] ([ProfessionalProfileID], [PeriodStart], [PeriodEnd]);
 GO
 
 -- -----------------------------------------------------------------------------
@@ -841,16 +415,30 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spCreateReferralEscalation]
     @ReferralRequestID uniqueidentifier,
     @ReferralAssignmentID uniqueidentifier = NULL,
     @EscalationLevel int = NULL,
-    @TriggerType nvarchar(60) = NULL,
+    @TriggerType nvarchar(30) = NULL,
     @Status nvarchar(40) = NULL,
-    @RecommendedAction nvarchar(60) = NULL,
+    @DedupKey nvarchar(200),
+    @RecommendedAction_Clear bit = 0,
+    @RecommendedAction nvarchar(40) = NULL,
+    @NotifierKey_Clear bit = 0,
+    @NotifierKey nvarchar(50) = NULL,
     @Notes_Clear bit = 0,
     @Notes nvarchar(MAX) = NULL,
-    @TriggeredAt datetimeoffset = NULL,
+    @RaisedAt datetimeoffset = NULL,
     @AcknowledgedAt_Clear bit = 0,
     @AcknowledgedAt datetimeoffset = NULL,
     @ResolvedAt_Clear bit = 0,
-    @ResolvedAt datetimeoffset = NULL
+    @ResolvedAt datetimeoffset = NULL,
+    @LinkedTaskID_Clear bit = 0,
+    @LinkedTaskID uniqueidentifier = NULL,
+    @AcknowledgedByPersonID_Clear bit = 0,
+    @AcknowledgedByPersonID uniqueidentifier = NULL,
+    @ResolvedByPersonID_Clear bit = 0,
+    @ResolvedByPersonID uniqueidentifier = NULL,
+    @ResolutionNotes_Clear bit = 0,
+    @ResolutionNotes nvarchar(MAX) = NULL,
+    @AIRationaleJSON_Clear bit = 0,
+    @AIRationaleJSON nvarchar(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -866,11 +454,18 @@ BEGIN
                 [EscalationLevel],
                 [TriggerType],
                 [Status],
+                [DedupKey],
                 [RecommendedAction],
+                [NotifierKey],
                 [Notes],
-                [TriggeredAt],
+                [RaisedAt],
                 [AcknowledgedAt],
-                [ResolvedAt]
+                [ResolvedAt],
+                [LinkedTaskID],
+                [AcknowledgedByPersonID],
+                [ResolvedByPersonID],
+                [ResolutionNotes],
+                [AIRationaleJSON]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
@@ -881,11 +476,18 @@ BEGIN
                 ISNULL(@EscalationLevel, 1),
                 ISNULL(@TriggerType, 'SLAWarning'),
                 ISNULL(@Status, 'Open'),
-                ISNULL(@RecommendedAction, 'Notify'),
+                @DedupKey,
+                CASE WHEN @RecommendedAction_Clear = 1 THEN NULL ELSE @RecommendedAction END,
+                CASE WHEN @NotifierKey_Clear = 1 THEN NULL ELSE @NotifierKey END,
                 CASE WHEN @Notes_Clear = 1 THEN NULL ELSE @Notes END,
-                ISNULL(@TriggeredAt, SYSDATETIMEOFFSET()),
+                ISNULL(@RaisedAt, SYSDATETIMEOFFSET()),
                 CASE WHEN @AcknowledgedAt_Clear = 1 THEN NULL ELSE @AcknowledgedAt END,
-                CASE WHEN @ResolvedAt_Clear = 1 THEN NULL ELSE @ResolvedAt END
+                CASE WHEN @ResolvedAt_Clear = 1 THEN NULL ELSE @ResolvedAt END,
+                CASE WHEN @LinkedTaskID_Clear = 1 THEN NULL ELSE @LinkedTaskID END,
+                CASE WHEN @AcknowledgedByPersonID_Clear = 1 THEN NULL ELSE @AcknowledgedByPersonID END,
+                CASE WHEN @ResolvedByPersonID_Clear = 1 THEN NULL ELSE @ResolvedByPersonID END,
+                CASE WHEN @ResolutionNotes_Clear = 1 THEN NULL ELSE @ResolutionNotes END,
+                CASE WHEN @AIRationaleJSON_Clear = 1 THEN NULL ELSE @AIRationaleJSON END
             )
     END
     ELSE
@@ -897,11 +499,18 @@ BEGIN
                 [EscalationLevel],
                 [TriggerType],
                 [Status],
+                [DedupKey],
                 [RecommendedAction],
+                [NotifierKey],
                 [Notes],
-                [TriggeredAt],
+                [RaisedAt],
                 [AcknowledgedAt],
-                [ResolvedAt]
+                [ResolvedAt],
+                [LinkedTaskID],
+                [AcknowledgedByPersonID],
+                [ResolvedByPersonID],
+                [ResolutionNotes],
+                [AIRationaleJSON]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
@@ -911,11 +520,18 @@ BEGIN
                 ISNULL(@EscalationLevel, 1),
                 ISNULL(@TriggerType, 'SLAWarning'),
                 ISNULL(@Status, 'Open'),
-                ISNULL(@RecommendedAction, 'Notify'),
+                @DedupKey,
+                CASE WHEN @RecommendedAction_Clear = 1 THEN NULL ELSE @RecommendedAction END,
+                CASE WHEN @NotifierKey_Clear = 1 THEN NULL ELSE @NotifierKey END,
                 CASE WHEN @Notes_Clear = 1 THEN NULL ELSE @Notes END,
-                ISNULL(@TriggeredAt, SYSDATETIMEOFFSET()),
+                ISNULL(@RaisedAt, SYSDATETIMEOFFSET()),
                 CASE WHEN @AcknowledgedAt_Clear = 1 THEN NULL ELSE @AcknowledgedAt END,
-                CASE WHEN @ResolvedAt_Clear = 1 THEN NULL ELSE @ResolvedAt END
+                CASE WHEN @ResolvedAt_Clear = 1 THEN NULL ELSE @ResolvedAt END,
+                CASE WHEN @LinkedTaskID_Clear = 1 THEN NULL ELSE @LinkedTaskID END,
+                CASE WHEN @AcknowledgedByPersonID_Clear = 1 THEN NULL ELSE @AcknowledgedByPersonID END,
+                CASE WHEN @ResolvedByPersonID_Clear = 1 THEN NULL ELSE @ResolvedByPersonID END,
+                CASE WHEN @ResolutionNotes_Clear = 1 THEN NULL ELSE @ResolutionNotes END,
+                CASE WHEN @AIRationaleJSON_Clear = 1 THEN NULL ELSE @AIRationaleJSON END
             )
     END
     SELECT * FROM [__mj_BizAppsReferrals].[vwReferralEscalations] WHERE [ID] = (SELECT [ID] FROM @InsertedRow)
@@ -943,18 +559,32 @@ GO
 CREATE PROCEDURE [__mj_BizAppsReferrals].[spUpdateReferralEscalation]
     @ID uniqueidentifier,
     @ReferralRequestID uniqueidentifier = NULL,
+    @ReferralAssignmentID_Clear bit = 0,
     @ReferralAssignmentID uniqueidentifier = NULL,
     @EscalationLevel int = NULL,
-    @TriggerType nvarchar(60) = NULL,
+    @TriggerType nvarchar(30) = NULL,
     @Status nvarchar(40) = NULL,
-    @RecommendedAction nvarchar(60) = NULL,
+    @DedupKey nvarchar(200) = NULL,
+    @RecommendedAction_Clear bit = 0,
+    @RecommendedAction nvarchar(40) = NULL,
+    @NotifierKey_Clear bit = 0,
+    @NotifierKey nvarchar(50) = NULL,
     @Notes_Clear bit = 0,
     @Notes nvarchar(MAX) = NULL,
-    @TriggeredAt datetimeoffset = NULL,
     @AcknowledgedAt_Clear bit = 0,
     @AcknowledgedAt datetimeoffset = NULL,
     @ResolvedAt_Clear bit = 0,
-    @ResolvedAt datetimeoffset = NULL
+    @ResolvedAt datetimeoffset = NULL,
+    @LinkedTaskID_Clear bit = 0,
+    @LinkedTaskID uniqueidentifier = NULL,
+    @AcknowledgedByPersonID_Clear bit = 0,
+    @AcknowledgedByPersonID uniqueidentifier = NULL,
+    @ResolvedByPersonID_Clear bit = 0,
+    @ResolvedByPersonID uniqueidentifier = NULL,
+    @ResolutionNotes_Clear bit = 0,
+    @ResolutionNotes nvarchar(MAX) = NULL,
+    @AIRationaleJSON_Clear bit = 0,
+    @AIRationaleJSON nvarchar(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -962,15 +592,21 @@ BEGIN
         [__mj_BizAppsReferrals].[ReferralEscalation]
     SET
         [ReferralRequestID] = ISNULL(@ReferralRequestID, [ReferralRequestID]),
-        [ReferralAssignmentID] = ISNULL(@ReferralAssignmentID, [ReferralAssignmentID]),
+        [ReferralAssignmentID] = CASE WHEN @ReferralAssignmentID_Clear = 1 THEN NULL ELSE ISNULL(@ReferralAssignmentID, [ReferralAssignmentID]) END,
         [EscalationLevel] = ISNULL(@EscalationLevel, [EscalationLevel]),
         [TriggerType] = ISNULL(@TriggerType, [TriggerType]),
         [Status] = ISNULL(@Status, [Status]),
-        [RecommendedAction] = ISNULL(@RecommendedAction, [RecommendedAction]),
+        [DedupKey] = ISNULL(@DedupKey, [DedupKey]),
+        [RecommendedAction] = CASE WHEN @RecommendedAction_Clear = 1 THEN NULL ELSE ISNULL(@RecommendedAction, [RecommendedAction]) END,
+        [NotifierKey] = CASE WHEN @NotifierKey_Clear = 1 THEN NULL ELSE ISNULL(@NotifierKey, [NotifierKey]) END,
         [Notes] = CASE WHEN @Notes_Clear = 1 THEN NULL ELSE ISNULL(@Notes, [Notes]) END,
-        [TriggeredAt] = ISNULL(@TriggeredAt, [TriggeredAt]),
         [AcknowledgedAt] = CASE WHEN @AcknowledgedAt_Clear = 1 THEN NULL ELSE ISNULL(@AcknowledgedAt, [AcknowledgedAt]) END,
         [ResolvedAt] = CASE WHEN @ResolvedAt_Clear = 1 THEN NULL ELSE ISNULL(@ResolvedAt, [ResolvedAt]) END,
+        [LinkedTaskID] = CASE WHEN @LinkedTaskID_Clear = 1 THEN NULL ELSE ISNULL(@LinkedTaskID, [LinkedTaskID]) END,
+        [AcknowledgedByPersonID] = CASE WHEN @AcknowledgedByPersonID_Clear = 1 THEN NULL ELSE ISNULL(@AcknowledgedByPersonID, [AcknowledgedByPersonID]) END,
+        [ResolvedByPersonID] = CASE WHEN @ResolvedByPersonID_Clear = 1 THEN NULL ELSE ISNULL(@ResolvedByPersonID, [ResolvedByPersonID]) END,
+        [ResolutionNotes] = CASE WHEN @ResolutionNotes_Clear = 1 THEN NULL ELSE ISNULL(@ResolutionNotes, [ResolutionNotes]) END,
+        [AIRationaleJSON] = CASE WHEN @AIRationaleJSON_Clear = 1 THEN NULL ELSE ISNULL(@AIRationaleJSON, [AIRationaleJSON]) END,
         [__mj_UpdatedAt] = GETUTCDATE()
     WHERE
         [ID] = @ID
@@ -1103,11 +739,20 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spCreateReferralOutcome]
     @ReferralAssignmentID uniqueidentifier,
     @ProfessionalProfileID uniqueidentifier,
     @OutcomeStatus nvarchar(60) = NULL,
-    @ResponseHours_Clear bit = 0,
-    @ResponseHours decimal(6, 2) = NULL,
-    @CompletionNotes_Clear bit = 0,
-    @CompletionNotes nvarchar(MAX) = NULL,
-    @CompletedAt datetimeoffset = NULL
+    @EngagedAt_Clear bit = 0,
+    @EngagedAt datetimeoffset = NULL,
+    @ClosedAt_Clear bit = 0,
+    @ClosedAt datetimeoffset = NULL,
+    @EstimatedFeeAmount_Clear bit = 0,
+    @EstimatedFeeAmount decimal(12,2) = NULL,
+    @ReportedFeeAmount_Clear bit = 0,
+    @ReportedFeeAmount decimal(12,2) = NULL,
+    @CurrencyCode nvarchar(3) = NULL,
+    @ReportedByType_Clear bit = 0,
+    @ReportedByType nvarchar(20) = NULL,
+    @ReportedAt datetimeoffset = NULL,
+    @AttributionNotes_Clear bit = 0,
+    @AttributionNotes nvarchar(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1122,9 +767,14 @@ BEGIN
                 [ReferralAssignmentID],
                 [ProfessionalProfileID],
                 [OutcomeStatus],
-                [ResponseHours],
-                [CompletionNotes],
-                [CompletedAt]
+                [EngagedAt],
+                [ClosedAt],
+                [EstimatedFeeAmount],
+                [ReportedFeeAmount],
+                [CurrencyCode],
+                [ReportedByType],
+                [ReportedAt],
+                [AttributionNotes]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
@@ -1133,10 +783,15 @@ BEGIN
                 @ReferralRequestID,
                 @ReferralAssignmentID,
                 @ProfessionalProfileID,
-                ISNULL(@OutcomeStatus, 'Completed'),
-                CASE WHEN @ResponseHours_Clear = 1 THEN NULL ELSE @ResponseHours END,
-                CASE WHEN @CompletionNotes_Clear = 1 THEN NULL ELSE @CompletionNotes END,
-                ISNULL(@CompletedAt, SYSDATETIMEOFFSET())
+                ISNULL(@OutcomeStatus, 'Resolved'),
+                CASE WHEN @EngagedAt_Clear = 1 THEN NULL ELSE @EngagedAt END,
+                CASE WHEN @ClosedAt_Clear = 1 THEN NULL ELSE @ClosedAt END,
+                CASE WHEN @EstimatedFeeAmount_Clear = 1 THEN NULL ELSE @EstimatedFeeAmount END,
+                CASE WHEN @ReportedFeeAmount_Clear = 1 THEN NULL ELSE @ReportedFeeAmount END,
+                ISNULL(@CurrencyCode, 'USD'),
+                CASE WHEN @ReportedByType_Clear = 1 THEN NULL ELSE @ReportedByType END,
+                ISNULL(@ReportedAt, SYSDATETIMEOFFSET()),
+                CASE WHEN @AttributionNotes_Clear = 1 THEN NULL ELSE @AttributionNotes END
             )
     END
     ELSE
@@ -1147,9 +802,14 @@ BEGIN
                 [ReferralAssignmentID],
                 [ProfessionalProfileID],
                 [OutcomeStatus],
-                [ResponseHours],
-                [CompletionNotes],
-                [CompletedAt]
+                [EngagedAt],
+                [ClosedAt],
+                [EstimatedFeeAmount],
+                [ReportedFeeAmount],
+                [CurrencyCode],
+                [ReportedByType],
+                [ReportedAt],
+                [AttributionNotes]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
@@ -1157,10 +817,15 @@ BEGIN
                 @ReferralRequestID,
                 @ReferralAssignmentID,
                 @ProfessionalProfileID,
-                ISNULL(@OutcomeStatus, 'Completed'),
-                CASE WHEN @ResponseHours_Clear = 1 THEN NULL ELSE @ResponseHours END,
-                CASE WHEN @CompletionNotes_Clear = 1 THEN NULL ELSE @CompletionNotes END,
-                ISNULL(@CompletedAt, SYSDATETIMEOFFSET())
+                ISNULL(@OutcomeStatus, 'Resolved'),
+                CASE WHEN @EngagedAt_Clear = 1 THEN NULL ELSE @EngagedAt END,
+                CASE WHEN @ClosedAt_Clear = 1 THEN NULL ELSE @ClosedAt END,
+                CASE WHEN @EstimatedFeeAmount_Clear = 1 THEN NULL ELSE @EstimatedFeeAmount END,
+                CASE WHEN @ReportedFeeAmount_Clear = 1 THEN NULL ELSE @ReportedFeeAmount END,
+                ISNULL(@CurrencyCode, 'USD'),
+                CASE WHEN @ReportedByType_Clear = 1 THEN NULL ELSE @ReportedByType END,
+                ISNULL(@ReportedAt, SYSDATETIMEOFFSET()),
+                CASE WHEN @AttributionNotes_Clear = 1 THEN NULL ELSE @AttributionNotes END
             )
     END
     SELECT * FROM [__mj_BizAppsReferrals].[vwReferralOutcomes] WHERE [ID] = (SELECT [ID] FROM @InsertedRow)
@@ -1191,11 +856,19 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spUpdateReferralOutcome]
     @ReferralAssignmentID uniqueidentifier = NULL,
     @ProfessionalProfileID uniqueidentifier = NULL,
     @OutcomeStatus nvarchar(60) = NULL,
-    @ResponseHours_Clear bit = 0,
-    @ResponseHours decimal(6, 2) = NULL,
-    @CompletionNotes_Clear bit = 0,
-    @CompletionNotes nvarchar(MAX) = NULL,
-    @CompletedAt datetimeoffset = NULL
+    @EngagedAt_Clear bit = 0,
+    @EngagedAt datetimeoffset = NULL,
+    @ClosedAt_Clear bit = 0,
+    @ClosedAt datetimeoffset = NULL,
+    @EstimatedFeeAmount_Clear bit = 0,
+    @EstimatedFeeAmount decimal(12,2) = NULL,
+    @ReportedFeeAmount_Clear bit = 0,
+    @ReportedFeeAmount decimal(12,2) = NULL,
+    @CurrencyCode nvarchar(3) = NULL,
+    @ReportedByType_Clear bit = 0,
+    @ReportedByType nvarchar(20) = NULL,
+    @AttributionNotes_Clear bit = 0,
+    @AttributionNotes nvarchar(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1206,9 +879,13 @@ BEGIN
         [ReferralAssignmentID] = ISNULL(@ReferralAssignmentID, [ReferralAssignmentID]),
         [ProfessionalProfileID] = ISNULL(@ProfessionalProfileID, [ProfessionalProfileID]),
         [OutcomeStatus] = ISNULL(@OutcomeStatus, [OutcomeStatus]),
-        [ResponseHours] = CASE WHEN @ResponseHours_Clear = 1 THEN NULL ELSE ISNULL(@ResponseHours, [ResponseHours]) END,
-        [CompletionNotes] = CASE WHEN @CompletionNotes_Clear = 1 THEN NULL ELSE ISNULL(@CompletionNotes, [CompletionNotes]) END,
-        [CompletedAt] = ISNULL(@CompletedAt, [CompletedAt]),
+        [EngagedAt] = CASE WHEN @EngagedAt_Clear = 1 THEN NULL ELSE ISNULL(@EngagedAt, [EngagedAt]) END,
+        [ClosedAt] = CASE WHEN @ClosedAt_Clear = 1 THEN NULL ELSE ISNULL(@ClosedAt, [ClosedAt]) END,
+        [EstimatedFeeAmount] = CASE WHEN @EstimatedFeeAmount_Clear = 1 THEN NULL ELSE ISNULL(@EstimatedFeeAmount, [EstimatedFeeAmount]) END,
+        [ReportedFeeAmount] = CASE WHEN @ReportedFeeAmount_Clear = 1 THEN NULL ELSE ISNULL(@ReportedFeeAmount, [ReportedFeeAmount]) END,
+        [CurrencyCode] = ISNULL(@CurrencyCode, [CurrencyCode]),
+        [ReportedByType] = CASE WHEN @ReportedByType_Clear = 1 THEN NULL ELSE ISNULL(@ReportedByType, [ReportedByType]) END,
+        [AttributionNotes] = CASE WHEN @AttributionNotes_Clear = 1 THEN NULL ELSE ISNULL(@AttributionNotes, [AttributionNotes]) END,
         [__mj_UpdatedAt] = GETUTCDATE()
     WHERE
         [ID] = @ID
@@ -1339,20 +1016,13 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spCreateProfessionalAvailabilityWindow
     @ID uniqueidentifier = NULL,
     @ProfessionalProfileID uniqueidentifier,
     @WindowType nvarchar(40) = NULL,
-    @DayOfWeek_Clear bit = 0,
-    @DayOfWeek int = NULL,
-    @StartTimeMinutes_Clear bit = 0,
-    @StartTimeMinutes int = NULL,
-    @EndTimeMinutes_Clear bit = 0,
-    @EndTimeMinutes int = NULL,
-    @StartDate_Clear bit = 0,
-    @StartDate datetimeoffset = NULL,
-    @EndDate_Clear bit = 0,
-    @EndDate datetimeoffset = NULL,
-    @IsAvailable bit = NULL,
-    @TimeZone nvarchar(100) = NULL,
-    @Notes_Clear bit = 0,
-    @Notes nvarchar(255) = NULL
+    @StartsAt datetimeoffset,
+    @EndsAt datetimeoffset,
+    @CapacityOverride_Clear bit = 0,
+    @CapacityOverride int = NULL,
+    @Reason_Clear bit = 0,
+    @Reason nvarchar(500) = NULL,
+    @IsActive bit = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1365,29 +1035,23 @@ BEGIN
                 [ID],
                 [ProfessionalProfileID],
                 [WindowType],
-                [DayOfWeek],
-                [StartTimeMinutes],
-                [EndTimeMinutes],
-                [StartDate],
-                [EndDate],
-                [IsAvailable],
-                [TimeZone],
-                [Notes]
+                [StartsAt],
+                [EndsAt],
+                [CapacityOverride],
+                [Reason],
+                [IsActive]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
             (
                 @ID,
                 @ProfessionalProfileID,
-                ISNULL(@WindowType, 'Recurring'),
-                CASE WHEN @DayOfWeek_Clear = 1 THEN NULL ELSE @DayOfWeek END,
-                CASE WHEN @StartTimeMinutes_Clear = 1 THEN NULL ELSE @StartTimeMinutes END,
-                CASE WHEN @EndTimeMinutes_Clear = 1 THEN NULL ELSE @EndTimeMinutes END,
-                CASE WHEN @StartDate_Clear = 1 THEN NULL ELSE @StartDate END,
-                CASE WHEN @EndDate_Clear = 1 THEN NULL ELSE @EndDate END,
-                ISNULL(@IsAvailable, 1),
-                ISNULL(@TimeZone, 'UTC'),
-                CASE WHEN @Notes_Clear = 1 THEN NULL ELSE @Notes END
+                ISNULL(@WindowType, 'Paused'),
+                @StartsAt,
+                @EndsAt,
+                CASE WHEN @CapacityOverride_Clear = 1 THEN NULL ELSE @CapacityOverride END,
+                CASE WHEN @Reason_Clear = 1 THEN NULL ELSE @Reason END,
+                ISNULL(@IsActive, 1)
             )
     END
     ELSE
@@ -1396,28 +1060,22 @@ BEGIN
             (
                 [ProfessionalProfileID],
                 [WindowType],
-                [DayOfWeek],
-                [StartTimeMinutes],
-                [EndTimeMinutes],
-                [StartDate],
-                [EndDate],
-                [IsAvailable],
-                [TimeZone],
-                [Notes]
+                [StartsAt],
+                [EndsAt],
+                [CapacityOverride],
+                [Reason],
+                [IsActive]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
             (
                 @ProfessionalProfileID,
-                ISNULL(@WindowType, 'Recurring'),
-                CASE WHEN @DayOfWeek_Clear = 1 THEN NULL ELSE @DayOfWeek END,
-                CASE WHEN @StartTimeMinutes_Clear = 1 THEN NULL ELSE @StartTimeMinutes END,
-                CASE WHEN @EndTimeMinutes_Clear = 1 THEN NULL ELSE @EndTimeMinutes END,
-                CASE WHEN @StartDate_Clear = 1 THEN NULL ELSE @StartDate END,
-                CASE WHEN @EndDate_Clear = 1 THEN NULL ELSE @EndDate END,
-                ISNULL(@IsAvailable, 1),
-                ISNULL(@TimeZone, 'UTC'),
-                CASE WHEN @Notes_Clear = 1 THEN NULL ELSE @Notes END
+                ISNULL(@WindowType, 'Paused'),
+                @StartsAt,
+                @EndsAt,
+                CASE WHEN @CapacityOverride_Clear = 1 THEN NULL ELSE @CapacityOverride END,
+                CASE WHEN @Reason_Clear = 1 THEN NULL ELSE @Reason END,
+                ISNULL(@IsActive, 1)
             )
     END
     SELECT * FROM [__mj_BizAppsReferrals].[vwProfessionalAvailabilityWindows] WHERE [ID] = (SELECT [ID] FROM @InsertedRow)
@@ -1446,20 +1104,13 @@ CREATE PROCEDURE [__mj_BizAppsReferrals].[spUpdateProfessionalAvailabilityWindow
     @ID uniqueidentifier,
     @ProfessionalProfileID uniqueidentifier = NULL,
     @WindowType nvarchar(40) = NULL,
-    @DayOfWeek_Clear bit = 0,
-    @DayOfWeek int = NULL,
-    @StartTimeMinutes_Clear bit = 0,
-    @StartTimeMinutes int = NULL,
-    @EndTimeMinutes_Clear bit = 0,
-    @EndTimeMinutes int = NULL,
-    @StartDate_Clear bit = 0,
-    @StartDate datetimeoffset = NULL,
-    @EndDate_Clear bit = 0,
-    @EndDate datetimeoffset = NULL,
-    @IsAvailable bit = NULL,
-    @TimeZone nvarchar(100) = NULL,
-    @Notes_Clear bit = 0,
-    @Notes nvarchar(255) = NULL
+    @StartsAt datetimeoffset = NULL,
+    @EndsAt datetimeoffset = NULL,
+    @CapacityOverride_Clear bit = 0,
+    @CapacityOverride int = NULL,
+    @Reason_Clear bit = 0,
+    @Reason nvarchar(500) = NULL,
+    @IsActive bit = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1468,14 +1119,11 @@ BEGIN
     SET
         [ProfessionalProfileID] = ISNULL(@ProfessionalProfileID, [ProfessionalProfileID]),
         [WindowType] = ISNULL(@WindowType, [WindowType]),
-        [DayOfWeek] = CASE WHEN @DayOfWeek_Clear = 1 THEN NULL ELSE ISNULL(@DayOfWeek, [DayOfWeek]) END,
-        [StartTimeMinutes] = CASE WHEN @StartTimeMinutes_Clear = 1 THEN NULL ELSE ISNULL(@StartTimeMinutes, [StartTimeMinutes]) END,
-        [EndTimeMinutes] = CASE WHEN @EndTimeMinutes_Clear = 1 THEN NULL ELSE ISNULL(@EndTimeMinutes, [EndTimeMinutes]) END,
-        [StartDate] = CASE WHEN @StartDate_Clear = 1 THEN NULL ELSE ISNULL(@StartDate, [StartDate]) END,
-        [EndDate] = CASE WHEN @EndDate_Clear = 1 THEN NULL ELSE ISNULL(@EndDate, [EndDate]) END,
-        [IsAvailable] = ISNULL(@IsAvailable, [IsAvailable]),
-        [TimeZone] = ISNULL(@TimeZone, [TimeZone]),
-        [Notes] = CASE WHEN @Notes_Clear = 1 THEN NULL ELSE ISNULL(@Notes, [Notes]) END,
+        [StartsAt] = ISNULL(@StartsAt, [StartsAt]),
+        [EndsAt] = ISNULL(@EndsAt, [EndsAt]),
+        [CapacityOverride] = CASE WHEN @CapacityOverride_Clear = 1 THEN NULL ELSE ISNULL(@CapacityOverride, [CapacityOverride]) END,
+        [Reason] = CASE WHEN @Reason_Clear = 1 THEN NULL ELSE ISNULL(@Reason, [Reason]) END,
+        [IsActive] = ISNULL(@IsActive, [IsActive]),
         [__mj_UpdatedAt] = GETUTCDATE()
     WHERE
         [ID] = @ID
@@ -1605,12 +1253,19 @@ GO
 CREATE PROCEDURE [__mj_BizAppsReferrals].[spCreateReciprocitySnapshot]
     @ID uniqueidentifier = NULL,
     @ProfessionalProfileID uniqueidentifier,
-    @SnapshotDate datetimeoffset = NULL,
-    @PeriodStartDate datetimeoffset,
-    @PeriodEndDate datetimeoffset,
-    @ReferralsGivenCount int = NULL,
-    @ReferralsReceivedCount int = NULL,
-    @ReciprocityIndex decimal(5, 2) = NULL
+    @ComputedAt datetimeoffset = NULL,
+    @PeriodStart date,
+    @PeriodEnd date,
+    @ReferralsSent int = NULL,
+    @ReferralsReceived int = NULL,
+    @ReferralsAccepted int = NULL,
+    @ReferralsResolved int = NULL,
+    @SLABreachCount int = NULL,
+    @AcceptanceRate decimal(5,4) = NULL,
+    @MedianResponseHours_Clear bit = 0,
+    @MedianResponseHours decimal(8,2) = NULL,
+    @ReciprocityIndex decimal(6,3) = NULL,
+    @AttributedFeeTotal decimal(14,2) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1622,24 +1277,36 @@ BEGIN
             (
                 [ID],
                 [ProfessionalProfileID],
-                [SnapshotDate],
-                [PeriodStartDate],
-                [PeriodEndDate],
-                [ReferralsGivenCount],
-                [ReferralsReceivedCount],
-                [ReciprocityIndex]
+                [ComputedAt],
+                [PeriodStart],
+                [PeriodEnd],
+                [ReferralsSent],
+                [ReferralsReceived],
+                [ReferralsAccepted],
+                [ReferralsResolved],
+                [SLABreachCount],
+                [AcceptanceRate],
+                [MedianResponseHours],
+                [ReciprocityIndex],
+                [AttributedFeeTotal]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
             (
                 @ID,
                 @ProfessionalProfileID,
-                ISNULL(@SnapshotDate, SYSDATETIMEOFFSET()),
-                @PeriodStartDate,
-                @PeriodEndDate,
-                ISNULL(@ReferralsGivenCount, 0),
-                ISNULL(@ReferralsReceivedCount, 0),
-                ISNULL(@ReciprocityIndex, 0.00)
+                ISNULL(@ComputedAt, SYSDATETIMEOFFSET()),
+                @PeriodStart,
+                @PeriodEnd,
+                ISNULL(@ReferralsSent, 0),
+                ISNULL(@ReferralsReceived, 0),
+                ISNULL(@ReferralsAccepted, 0),
+                ISNULL(@ReferralsResolved, 0),
+                ISNULL(@SLABreachCount, 0),
+                ISNULL(@AcceptanceRate, 0),
+                CASE WHEN @MedianResponseHours_Clear = 1 THEN NULL ELSE @MedianResponseHours END,
+                ISNULL(@ReciprocityIndex, 0),
+                ISNULL(@AttributedFeeTotal, 0)
             )
     END
     ELSE
@@ -1647,23 +1314,35 @@ BEGIN
         INSERT INTO [__mj_BizAppsReferrals].[ReciprocitySnapshot]
             (
                 [ProfessionalProfileID],
-                [SnapshotDate],
-                [PeriodStartDate],
-                [PeriodEndDate],
-                [ReferralsGivenCount],
-                [ReferralsReceivedCount],
-                [ReciprocityIndex]
+                [ComputedAt],
+                [PeriodStart],
+                [PeriodEnd],
+                [ReferralsSent],
+                [ReferralsReceived],
+                [ReferralsAccepted],
+                [ReferralsResolved],
+                [SLABreachCount],
+                [AcceptanceRate],
+                [MedianResponseHours],
+                [ReciprocityIndex],
+                [AttributedFeeTotal]
             )
         OUTPUT INSERTED.[ID] INTO @InsertedRow
         VALUES
             (
                 @ProfessionalProfileID,
-                ISNULL(@SnapshotDate, SYSDATETIMEOFFSET()),
-                @PeriodStartDate,
-                @PeriodEndDate,
-                ISNULL(@ReferralsGivenCount, 0),
-                ISNULL(@ReferralsReceivedCount, 0),
-                ISNULL(@ReciprocityIndex, 0.00)
+                ISNULL(@ComputedAt, SYSDATETIMEOFFSET()),
+                @PeriodStart,
+                @PeriodEnd,
+                ISNULL(@ReferralsSent, 0),
+                ISNULL(@ReferralsReceived, 0),
+                ISNULL(@ReferralsAccepted, 0),
+                ISNULL(@ReferralsResolved, 0),
+                ISNULL(@SLABreachCount, 0),
+                ISNULL(@AcceptanceRate, 0),
+                CASE WHEN @MedianResponseHours_Clear = 1 THEN NULL ELSE @MedianResponseHours END,
+                ISNULL(@ReciprocityIndex, 0),
+                ISNULL(@AttributedFeeTotal, 0)
             )
     END
     SELECT * FROM [__mj_BizAppsReferrals].[vwReciprocitySnapshots] WHERE [ID] = (SELECT [ID] FROM @InsertedRow)
@@ -1691,12 +1370,19 @@ GO
 CREATE PROCEDURE [__mj_BizAppsReferrals].[spUpdateReciprocitySnapshot]
     @ID uniqueidentifier,
     @ProfessionalProfileID uniqueidentifier = NULL,
-    @SnapshotDate datetimeoffset = NULL,
-    @PeriodStartDate datetimeoffset = NULL,
-    @PeriodEndDate datetimeoffset = NULL,
-    @ReferralsGivenCount int = NULL,
-    @ReferralsReceivedCount int = NULL,
-    @ReciprocityIndex decimal(5, 2) = NULL
+    @ComputedAt datetimeoffset = NULL,
+    @PeriodStart date = NULL,
+    @PeriodEnd date = NULL,
+    @ReferralsSent int = NULL,
+    @ReferralsReceived int = NULL,
+    @ReferralsAccepted int = NULL,
+    @ReferralsResolved int = NULL,
+    @SLABreachCount int = NULL,
+    @AcceptanceRate decimal(5,4) = NULL,
+    @MedianResponseHours_Clear bit = 0,
+    @MedianResponseHours decimal(8,2) = NULL,
+    @ReciprocityIndex decimal(6,3) = NULL,
+    @AttributedFeeTotal decimal(14,2) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1704,12 +1390,18 @@ BEGIN
         [__mj_BizAppsReferrals].[ReciprocitySnapshot]
     SET
         [ProfessionalProfileID] = ISNULL(@ProfessionalProfileID, [ProfessionalProfileID]),
-        [SnapshotDate] = ISNULL(@SnapshotDate, [SnapshotDate]),
-        [PeriodStartDate] = ISNULL(@PeriodStartDate, [PeriodStartDate]),
-        [PeriodEndDate] = ISNULL(@PeriodEndDate, [PeriodEndDate]),
-        [ReferralsGivenCount] = ISNULL(@ReferralsGivenCount, [ReferralsGivenCount]),
-        [ReferralsReceivedCount] = ISNULL(@ReferralsReceivedCount, [ReferralsReceivedCount]),
+        [ComputedAt] = ISNULL(@ComputedAt, [ComputedAt]),
+        [PeriodStart] = ISNULL(@PeriodStart, [PeriodStart]),
+        [PeriodEnd] = ISNULL(@PeriodEnd, [PeriodEnd]),
+        [ReferralsSent] = ISNULL(@ReferralsSent, [ReferralsSent]),
+        [ReferralsReceived] = ISNULL(@ReferralsReceived, [ReferralsReceived]),
+        [ReferralsAccepted] = ISNULL(@ReferralsAccepted, [ReferralsAccepted]),
+        [ReferralsResolved] = ISNULL(@ReferralsResolved, [ReferralsResolved]),
+        [SLABreachCount] = ISNULL(@SLABreachCount, [SLABreachCount]),
+        [AcceptanceRate] = ISNULL(@AcceptanceRate, [AcceptanceRate]),
+        [MedianResponseHours] = CASE WHEN @MedianResponseHours_Clear = 1 THEN NULL ELSE ISNULL(@MedianResponseHours, [MedianResponseHours]) END,
         [ReciprocityIndex] = ISNULL(@ReciprocityIndex, [ReciprocityIndex]),
+        [AttributedFeeTotal] = ISNULL(@AttributedFeeTotal, [AttributedFeeTotal]),
         [__mj_UpdatedAt] = GETUTCDATE()
     WHERE
         [ID] = @ID
@@ -1786,58 +1478,6 @@ END
 GO
 GRANT EXECUTE ON [__mj_BizAppsReferrals].[spDeleteReciprocitySnapshot] TO [cdp_Developer], [cdp_Integration]
 GO
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

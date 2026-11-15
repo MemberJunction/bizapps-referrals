@@ -19,15 +19,15 @@ Return a JSON object:
 
 ```json
 {
-  "recommendedAction": "ExtendSLA | AdvanceCascade | ReassignTier | ExpandPracticeArea | ContactProfessional | CloseUnfulfilled",
+  "recommendedAction": "ReassignNextCandidate | ExpandPracticeArea | ExtendSLA | ContactSeeker | CloseAsExhausted",
   "summary": "One sentence summarizing the recommendation",
   "rationale": "2-3 sentences explaining why this action fits the trigger type, level, and context"
 }
 ```
 
-`recommendedAction` MUST be exactly one of `ExtendSLA`, `AdvanceCascade`, `ReassignTier`, `ExpandPracticeArea`, `ContactProfessional`, or `CloseUnfulfilled` - any other value will be rejected and replaced with a rules-based default. General guidance:
+`recommendedAction` MUST be exactly one of `ReassignNextCandidate`, `ExpandPracticeArea`, `ExtendSLA`, `ContactSeeker`, or `CloseAsExhausted` - any other value will be rejected and replaced with a rules-based default. General guidance:
 - `CascadeExhausted` typically warrants `ExpandPracticeArea` (widen the match pool to the parent practice area).
-- `SLABreach` typically warrants `AdvanceCascade` (move to the next candidate).
-- `UrgentUnassigned` or level 3+ escalations typically warrant `ReassignTier` (escalate to a higher-SLA tier).
-- `ConflictDeadlock` or `ManualOverride` typically warrant `ContactProfessional`.
-- Routine `SLAWarning` at low levels typically warrants `ContactProfessional`.
+- `SLABreach` or `UrgentUnassigned` typically warrant `ReassignNextCandidate` (move to the next candidate).
+- Level 3 (maximum) escalations typically warrant `CloseAsExhausted`.
+- `Manual` or `AIRecommended` triggers typically warrant `ContactSeeker`.
+- Routine `SLAWarning` at low levels typically warrants `ExtendSLA`.
