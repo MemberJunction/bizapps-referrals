@@ -6,6 +6,7 @@ import { ResourceData } from '@memberjunction/core-entities';
 import { RegisterClass } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJButtonDirective,
   MJPageBodyComponent,
   MJPageHeaderComponent,
   MJPageLayoutComponent,
@@ -18,6 +19,7 @@ import {
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { OpsTelemetryPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
@@ -44,6 +46,7 @@ export interface SupplyDemandGapRow {
   imports: [
     CommonModule,
     FormsModule,
+    MJButtonDirective,
     MJPageLayoutComponent,
     MJPageHeaderComponent,
     MJPageBodyComponent,
@@ -51,15 +54,15 @@ export interface SupplyDemandGapRow {
   template: `
     <mj-page-layout>
       <mj-page-header Title="Referrals Ops Command" Icon="fa-solid fa-chart-line">
-        <div class="ops-toolbar">
+        <div class="ops-toolbar" actions>
           <label class="toggle-chip">
             <input type="checkbox" [(ngModel)]="Prefs.ShowExhaustedOnly" (ngModelChange)="OnToggleChange()" />
             <span>Exhausted Only</span>
           </label>
-          <button type="button" class="btn-outline" (click)="RunSlaSweep()" [disabled]="IsSweeping">
+          <button type="button" mjButton Variant="outline" Size="sm" (click)="RunSlaSweep()" [disabled]="IsSweeping">
             {{ IsSweeping ? 'Sweeping...' : 'Sweep Expired SLAs' }}
           </button>
-          <button type="button" class="btn-outline" (click)="Refresh()">Refresh</button>
+          <button type="button" mjButton Variant="outline" Size="sm" (click)="Refresh()">Refresh</button>
         </div>
       </mj-page-header>
       <mj-page-body>
@@ -101,6 +104,10 @@ export interface SupplyDemandGapRow {
               <span class="kpi-label">Expired SLAs</span>
               <strong class="kpi-value">{{ ExpiredAssignmentCount }}</strong>
             </div>
+            <button type="button" mjButton Variant="flat" class="kpi-card kpi-card--link" (click)="OpenEscalationConsole()" [AriaLabel]="'Open Escalation Console, ' + OpenEscalationCount + ' open escalations'">
+              <span class="kpi-label">Open Escalations</span>
+              <strong class="kpi-value">{{ OpenEscalationCount }}</strong>
+            </button>
           </div>
 
           <div class="table-card">
@@ -197,6 +204,8 @@ export interface SupplyDemandGapRow {
       flex-direction: column;
       gap: 0.25rem;
     }
+    .kpi-card--link { align-items: flex-start; text-align: left; cursor: pointer; }
+    .kpi-card--link:hover { background: var(--mj-bg-surface-hover); }
     .kpi-label { font-size: 0.78rem; color: var(--mj-text-secondary); }
     .kpi-value { font-size: 1.5rem; color: var(--mj-text-primary); }
     .table-card {
@@ -277,7 +286,15 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
     return sum / accepted.length;
   }
 
-  public get SupplyDemandMatrix(): SupplyDemandGapRow[] {
+  /** Memoized by {@link Refresh}; recomputed only when the underlying data reloads, not on every CD cycle. */
+  public SupplyDemandMatrix: SupplyDemandGapRow[] = [];
+  public Escalations: ReferralEscalationEntity[] = [];
+
+  public get OpenEscalationCount(): number {
+    return this.Escalations.filter((e) => e.Status === 'Open' || e.Status === 'Acknowledged').length;
+  }
+
+  private computeSupplyDemandMatrix(): SupplyDemandGapRow[] {
     const verifiedIds = new Set(
       this.Profiles.filter((p) => p.IsActive && p.VerificationStatus === 'Verified').map((p) => p.ID.toLowerCase()),
     );
@@ -371,6 +388,7 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
         { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'entity_object' },
         { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Referral Escalations', ResultType: 'entity_object' },
       ],
       md.CurrentUser,
     );
@@ -381,7 +399,13 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
     this.Profiles = results[4]?.Success ? (results[4].Results as ProfessionalProfileEntity[]) : [];
     this.PracticeLinks = results[5]?.Success ? (results[5].Results as ProfessionalPracticeAreaEntity[]) : [];
     this.JurisdictionLinks = results[6]?.Success ? (results[6].Results as ProfessionalJurisdictionEntity[]) : [];
+    this.Escalations = results[7]?.Success ? (results[7].Results as ReferralEscalationEntity[]) : [];
+    this.SupplyDemandMatrix = this.computeSupplyDemandMatrix();
     this.cdr.markForCheck();
+  }
+
+  public OpenEscalationConsole(): void {
+    void this.navService.OpenNavItemByName('Escalations');
   }
 
   public async RunSlaSweep(): Promise<void> {

@@ -1347,6 +1347,7 @@ export class CascadeRoutingService {
       ReferralAssignmentID: string;
       OutcomeStatus?: ReferralOutcomeEntity['OutcomeStatus'];
       CompletionNotes?: string;
+      FeeAmount?: number | null;
     },
     contextUser: UserInfo,
     provider?: IMetadataProvider & IRunViewProvider,
@@ -1445,6 +1446,9 @@ export class CascadeRoutingService {
       }
       if (params.CompletionNotes) {
         outcome.CompletionNotes = params.CompletionNotes;
+      }
+      if (params.FeeAmount != null) {
+        outcome.FeeAmount = params.FeeAmount;
       }
       outcome.CompletedAt = now;
       await saveOrThrow(outcome, 'ReferralOutcome');

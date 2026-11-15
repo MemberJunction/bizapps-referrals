@@ -12,6 +12,7 @@ import { ResourceData } from '@memberjunction/core-entities';
 import { RegisterClass } from '@memberjunction/global';
 import { BaseResourceComponent, NavigationService } from '@memberjunction/ng-shared';
 import {
+  MJButtonDirective,
   MJPageBodyComponent,
   MJPageHeaderComponent,
   MJPageLayoutComponent,
@@ -88,6 +89,7 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
   imports: [
     CommonModule,
     FormsModule,
+    MJButtonDirective,
     MJPageLayoutComponent,
     MJPageHeaderComponent,
     MJPageBodyComponent,
@@ -301,6 +303,8 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
       cursor: pointer;
       text-align: left;
     }
+    .cell-emphasis { font-weight: 600; }
+    .cell-emphasis-strong { font-weight: 700; }
     .link-btn:hover {
       color: var(--mj-text-link-hover, var(--mj-brand-primary-hover));
       text-decoration: underline;
@@ -319,7 +323,7 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
   template: `
     <mj-page-layout>
       <mj-page-header Title="Referrals Report Gallery" Icon="fa-solid fa-chart-pie">
-        <div class="toolbar-group">
+        <div class="toolbar-group" actions>
           <select
             class="domain-select"
             [ngModel]="SelectedDomain"
@@ -332,10 +336,10 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
             <option value="Accounting">Accounting &amp; Tax</option>
           </select>
           <div class="filter-pills">
-            <button type="button" class="filter-btn" [class.active]="SelectedPeriod === '30d'" (click)="SetPeriod('30d')">Last 30 Days</button>
-            <button type="button" class="filter-btn" [class.active]="SelectedPeriod === '90d'" (click)="SetPeriod('90d')">Quarter</button>
-            <button type="button" class="filter-btn" [class.active]="SelectedPeriod === 'all'" (click)="SetPeriod('all')">All Time</button>
-            <button type="button" class="filter-btn" (click)="Refresh()">Refresh</button>
+            <button type="button" mjButton Variant="outline" Size="sm" class="filter-btn" [class.active]="SelectedPeriod === '30d'" (click)="SetPeriod('30d')">Last 30 Days</button>
+            <button type="button" mjButton Variant="outline" Size="sm" class="filter-btn" [class.active]="SelectedPeriod === '90d'" (click)="SetPeriod('90d')">Quarter</button>
+            <button type="button" mjButton Variant="outline" Size="sm" class="filter-btn" [class.active]="SelectedPeriod === 'all'" (click)="SetPeriod('all')">All Time</button>
+            <button type="button" mjButton Variant="outline" Size="sm" class="filter-btn" (click)="Refresh()">Refresh</button>
           </div>
         </div>
       </mj-page-header>
@@ -482,7 +486,7 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
                   @for (partner of PartnerPayoutRows; track partner.ProfileID) {
                     <tr>
                       <td>
-                        <button type="button" class="link-btn" (click)="OpenProfile(partner.ProfileID)">
+                        <button type="button" mjButton Variant="flat" Size="sm" class="link-btn" (click)="OpenProfile(partner.ProfileID)">
                           {{ partner.DisplayName }}
                         </button>
                       </td>
@@ -498,7 +502,7 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
                           —
                         }
                       </td>
-                      <td style="font-weight: 700;">\${{ partner.EstimatedVolume | number:'1.0-0' }}</td>
+                      <td class="cell-emphasis-strong">\${{ partner.EstimatedVolume | number:'1.0-0' }}</td>
                     </tr>
                   }
                 </tbody>
@@ -526,7 +530,7 @@ export type DomainFilterKey = 'All' | keyof typeof VOCABULARY_PRESETS;
                 <tbody>
                   @for (row of SupplyDemandRows; track row.PracticeArea + ':' + row.Jurisdiction) {
                     <tr>
-                      <td style="font-weight: 600;">{{ row.PracticeArea }}</td>
+                      <td class="cell-emphasis">{{ row.PracticeArea }}</td>
                       <td>{{ row.Jurisdiction }}</td>
                       <td>{{ row.RequestsCount }}</td>
                       <td>{{ row.AvailablePros }}</td>
