@@ -135,6 +135,11 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 | `RouteReferralAction` / `RouteReferralOperation` | Dispatches the next `ReferralAssignment` in sequence with an SLA deadline |
 | `RespondToReferralAction` / `RespondToReferralOperation` | Atomically records `Accepted`, `Declined`, or `ConflictFlagged` and auto-cascades on non-acceptance |
 | `SweepExpiredReferralSLAsAction` / `SweepExpiredReferralSLAsOperation` | Marks expired `Offered` assignments as `TimedOut` and cascades to the next ranked candidate |
+| `MarkReferralInProgressAction` / `CompleteReferralAction` | Transactional, authorization-checked, idempotent lifecycle completion; the latter creates a `ReferralOutcome` |
+| `SetAvailabilityWindowAction` | Creates/updates a `ProfessionalAvailabilityWindow` (Recurring / DateRange / Blackout) |
+| `EvaluateEscalationsAction` / `AcknowledgeEscalationAction` / `ResolveEscalationAction` | SLA-warning/urgent-unassigned escalation evaluation and coordinator/admin-gated lifecycle transitions |
+| `ReopenExhaustedReferralAction` | Admin-only reopen of an `Exhausted` request, excluding previously-assigned professionals |
+| `RecomputeReciprocityAction` / `GetReciprocityScorecardAction` | Batch recompute and on-demand read of per-professional reciprocity scorecards |
 
 ---
 
@@ -167,6 +172,17 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **Lifecycle Completion (`CascadeRoutingService`)**: `MarkInProgress` and `CompleteReferral` are transactional, authorization-checked *before* any writes, and idempotent on repeat calls. `CompleteReferral` creates a `ReferralOutcome`, decrements `ActiveReferralCount` (never below 0), increments `TotalCompletedCount`, and recomputes a 90-day rolling `AverageResponseHours`. Cascade `CascadeOrder` numbering was fixed so conflict-rejected candidates are always numbered after eligible ones.
 - **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.MarkReferralInProgress`, `Referrals.CompleteReferral`, `Referrals.SetAvailabilityWindow`.
 - **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: `BaseFormComponent` + `BaseFormPanel` registrations for all 15 entities.
+
+---
+
+## Wave 3 Slice 2: Escalation Engine, Reopen & Reciprocity Scorecards
+
+- **Schema v1.2.1 (`V202611152000`)**: Additive escalation-lifecycle columns on `ReferralEscalation` (`DedupKey`, `LinkedTaskID`, `AcknowledgedByPersonID`, `ResolvedByPersonID`, `ResolutionNotes`; `TriggerType` widened to 6 values — `SLAWarning`, `SLABreach`, `ManualEscalation`, `CapacityExhausted`, `CascadeExhausted`, `UrgentUnassigned` — and `Status` widened to 4 — `Open`, `Acknowledged`, `Resolved`, `Dismissed`), `FeeAmount` on `ReferralOutcome`, and full scorecard metrics (`AcceptedCount`, `ResolvedCount`, `SLABreachCount`, `AcceptanceRate`, `MedianResponseHours`, `AttributedFeeTotal`, with a unique index per profile/period) on `ReciprocitySnapshot`.
+- **`SlaEscalationService` (`@mj-biz-apps/referrals-core`)**: `EvaluateEscalations` raises SLA-warning and urgent-unassigned escalations; `RaiseEscalation` is idempotent by `DedupKey` and caps `EscalationLevel` at the tier's `MaxEscalationLevel`; `AcknowledgeEscalation` / `ResolveEscalation` / `DismissEscalation` enforce coordinator/admin authorization *before* any writes. Notifications are dispatched through a pluggable `BaseEscalationNotifier` (`None`, `BizAppsTasks` — the latter discovers the sibling BizApps Tasks schema at runtime via `provider.Entities` and raw parameterized SQL, with no static dependency on that package).
+- **`CascadeRoutingService.ReopenExhaustedRequest`**: Admin-only reopen of an `Exhausted` referral — re-runs matching excluding every previously-assigned professional, optionally expanding to the parent `PracticeArea`, and auto-resolves the open `CascadeExhausted` escalation when a new candidate is found.
+- **`ReciprocityScorecardService` (`@mj-biz-apps/referrals-core`)**: `ComputeScorecard` computes `ReciprocityIndex = round((Sent + 1) / (Accepted + 1), 3)` plus Sent/Received/Accepted/Resolved/SLABreachCount/AcceptanceRate/MedianResponseHours/AttributedFeeTotal; `RecomputeSnapshots` batch-upserts `ReciprocitySnapshot` rows per professional per UTC calendar quarter and updates `ProfessionalProfile.ReciprocityIndex` / `ReadinessScore` / `ReadinessComputedAt`. `MatchingEngine.ScoreCandidate` can apply an optional reciprocity-based match-score boost (`ApplyReciprocityBoost`).
+- **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.EvaluateEscalations`, `Referrals.AcknowledgeEscalation`, `Referrals.ResolveEscalation`, `Referrals.ReopenExhaustedReferral`, `Referrals.RecomputeReciprocity`, `Referrals.GetReciprocityScorecard`.
+- **`ReferralsSlaSweepScheduler` (`@mj-biz-apps/referrals-server`)**: `RunOnce` now runs the SLA sweep followed by `EvaluateEscalations` and reports `EscalationsRaised` on `SlaSweepRunRecord`; a second recurring timer (`reciprocityIntervalMs`, default 24h; `disableAutoReciprocity` to turn it off) drives daily `RecomputeReciprocity` passes. `LoadBizAppsReferralsServer` accepts an `escalationNotifierKey` option (default `BizAppsTasks`), safely falling back to `None` at evaluation time when that notifier isn't registered.
 
 ---
 
