@@ -267,60 +267,66 @@ BEGIN
 
     -- 7. 14 additional ReferralEscalation rows spanning all 6 TriggerType values,
     --    all 4 Status values, and EscalationLevel 1-3 (16 total combined with
-    --    Slice 1's 2 rows). 3 reference the synthetic A/B/C assignments above,
-    --    each of which carries a populated AIRationaleJSON.
+    --    Slice 1's 2 rows). Rows 7, 8, and 11 populate RecommendedAction AND
+    --    AIRationaleJSON directly on the escalation row (AC-17/AC-30).
     INSERT INTO __mj_BizAppsReferrals."ReferralEscalation"
-        ("ID","ReferralRequestID","ReferralAssignmentID","EscalationLevel","TriggerType","Status","RecommendedAction","Notes","DedupKey","RaisedAt","AcknowledgedAt","ResolvedAt","ResolutionNotes")
+        ("ID","ReferralRequestID","ReferralAssignmentID","EscalationLevel","TriggerType","Status","RecommendedAction","Notes","DedupKey","RaisedAt","AcknowledgedAt","ResolvedAt","ResolutionNotes","AIRationaleJSON")
     SELECT * FROM (VALUES
-        ('e3000002-0000-0000-0000-000000000011'::UUID, 'e2000001-0000-0000-0000-000000000110'::UUID, 'f2000001-0000-0000-0000-000000000112'::UUID, 1, 'SLAWarning', 'Open', 'ExtendSLA', '75% of SLA window elapsed on the SAP integration lead review; no response yet.', 'SLAWARN:f2000001-0000-0000-0000-000000000112', NOW() - INTERVAL '2 hours', NULL::TIMESTAMPTZ, NULL::TIMESTAMPTZ, NULL::TEXT),
-        ('e3000002-0000-0000-0000-000000000012'::UUID, 'e2000001-0000-0000-0000-000000000114'::UUID, 'f2000001-0000-0000-0000-000000000116'::UUID, 1, 'SLAWarning', 'Dismissed', 'ExtendSLA', 'SLA warning fired while professional confirmation was in flight by phone.', 'SLAWARN:f2000001-0000-0000-0000-000000000116', NOW() - INTERVAL '20 hours', NOW() - INTERVAL '19 hours', NOW() - INTERVAL '18 hours', 'False positive; professional had already accepted by phone before the system recorded the response.'),
-        ('e3000002-0000-0000-0000-000000000013'::UUID, 'e2000001-0000-0000-0000-000000000119'::UUID, 'f2000001-0000-0000-0000-000000000119'::UUID, 2, 'SLABreach', 'Open', 'ReassignNextCandidate', 'First cascade step exceeded its SLA window without a response during the holiday week.', 'SLABREACH:f2000001-0000-0000-0000-000000000119', NOW() - INTERVAL '16 hours', NULL, NULL, NULL),
-        ('e3000002-0000-0000-0000-000000000014'::UUID, 'e2000001-0000-0000-0000-000000000106'::UUID, 'f2000001-0000-0000-0000-000000000107'::UUID, 2, 'SLABreach', 'Acknowledged', 'ReassignNextCandidate', 'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', 'SLABREACH:f2000001-0000-0000-0000-000000000107', NOW() - INTERVAL '4 hours', NOW() - INTERVAL '3 hours', NULL, NULL),
-        ('e3000002-0000-0000-0000-000000000015'::UUID, 'e2000001-0000-0000-0000-000000000113'::UUID, 'f2000001-0000-0000-0000-000000000115'::UUID, 1, 'Manual', 'Open', 'ContactSeeker', 'Seeker requested a manual status check on the FHIR R4 telehealth audit.', 'MANUAL:e2000001-0000-0000-0000-000000000113:1', NOW() - INTERVAL '1 hour', NULL, NULL, NULL),
-        ('e3000002-0000-0000-0000-000000000016'::UUID, 'e2000001-0000-0000-0000-000000000109'::UUID, 'f2000001-0000-0000-0000-000000000111'::UUID, 2, 'Manual', 'Resolved', 'ContactSeeker', 'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', 'MANUAL:e2000001-0000-0000-0000-000000000109:2', NOW() - INTERVAL '14 hours', NOW() - INTERVAL '13 hours', NOW() - INTERVAL '12 hours', 'Confirmed engagement is on-track; no compliance gap found.'),
-        ('e3000002-0000-0000-0000-000000000017'::UUID, 'e2000001-0000-0000-0000-000000000117'::UUID, NULL, 2, 'CascadeExhausted', 'Open', 'ExpandPracticeArea', 'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', 'CAPACITY:e2000001-0000-0000-0000-000000000117', NOW() - INTERVAL '3 hours', NULL, NULL, NULL),
-        ('e3000002-0000-0000-0000-000000000018'::UUID, 'e2000001-0000-0000-0000-000000000118'::UUID, NULL, 3, 'CascadeExhausted', 'Acknowledged', 'CloseAsExhausted', 'No supply-chain security specialists available at the Standard tier; considering tier escalation.', 'CAPACITY:e2000001-0000-0000-0000-000000000118', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '5 hours', NULL, NULL),
-        ('e3000002-0000-0000-0000-000000000019'::UUID, 'e2000001-0000-0000-0000-000000000121'::UUID, NULL, 1, 'AIRecommended', 'Dismissed', 'ContactSeeker', 'Conflict screening flagged a potential adverse-party overlap moments before the seeker cancelled the request.', 'CONFLICT:e2000001-0000-0000-0000-000000000121', NOW() - INTERVAL '40 hours', NOW() - INTERVAL '39 hours', NOW() - INTERVAL '39 hours', 'Request was cancelled by the seeker; no further action needed.'),
-        ('e3000002-0000-0000-0000-00000000001a'::UUID, 'e2000001-0000-0000-0000-000000000119'::UUID, 'f2000001-0000-0000-0000-000000000121'::UUID, 3, 'CascadeExhausted', 'Resolved', 'ExpandPracticeArea', 'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', 'CASCADE:e2000001-0000-0000-0000-000000000119', NOW() - INTERVAL '16 hours', NOW() - INTERVAL '15 hours', NOW() - INTERVAL '2 hours', 'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.'),
-        ('e3000002-0000-0000-0000-00000000001b'::UUID, 'e3000002-0000-0000-0000-000000000001'::UUID, 'f3000002-0000-0000-0000-000000000001'::UUID, 2, 'CascadeExhausted', 'Open', 'ExpandPracticeArea', 'Both cascade candidates for the SCADA cloud migration declined on capacity.', 'CASCADE:f3000002-0000-0000-0000-000000000001', NOW() - INTERVAL '2 hours', NULL, NULL, NULL),
-        ('e3000002-0000-0000-0000-00000000001c'::UUID, 'e3000002-0000-0000-0000-000000000002'::UUID, 'f3000002-0000-0000-0000-000000000002'::UUID, 1, 'SLABreach', 'Acknowledged', 'ReassignNextCandidate', 'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', 'SLABREACH:f3000002-0000-0000-0000-000000000002', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '5 hours', NULL, NULL),
-        ('e3000002-0000-0000-0000-00000000001d'::UUID, 'e3000002-0000-0000-0000-000000000003'::UUID, 'f3000002-0000-0000-0000-000000000003'::UUID, 3, 'UrgentUnassigned', 'Resolved', 'CloseAsExhausted', 'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', 'URGENT:f3000002-0000-0000-0000-000000000003', NOW() - INTERVAL '9 hours', NOW() - INTERVAL '8 hours', NOW() - INTERVAL '1 hour', 'Coordinator manually matched an available senior professional outside the automated cascade.'),
-        ('e3000002-0000-0000-0000-00000000001e'::UUID, 'e2000001-0000-0000-0000-000000000121'::UUID, NULL, 1, 'UrgentUnassigned', 'Open', 'ContactSeeker', 'Urgent ransomware tabletop request left unassigned after cancellation review.', 'URGENT:e2000001-0000-0000-0000-000000000121', NOW() - INTERVAL '1 hour', NULL, NULL, NULL)
-    ) AS e(id, reqid, assignid, level, triggertype, status, recommendedaction, notes, dedupkey, raisedat, acknowledgedat, resolvedat, resolutionnotes)
+        ('e3000002-0000-0000-0000-000000000011'::UUID, 'e2000001-0000-0000-0000-000000000110'::UUID, 'f2000001-0000-0000-0000-000000000112'::UUID, 1, 'SLAWarning', 'Open', 'ExtendSLA', '75% of SLA window elapsed on the SAP integration lead review; no response yet.', 'SLAWARN:f2000001-0000-0000-0000-000000000112', NOW() - INTERVAL '2 hours', NULL::TIMESTAMPTZ, NULL::TIMESTAMPTZ, NULL::TEXT, NULL::TEXT),
+        ('e3000002-0000-0000-0000-000000000012'::UUID, 'e2000001-0000-0000-0000-000000000114'::UUID, 'f2000001-0000-0000-0000-000000000116'::UUID, 1, 'SLAWarning', 'Dismissed', 'ExtendSLA', 'SLA warning fired while professional confirmation was in flight by phone.', 'SLAWARN:f2000001-0000-0000-0000-000000000116', NOW() - INTERVAL '20 hours', NOW() - INTERVAL '19 hours', NOW() - INTERVAL '18 hours', 'False positive; professional had already accepted by phone before the system recorded the response.', NULL),
+        ('e3000002-0000-0000-0000-000000000013'::UUID, 'e2000001-0000-0000-0000-000000000119'::UUID, 'f2000001-0000-0000-0000-000000000119'::UUID, 2, 'SLABreach', 'Open', 'ReassignNextCandidate', 'First cascade step exceeded its SLA window without a response during the holiday week.', 'SLABREACH:f2000001-0000-0000-0000-000000000119', NOW() - INTERVAL '16 hours', NULL, NULL, NULL, NULL),
+        ('e3000002-0000-0000-0000-000000000014'::UUID, 'e2000001-0000-0000-0000-000000000106'::UUID, 'f2000001-0000-0000-0000-000000000107'::UUID, 2, 'SLABreach', 'Acknowledged', 'ReassignNextCandidate', 'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', 'SLABREACH:f2000001-0000-0000-0000-000000000107', NOW() - INTERVAL '4 hours', NOW() - INTERVAL '3 hours', NULL, NULL, NULL),
+        ('e3000002-0000-0000-0000-000000000015'::UUID, 'e2000001-0000-0000-0000-000000000113'::UUID, 'f2000001-0000-0000-0000-000000000115'::UUID, 1, 'Manual', 'Open', 'ContactSeeker', 'Seeker requested a manual status check on the FHIR R4 telehealth audit.', 'MANUAL:e2000001-0000-0000-0000-000000000113:1', NOW() - INTERVAL '1 hour', NULL, NULL, NULL, NULL),
+        ('e3000002-0000-0000-0000-000000000016'::UUID, 'e2000001-0000-0000-0000-000000000109'::UUID, 'f2000001-0000-0000-0000-000000000111'::UUID, 2, 'Manual', 'Resolved', 'ContactSeeker', 'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', 'MANUAL:e2000001-0000-0000-0000-000000000109:2', NOW() - INTERVAL '14 hours', NOW() - INTERVAL '13 hours', NOW() - INTERVAL '12 hours', 'Confirmed engagement is on-track; no compliance gap found.', NULL),
+        ('e3000002-0000-0000-0000-000000000017'::UUID, 'e2000001-0000-0000-0000-000000000117'::UUID, NULL, 2, 'CascadeExhausted', 'Open', 'ExpandPracticeArea', 'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', 'CAPACITY:e2000001-0000-0000-0000-000000000117', NOW() - INTERVAL '3 hours', NULL, NULL, NULL, '{"decision":"cascade_exhausted","consideredCandidates":3,"reason":"All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity."}'),
+        ('e3000002-0000-0000-0000-000000000018'::UUID, 'e2000001-0000-0000-0000-000000000118'::UUID, NULL, 3, 'CascadeExhausted', 'Acknowledged', 'CloseAsExhausted', 'No supply-chain security specialists available at the Standard tier; considering tier escalation.', 'CAPACITY:e2000001-0000-0000-0000-000000000118', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '5 hours', NULL, NULL, '{"decision":"cascade_exhausted","consideredCandidates":2,"reason":"No supply-chain security specialists available at the Standard tier."}'),
+        ('e3000002-0000-0000-0000-000000000019'::UUID, 'e2000001-0000-0000-0000-000000000121'::UUID, NULL, 1, 'AIRecommended', 'Dismissed', 'ContactSeeker', 'Conflict screening flagged a potential adverse-party overlap moments before the seeker cancelled the request.', 'CONFLICT:e2000001-0000-0000-0000-000000000121', NOW() - INTERVAL '40 hours', NOW() - INTERVAL '39 hours', NOW() - INTERVAL '39 hours', 'Request was cancelled by the seeker; no further action needed.', NULL),
+        ('e3000002-0000-0000-0000-00000000001a'::UUID, 'e2000001-0000-0000-0000-000000000119'::UUID, 'f2000001-0000-0000-0000-000000000121'::UUID, 3, 'CascadeExhausted', 'Resolved', 'ExpandPracticeArea', 'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', 'CASCADE:e2000001-0000-0000-0000-000000000119', NOW() - INTERVAL '16 hours', NOW() - INTERVAL '15 hours', NOW() - INTERVAL '2 hours', 'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.', NULL),
+        ('e3000002-0000-0000-0000-00000000001b'::UUID, 'e3000002-0000-0000-0000-000000000001'::UUID, 'f3000002-0000-0000-0000-000000000001'::UUID, 2, 'CascadeExhausted', 'Open', 'ExpandPracticeArea', 'Both cascade candidates for the SCADA cloud migration declined on capacity.', 'CASCADE:f3000002-0000-0000-0000-000000000001', NOW() - INTERVAL '2 hours', NULL, NULL, NULL, '{"decision":"cascade_exhausted","consideredCandidates":2,"reason":"Both cascade candidates for the SCADA cloud migration declined on capacity."}'),
+        ('e3000002-0000-0000-0000-00000000001c'::UUID, 'e3000002-0000-0000-0000-000000000002'::UUID, 'f3000002-0000-0000-0000-000000000002'::UUID, 1, 'SLABreach', 'Acknowledged', 'ReassignNextCandidate', 'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', 'SLABREACH:f3000002-0000-0000-0000-000000000002', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '5 hours', NULL, NULL, NULL),
+        ('e3000002-0000-0000-0000-00000000001d'::UUID, 'e3000002-0000-0000-0000-000000000003'::UUID, 'f3000002-0000-0000-0000-000000000003'::UUID, 3, 'UrgentUnassigned', 'Resolved', 'CloseAsExhausted', 'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', 'URGENT:f3000002-0000-0000-0000-000000000003', NOW() - INTERVAL '9 hours', NOW() - INTERVAL '8 hours', NOW() - INTERVAL '1 hour', 'Coordinator manually matched an available senior professional outside the automated cascade.', NULL),
+        ('e3000002-0000-0000-0000-00000000001e'::UUID, 'e2000001-0000-0000-0000-000000000121'::UUID, NULL, 1, 'UrgentUnassigned', 'Open', 'ContactSeeker', 'Urgent ransomware tabletop request left unassigned after cancellation review.', 'URGENT:e2000001-0000-0000-0000-000000000121', NOW() - INTERVAL '1 hour', NULL, NULL, NULL, NULL)
+    ) AS e(id, reqid, assignid, level, triggertype, status, recommendedaction, notes, dedupkey, raisedat, acknowledgedat, resolvedat, resolutionnotes, airationalejson)
     WHERE NOT EXISTS (SELECT 1 FROM __mj_BizAppsReferrals."ReferralEscalation" existing WHERE existing."ID" = e.id);
 
     -- 8. 20 ReferralOutcome rows spanning all 5 OutcomeStatus values.
+    -- CR-19: each assignid below was verified against scripts/seed-referrals-demo-data.pg.sql
+    -- to map to a unique ReferralRequestID (several base-demo requests have 2-3
+    -- cascade-step assignments sharing one request; only one assignment per
+    -- request is used here to avoid violating UQ_ReferralOutcome_ReferralRequest).
+    -- daysago spans 2026-Q2 (Apr-Jun), Q3 (Jul-Sep), and Q4 (Oct-Nov) relative to "now".
     FOR v_seq IN 1..20 LOOP
-        INSERT INTO __mj_BizAppsReferrals."ReferralOutcome" ("ID","ReferralRequestID","ReferralAssignmentID","ProfessionalProfileID","OutcomeStatus","EngagedAt","ClosedAt","EstimatedFeeAmount","ReportedFeeAmount","CurrencyCode","ReportedByType","AttributionNotes")
+        INSERT INTO __mj_BizAppsReferrals."ReferralOutcome" ("ID","ReferralRequestID","ReferralAssignmentID","ProfessionalProfileID","OutcomeStatus","EngagedAt","ClosedAt","EstimatedFeeAmount","ReportedFeeAmount","CurrencyCode","ReportedByType","ReportedAt","AttributionNotes")
         SELECT
             ('e3000004-0000-0000-0000-0000000000' || lpad(o.seq::TEXT, 2, '0'))::UUID,
             a."ReferralRequestID", a."ID", a."ProfessionalProfileID", o.status,
-            CASE WHEN o.status IN ('Engaged', 'Resolved') THEN NOW() - (o.seq || ' days')::INTERVAL ELSE NULL END,
-            CASE WHEN o.status IN ('Resolved', 'Withdrawn', 'NoEngagement', 'Lost') THEN NOW() ELSE NULL END,
+            CASE WHEN o.status IN ('Engaged', 'Resolved') THEN NOW() - ((o.daysago + 2) || ' days')::INTERVAL ELSE NULL END,
+            CASE WHEN o.status IN ('Resolved', 'Withdrawn', 'NoEngagement', 'Lost') THEN NOW() - (o.daysago || ' days')::INTERVAL ELSE NULL END,
             o.estfee, o.repfee, 'USD', o.reportedbytype,
+            NOW() - (o.daysago || ' days')::INTERVAL,
             'Seed fixture outcome #' || o.seq::TEXT || ' (' || o.status || ').'
         FROM (VALUES
-            (1, 'f2000001-0000-0000-0000-000000000101'::UUID, 'Resolved', 12000.00::NUMERIC, 12500.00::NUMERIC, 'Professional'),
-            (2, 'f2000001-0000-0000-0000-000000000103'::UUID, 'Engaged', 8000.00::NUMERIC, NULL::NUMERIC, 'Professional'),
-            (3, 'f2000001-0000-0000-0000-000000000105'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker'),
-            (4, 'f2000001-0000-0000-0000-000000000108'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (5, 'f2000001-0000-0000-0000-000000000110'::UUID, 'Lost', 5000.00::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (6, 'f2000001-0000-0000-0000-000000000102'::UUID, 'Resolved', 15000.00::NUMERIC, 15800.00::NUMERIC, 'Professional'),
-            (7, 'f2000001-0000-0000-0000-000000000104'::UUID, 'Engaged', 9500.00::NUMERIC, NULL::NUMERIC, 'Professional'),
-            (8, 'f2000001-0000-0000-0000-000000000106'::UUID, 'Resolved', 22000.00::NUMERIC, 21000.00::NUMERIC, 'Professional'),
-            (9, 'f2000001-0000-0000-0000-000000000111'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker'),
-            (10, 'f2000001-0000-0000-0000-000000000113'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (11, 'f2000001-0000-0000-0000-000000000115'::UUID, 'Lost', 3000.00::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (12, 'f2000001-0000-0000-0000-000000000116'::UUID, 'Resolved', 18000.00::NUMERIC, 18750.00::NUMERIC, 'Professional'),
-            (13, 'f2000001-0000-0000-0000-000000000120'::UUID, 'Engaged', 7000.00::NUMERIC, NULL::NUMERIC, 'Professional'),
-            (14, 'f2000001-0000-0000-0000-000000000122'::UUID, 'Resolved', 26000.00::NUMERIC, 25500.00::NUMERIC, 'Professional'),
-            (15, 'f2000001-0000-0000-0000-000000000107'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker'),
-            (16, 'f2000001-0000-0000-0000-000000000117'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (17, 'f2000001-0000-0000-0000-000000000112'::UUID, 'Engaged', 6200.00::NUMERIC, NULL::NUMERIC, 'Professional'),
-            (18, 'f2000001-0000-0000-0000-000000000118'::UUID, 'Resolved', 31000.00::NUMERIC, 30200.00::NUMERIC, 'Professional'),
-            (19, 'f2000001-0000-0000-0000-000000000114'::UUID, 'Lost', 4100.00::NUMERIC, NULL::NUMERIC, 'Operator'),
-            (20, 'f2000001-0000-0000-0000-000000000119'::UUID, 'Resolved', 19500.00::NUMERIC, 20000.00::NUMERIC, 'Professional')
-        ) AS o(seq, assignid, status, estfee, repfee, reportedbytype)
+            (1, 'f2000001-0000-0000-0000-000000000101'::UUID, 'Resolved', 12000.00::NUMERIC, 12500.00::NUMERIC, 'Professional', 220),
+            (2, 'f2000001-0000-0000-0000-000000000102'::UUID, 'Engaged', 8000.00::NUMERIC, NULL::NUMERIC, 'Professional', 200),
+            (3, 'f2000001-0000-0000-0000-000000000103'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker', 190),
+            (4, 'f2000001-0000-0000-0000-000000000104'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator', 180),
+            (5, 'f2000001-0000-0000-0000-000000000105'::UUID, 'Lost', 5000.00::NUMERIC, NULL::NUMERIC, 'Operator', 170),
+            (6, 'f2000001-0000-0000-0000-000000000106'::UUID, 'Resolved', 15000.00::NUMERIC, 15800.00::NUMERIC, 'Professional', 160),
+            (7, 'f2000001-0000-0000-0000-000000000109'::UUID, 'Engaged', 9500.00::NUMERIC, NULL::NUMERIC, 'Professional', 150),
+            (8, 'f2000001-0000-0000-0000-000000000110'::UUID, 'Resolved', 22000.00::NUMERIC, 21000.00::NUMERIC, 'Professional', 140),
+            (9, 'f2000001-0000-0000-0000-000000000111'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker', 130),
+            (10, 'f2000001-0000-0000-0000-000000000112'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator', 120),
+            (11, 'f2000001-0000-0000-0000-000000000113'::UUID, 'Lost', 3000.00::NUMERIC, NULL::NUMERIC, 'Operator', 110),
+            (12, 'f2000001-0000-0000-0000-000000000114'::UUID, 'Resolved', 18000.00::NUMERIC, 18750.00::NUMERIC, 'Professional', 100),
+            (13, 'f2000001-0000-0000-0000-000000000115'::UUID, 'Engaged', 7000.00::NUMERIC, NULL::NUMERIC, 'Professional', 90),
+            (14, 'f2000001-0000-0000-0000-000000000116'::UUID, 'Resolved', 26000.00::NUMERIC, 25500.00::NUMERIC, 'Professional', 80),
+            (15, 'f2000001-0000-0000-0000-000000000117'::UUID, 'Withdrawn', NULL::NUMERIC, NULL::NUMERIC, 'Seeker', 70),
+            (16, 'f2000001-0000-0000-0000-000000000118'::UUID, 'NoEngagement', NULL::NUMERIC, NULL::NUMERIC, 'Operator', 60),
+            (17, 'f2000001-0000-0000-0000-000000000121'::UUID, 'Engaged', 6200.00::NUMERIC, NULL::NUMERIC, 'Professional', 40),
+            (18, 'f2000001-0000-0000-0000-000000000122'::UUID, 'Resolved', 31000.00::NUMERIC, 30200.00::NUMERIC, 'Professional', 25),
+            (19, 'f3000002-0000-0000-0000-000000000001'::UUID, 'Lost', 4100.00::NUMERIC, NULL::NUMERIC, 'Operator', 15),
+            (20, 'f3000002-0000-0000-0000-000000000002'::UUID, 'Resolved', 19500.00::NUMERIC, 20000.00::NUMERIC, 'Professional', 10)
+        ) AS o(seq, assignid, status, estfee, repfee, reportedbytype, daysago)
         INNER JOIN __mj_BizAppsReferrals."ReferralAssignment" a ON a."ID" = o.assignid
         WHERE o.seq = v_seq
           AND NOT EXISTS (SELECT 1 FROM __mj_BizAppsReferrals."ReferralOutcome" ro WHERE ro."ReferralRequestID" = a."ReferralRequestID")

@@ -125,8 +125,7 @@ END $$;
 -- -----------------------------------------------------------------------------
 -- 5. New table: "ReferralEscalation" (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS __mj_BizAppsReferrals."ReferralEscalation" CASCADE;
-CREATE TABLE __mj_BizAppsReferrals."ReferralEscalation" (
+CREATE TABLE IF NOT EXISTS __mj_BizAppsReferrals."ReferralEscalation" (
     "ID" UUID NOT NULL DEFAULT gen_random_uuid(),
     "ReferralRequestID" UUID NOT NULL,
     "ReferralAssignmentID" UUID NULL,
@@ -163,6 +162,24 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralEscalation" (
     CONSTRAINT "CK_ReferralEscalation_RecommendedAction" CHECK ("RecommendedAction" IS NULL OR "RecommendedAction" IN ('ReassignNextCandidate', 'ExpandPracticeArea', 'ExtendSLA', 'ContactSeeker', 'CloseAsExhausted'))
 );
 
+-- Defensive replay-safety: if "ReferralEscalation" already existed from an older
+-- shape of this migration, backfill any columns it may be missing (CR-23: a
+-- second run on a populated database must be a true no-op, never a DROP).
+DO $$ BEGIN
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "DedupKey" VARCHAR(200);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "RecommendedAction" VARCHAR(40);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "NotifierKey" VARCHAR(50);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "RaisedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "LinkedTaskID" UUID;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "AcknowledgedByPersonID" UUID;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "ResolvedByPersonID" UUID;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "ResolutionNotes" TEXT;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD COLUMN IF NOT EXISTS "AIRationaleJSON" TEXT;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'UQ_ReferralEscalation_DedupKey') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralEscalation" ADD CONSTRAINT "UQ_ReferralEscalation_DedupKey" UNIQUE ("DedupKey");
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "IX_ReferralEscalation_Request" ON __mj_BizAppsReferrals."ReferralEscalation" ("ReferralRequestID");
 CREATE INDEX IF NOT EXISTS "IX_ReferralEscalation_Assignment" ON __mj_BizAppsReferrals."ReferralEscalation" ("ReferralAssignmentID");
 CREATE INDEX IF NOT EXISTS "IX_ReferralEscalation_Status" ON __mj_BizAppsReferrals."ReferralEscalation" ("Status");
@@ -173,8 +190,7 @@ COMMENT ON TABLE __mj_BizAppsReferrals."ReferralEscalation" IS
 -- -----------------------------------------------------------------------------
 -- 6. New table: "ReferralOutcome" (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS __mj_BizAppsReferrals."ReferralOutcome" CASCADE;
-CREATE TABLE __mj_BizAppsReferrals."ReferralOutcome" (
+CREATE TABLE IF NOT EXISTS __mj_BizAppsReferrals."ReferralOutcome" (
     "ID" UUID NOT NULL DEFAULT gen_random_uuid(),
     "ReferralRequestID" UUID NOT NULL,
     "ReferralAssignmentID" UUID NOT NULL,
@@ -205,6 +221,22 @@ CREATE TABLE __mj_BizAppsReferrals."ReferralOutcome" (
     CONSTRAINT "CK_ReferralOutcome_Dates" CHECK ("ClosedAt" IS NULL OR "EngagedAt" IS NULL OR "ClosedAt" >= "EngagedAt")
 );
 
+-- Defensive replay-safety (CR-23): backfill any columns a pre-existing
+-- "ReferralOutcome" table from an older migration shape may be missing.
+DO $$ BEGIN
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "EngagedAt" TIMESTAMPTZ;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "ClosedAt" TIMESTAMPTZ;
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "EstimatedFeeAmount" NUMERIC(12,2);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "ReportedFeeAmount" NUMERIC(12,2);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "CurrencyCode" VARCHAR(3) NOT NULL DEFAULT 'USD';
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "ReportedByType" VARCHAR(20);
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "ReportedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD COLUMN IF NOT EXISTS "AttributionNotes" TEXT;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'UQ_ReferralOutcome_ReferralRequest') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReferralOutcome" ADD CONSTRAINT "UQ_ReferralOutcome_ReferralRequest" UNIQUE ("ReferralRequestID");
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "IX_ReferralOutcome_Request" ON __mj_BizAppsReferrals."ReferralOutcome" ("ReferralRequestID");
 CREATE INDEX IF NOT EXISTS "IX_ReferralOutcome_Profile" ON __mj_BizAppsReferrals."ReferralOutcome" ("ProfessionalProfileID");
 
@@ -214,8 +246,7 @@ COMMENT ON TABLE __mj_BizAppsReferrals."ReferralOutcome" IS
 -- -----------------------------------------------------------------------------
 -- 7. New table: "ProfessionalAvailabilityWindow" (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" CASCADE;
-CREATE TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" (
+CREATE TABLE IF NOT EXISTS __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" (
     "ID" UUID NOT NULL DEFAULT gen_random_uuid(),
     "ProfessionalProfileID" UUID NOT NULL,
     "WindowType" VARCHAR(40) NOT NULL DEFAULT 'Paused',
@@ -234,6 +265,19 @@ CREATE TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" (
     CONSTRAINT "CK_ProfessionalAvailabilityWindow_Dates" CHECK ("EndsAt" > "StartsAt")
 );
 
+-- Defensive replay-safety (CR-23): backfill any columns a pre-existing
+-- "ProfessionalAvailabilityWindow" table from an older migration shape may be
+-- missing. Added nullable here (rather than NOT NULL) so this path never
+-- fails against a populated table; the CHECK/NOT NULL constraints above apply
+-- to rows inserted after this migration reaches its final shape.
+DO $$ BEGIN
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD COLUMN IF NOT EXISTS "StartsAt" TIMESTAMPTZ;
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD COLUMN IF NOT EXISTS "EndsAt" TIMESTAMPTZ;
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD COLUMN IF NOT EXISTS "CapacityOverride" INT;
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD COLUMN IF NOT EXISTS "Reason" VARCHAR(500);
+    ALTER TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ADD COLUMN IF NOT EXISTS "IsActive" BOOLEAN NOT NULL DEFAULT TRUE;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "IX_ProfessionalAvailabilityWindow_Profile" ON __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" ("ProfessionalProfileID");
 
 COMMENT ON TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" IS
@@ -242,8 +286,7 @@ COMMENT ON TABLE __mj_BizAppsReferrals."ProfessionalAvailabilityWindow" IS
 -- -----------------------------------------------------------------------------
 -- 8. New table: "ReciprocitySnapshot" (final shape per Spec SS2.2/SS2.3)
 -- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS __mj_BizAppsReferrals."ReciprocitySnapshot" CASCADE;
-CREATE TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" (
+CREATE TABLE IF NOT EXISTS __mj_BizAppsReferrals."ReciprocitySnapshot" (
     "ID" UUID NOT NULL DEFAULT gen_random_uuid(),
     "ProfessionalProfileID" UUID NOT NULL,
     "ComputedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -267,6 +310,26 @@ CREATE TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" (
     CONSTRAINT "CK_ReciprocitySnapshot_ReferralsSent" CHECK ("ReferralsSent" >= 0),
     CONSTRAINT "CK_ReciprocitySnapshot_ReferralsReceived" CHECK ("ReferralsReceived" >= 0)
 );
+
+-- Defensive replay-safety (CR-23): backfill any columns a pre-existing
+-- "ReciprocitySnapshot" table from an older migration shape may be missing.
+DO $$ BEGIN
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ComputedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "PeriodStart" DATE;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "PeriodEnd" DATE;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ReferralsSent" INT NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ReferralsReceived" INT NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ReferralsAccepted" INT NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ReferralsResolved" INT NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "SLABreachCount" INT NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "AcceptanceRate" NUMERIC(5,4) NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "MedianResponseHours" NUMERIC(8,2);
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "ReciprocityIndex" NUMERIC(6,3) NOT NULL DEFAULT 0;
+    ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD COLUMN IF NOT EXISTS "AttributedFeeTotal" NUMERIC(14,2) NOT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'UQ_ReciprocitySnapshot_Period') THEN
+        ALTER TABLE __mj_BizAppsReferrals."ReciprocitySnapshot" ADD CONSTRAINT "UQ_ReciprocitySnapshot_Period" UNIQUE ("ProfessionalProfileID", "PeriodStart", "PeriodEnd");
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS "IX_ReciprocitySnapshot_Profile_Period" ON __mj_BizAppsReferrals."ReciprocitySnapshot" ("ProfessionalProfileID", "PeriodStart", "PeriodEnd");
 

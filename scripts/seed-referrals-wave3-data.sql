@@ -96,13 +96,13 @@ INSERT INTO @Win VALUES
 
 INSERT INTO [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] ([ID],[ProfessionalProfileID],[WindowType],[StartsAt],[EndsAt],[CapacityOverride],[Reason],[IsActive])
 SELECT
-  CAST('E3000001-0000-0000-0000-00000000' + RIGHT('00' + CAST(9 + w.Seq AS VARCHAR(2)), 2) + '0' AS UNIQUEIDENTIFIER),
+  CAST('E3000001-0000-0000-0000-000000000' + RIGHT('00' + CAST(9 + w.Seq AS VARCHAR(2)), 2) + '0' AS UNIQUEIDENTIFIER),
   w.ProID, w.WindowType, DATEADD(DAY, w.DaysFromNowStart, SYSDATETIMEOFFSET()), DATEADD(DAY, w.DaysFromNowEnd, SYSDATETIMEOFFSET()), w.CapacityOverride, w.Reason, 1
 FROM @Win w
 WHERE w.ProID IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] existing
-    WHERE existing.[ID] = CAST('E3000001-0000-0000-0000-00000000' + RIGHT('00' + CAST(9 + w.Seq AS VARCHAR(2)), 2) + '0' AS UNIQUEIDENTIFIER)
+    WHERE existing.[ID] = CAST('E3000001-0000-0000-0000-000000000' + RIGHT('00' + CAST(9 + w.Seq AS VARCHAR(2)), 2) + '0' AS UNIQUEIDENTIFIER)
   );
 
 -- 4. ReciprocitySnapshot records: one per professional for the current canonical quarter.
@@ -215,74 +215,81 @@ WHERE pr.ReferrerID IS NOT NULL
 
 -- 7. 14 additional ReferralEscalation rows spanning all 6 TriggerType values, all 4
 --    Status values, and EscalationLevel 1-3 (combined with the 2 Slice 1 rows above,
---    this yields 16 total). 3 of these (synthetic A/B/C above) carry a linked
---    ReferralAssignment with AIRationaleJSON populated.
+--    this yields 16 total). 3 of these (rows 7, 8, 11) populate RecommendedAction AND
+--    AIRationaleJSON directly on the ReferralEscalation row itself (AC-17/AC-30),
+--    independent of whatever AIRationaleJSON may also exist on a linked ReferralAssignment.
 DECLARE @Esc TABLE (
   Seq INT, ID UNIQUEIDENTIFIER, ReqID UNIQUEIDENTIFIER, AssignID UNIQUEIDENTIFIER NULL,
   Level INT, TriggerType NVARCHAR(30), Status NVARCHAR(40), RecommendedAction NVARCHAR(40),
   Notes NVARCHAR(MAX), DedupKey NVARCHAR(200), HoursAgoTriggered INT,
-  HoursAgoAcknowledged INT NULL, HoursAgoResolved INT NULL, ResolutionNotes NVARCHAR(MAX) NULL
+  HoursAgoAcknowledged INT NULL, HoursAgoResolved INT NULL, ResolutionNotes NVARCHAR(MAX) NULL,
+  AIRationaleJSON NVARCHAR(MAX) NULL
 );
 
 INSERT INTO @Esc VALUES
-(1, 'E3000002-0000-0000-0000-000000000011', 'E2000001-0000-0000-0000-000000000110', 'F2000001-0000-0000-0000-000000000112', 1, N'SLAWarning', N'Open', N'ExtendSLA', N'75% of SLA window elapsed on the SAP integration lead review; no response yet.', N'SLAWARN:F2000001-0000-0000-0000-000000000112', 2, NULL, NULL, NULL),
-(2, 'E3000002-0000-0000-0000-000000000012', 'E2000001-0000-0000-0000-000000000114', 'F2000001-0000-0000-0000-000000000116', 1, N'SLAWarning', N'Dismissed', N'ExtendSLA', N'SLA warning fired while professional confirmation was in flight by phone.', N'SLAWARN:F2000001-0000-0000-0000-000000000116', 20, 19, 18, N'False positive; professional had already accepted by phone before the system recorded the response.'),
-(3, 'E3000002-0000-0000-0000-000000000013', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000119', 2, N'SLABreach', N'Open', N'ReassignNextCandidate', N'First cascade step exceeded its SLA window without a response during the holiday week.', N'SLABREACH:F2000001-0000-0000-0000-000000000119', 16, NULL, NULL, NULL),
-(4, 'E3000002-0000-0000-0000-000000000014', 'E2000001-0000-0000-0000-000000000106', 'F2000001-0000-0000-0000-000000000107', 2, N'SLABreach', N'Acknowledged', N'ReassignNextCandidate', N'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', N'SLABREACH:F2000001-0000-0000-0000-000000000107', 4, 3, NULL, NULL),
-(5, 'E3000002-0000-0000-0000-000000000015', 'E2000001-0000-0000-0000-000000000113', 'F2000001-0000-0000-0000-000000000115', 1, N'Manual', N'Open', N'ContactSeeker', N'Seeker requested a manual status check on the FHIR R4 telehealth audit.', N'MANUAL:E2000001-0000-0000-0000-000000000113:1', 1, NULL, NULL, NULL),
-(6, 'E3000002-0000-0000-0000-000000000016', 'E2000001-0000-0000-0000-000000000109', 'F2000001-0000-0000-0000-000000000111', 2, N'Manual', N'Resolved', N'ContactSeeker', N'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', N'MANUAL:E2000001-0000-0000-0000-000000000109:2', 14, 13, 12, N'Confirmed engagement is on-track; no compliance gap found.'),
-(7, 'E3000002-0000-0000-0000-000000000017', 'E2000001-0000-0000-0000-000000000117', NULL, 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', N'CAPACITY:E2000001-0000-0000-0000-000000000117', 3, NULL, NULL, NULL),
-(8, 'E3000002-0000-0000-0000-000000000018', 'E2000001-0000-0000-0000-000000000118', NULL, 3, N'CascadeExhausted', N'Acknowledged', N'CloseAsExhausted', N'No supply-chain security specialists available at the Standard tier; considering tier escalation.', N'CAPACITY:E2000001-0000-0000-0000-000000000118', 6, 5, NULL, NULL),
-(9, 'E3000002-0000-0000-0000-000000000019', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'AIRecommended', N'Dismissed', N'ContactSeeker', N'Conflict screening flagged a potential adverse-party overlap moments before the seeker cancelled the request.', N'CONFLICT:E2000001-0000-0000-0000-000000000121', 40, 39, 39, N'Request was cancelled by the seeker; no further conflict action needed.'),
-(10, 'E3000002-0000-0000-0000-00000000001A', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000121', 3, N'CascadeExhausted', N'Resolved', N'ExpandPracticeArea', N'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', N'CASCADE:E2000001-0000-0000-0000-000000000119', 16, 15, 2, N'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.'),
-(11, 'E3000002-0000-0000-0000-00000000001B', 'E3000002-0000-0000-0000-000000000001', 'F3000002-0000-0000-0000-000000000001', 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'Both cascade candidates for the SCADA cloud migration declined on capacity.', N'CASCADE:F3000002-0000-0000-0000-000000000001', 2, NULL, NULL, NULL),
-(12, 'E3000002-0000-0000-0000-00000000001C', 'E3000002-0000-0000-0000-000000000002', 'F3000002-0000-0000-0000-000000000002', 1, N'SLABreach', N'Acknowledged', N'ReassignNextCandidate', N'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', N'SLABREACH:F3000002-0000-0000-0000-000000000002', 6, 5, NULL, NULL),
-(13, 'E3000002-0000-0000-0000-00000000001D', 'E3000002-0000-0000-0000-000000000003', 'F3000002-0000-0000-0000-000000000003', 3, N'UrgentUnassigned', N'Resolved', N'CloseAsExhausted', N'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', N'URGENT:F3000002-0000-0000-0000-000000000003', 9, 8, 1, N'Coordinator manually matched an available senior professional outside the automated cascade.'),
-(14, 'E3000002-0000-0000-0000-00000000001E', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'UrgentUnassigned', N'Open', N'ContactSeeker', N'Urgent ransomware tabletop request left unassigned after cancellation review.', N'URGENT:E2000001-0000-0000-0000-000000000121', 1, NULL, NULL, NULL);
+(1, 'E3000002-0000-0000-0000-000000000011', 'E2000001-0000-0000-0000-000000000110', 'F2000001-0000-0000-0000-000000000112', 1, N'SLAWarning', N'Open', N'ExtendSLA', N'75% of SLA window elapsed on the SAP integration lead review; no response yet.', N'SLAWARN:F2000001-0000-0000-0000-000000000112', 2, NULL, NULL, NULL, NULL),
+(2, 'E3000002-0000-0000-0000-000000000012', 'E2000001-0000-0000-0000-000000000114', 'F2000001-0000-0000-0000-000000000116', 1, N'SLAWarning', N'Dismissed', N'ExtendSLA', N'SLA warning fired while professional confirmation was in flight by phone.', N'SLAWARN:F2000001-0000-0000-0000-000000000116', 20, 19, 18, N'False positive; professional had already accepted by phone before the system recorded the response.', NULL),
+(3, 'E3000002-0000-0000-0000-000000000013', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000119', 2, N'SLABreach', N'Open', N'ReassignNextCandidate', N'First cascade step exceeded its SLA window without a response during the holiday week.', N'SLABREACH:F2000001-0000-0000-0000-000000000119', 16, NULL, NULL, NULL, NULL),
+(4, 'E3000002-0000-0000-0000-000000000014', 'E2000001-0000-0000-0000-000000000106', 'F2000001-0000-0000-0000-000000000107', 2, N'SLABreach', N'Acknowledged', N'ReassignNextCandidate', N'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', N'SLABREACH:F2000001-0000-0000-0000-000000000107', 4, 3, NULL, NULL, NULL),
+(5, 'E3000002-0000-0000-0000-000000000015', 'E2000001-0000-0000-0000-000000000113', 'F2000001-0000-0000-0000-000000000115', 1, N'Manual', N'Open', N'ContactSeeker', N'Seeker requested a manual status check on the FHIR R4 telehealth audit.', N'MANUAL:E2000001-0000-0000-0000-000000000113:1', 1, NULL, NULL, NULL, NULL),
+(6, 'E3000002-0000-0000-0000-000000000016', 'E2000001-0000-0000-0000-000000000109', 'F2000001-0000-0000-0000-000000000111', 2, N'Manual', N'Resolved', N'ContactSeeker', N'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', N'MANUAL:E2000001-0000-0000-0000-000000000109:2', 14, 13, 12, N'Confirmed engagement is on-track; no compliance gap found.', NULL),
+(7, 'E3000002-0000-0000-0000-000000000017', 'E2000001-0000-0000-0000-000000000117', NULL, 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', N'CAPACITY:E2000001-0000-0000-0000-000000000117', 3, NULL, NULL, NULL, N'{"decision":"cascade_exhausted","consideredCandidates":3,"reason":"All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity."}'),
+(8, 'E3000002-0000-0000-0000-000000000018', 'E2000001-0000-0000-0000-000000000118', NULL, 3, N'CascadeExhausted', N'Acknowledged', N'CloseAsExhausted', N'No supply-chain security specialists available at the Standard tier; considering tier escalation.', N'CAPACITY:E2000001-0000-0000-0000-000000000118', 6, 5, NULL, NULL, N'{"decision":"cascade_exhausted","consideredCandidates":2,"reason":"No supply-chain security specialists available at the Standard tier."}'),
+(9, 'E3000002-0000-0000-0000-000000000019', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'AIRecommended', N'Dismissed', N'ContactSeeker', N'Conflict screening flagged a potential adverse-party overlap moments before the seeker cancelled the request.', N'CONFLICT:E2000001-0000-0000-0000-000000000121', 40, 39, 39, N'Request was cancelled by the seeker; no further conflict action needed.', NULL),
+(10, 'E3000002-0000-0000-0000-00000000001A', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000121', 3, N'CascadeExhausted', N'Resolved', N'ExpandPracticeArea', N'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', N'CASCADE:E2000001-0000-0000-0000-000000000119', 16, 15, 2, N'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.', NULL),
+(11, 'E3000002-0000-0000-0000-00000000001B', 'E3000002-0000-0000-0000-000000000001', 'F3000002-0000-0000-0000-000000000001', 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'Both cascade candidates for the SCADA cloud migration declined on capacity.', N'CASCADE:F3000002-0000-0000-0000-000000000001', 2, NULL, NULL, NULL, N'{"decision":"cascade_exhausted","consideredCandidates":2,"reason":"Both cascade candidates for the SCADA cloud migration declined on capacity."}'),
+(12, 'E3000002-0000-0000-0000-00000000001C', 'E3000002-0000-0000-0000-000000000002', 'F3000002-0000-0000-0000-000000000002', 1, N'SLABreach', N'Acknowledged', N'ReassignNextCandidate', N'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', N'SLABREACH:F3000002-0000-0000-0000-000000000002', 6, 5, NULL, NULL, NULL),
+(13, 'E3000002-0000-0000-0000-00000000001D', 'E3000002-0000-0000-0000-000000000003', 'F3000002-0000-0000-0000-000000000003', 3, N'UrgentUnassigned', N'Resolved', N'CloseAsExhausted', N'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', N'URGENT:F3000002-0000-0000-0000-000000000003', 9, 8, 1, N'Coordinator manually matched an available senior professional outside the automated cascade.', NULL),
+(14, 'E3000002-0000-0000-0000-00000000001E', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'UrgentUnassigned', N'Open', N'ContactSeeker', N'Urgent ransomware tabletop request left unassigned after cancellation review.', N'URGENT:E2000001-0000-0000-0000-000000000121', 1, NULL, NULL, NULL, NULL);
 
 INSERT INTO [__mj_BizAppsReferrals].[ReferralEscalation]
-  ([ID],[ReferralRequestID],[ReferralAssignmentID],[EscalationLevel],[TriggerType],[Status],[RecommendedAction],[Notes],[DedupKey],[RaisedAt],[AcknowledgedAt],[ResolvedAt],[ResolutionNotes])
+  ([ID],[ReferralRequestID],[ReferralAssignmentID],[EscalationLevel],[TriggerType],[Status],[RecommendedAction],[Notes],[DedupKey],[RaisedAt],[AcknowledgedAt],[ResolvedAt],[ResolutionNotes],[AIRationaleJSON])
 SELECT
   e.ID, e.ReqID, e.AssignID, e.Level, e.TriggerType, e.Status, e.RecommendedAction, e.Notes, e.DedupKey,
   DATEADD(HOUR, -e.HoursAgoTriggered, SYSDATETIMEOFFSET()),
   CASE WHEN e.HoursAgoAcknowledged IS NOT NULL THEN DATEADD(HOUR, -e.HoursAgoAcknowledged, SYSDATETIMEOFFSET()) ELSE NULL END,
   CASE WHEN e.HoursAgoResolved IS NOT NULL THEN DATEADD(HOUR, -e.HoursAgoResolved, SYSDATETIMEOFFSET()) ELSE NULL END,
-  e.ResolutionNotes
+  e.ResolutionNotes, e.AIRationaleJSON
 FROM @Esc e
 WHERE NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralEscalation] existing WHERE existing.[ID] = e.ID);
 
--- 8. 20 ReferralOutcome rows spanning all 5 OutcomeStatus values across the 3
---    seeded practice-area domains and completed assignments from the base demo seed.
-DECLARE @Out TABLE (Seq INT, AssignID UNIQUEIDENTIFIER, ReqID UNIQUEIDENTIFIER, ProID UNIQUEIDENTIFIER, Status NVARCHAR(60), EstFee DECIMAL(12,2), RepFee DECIMAL(12,2), ReportedByType NVARCHAR(20));
+-- 8. 20 ReferralOutcome rows spanning all 5 OutcomeStatus values, 3 distinct
+--    quarters (2026-Q2/Q3/Q4), and 20 DISTINCT ReferralRequestIDs (CR-19): each
+--    assignment below was verified against scripts/seed-referrals-demo-data.sql
+--    to map to a unique ReferralRequestID (several base-demo requests have 2-3
+--    cascade-step assignments sharing one request; only one assignment per
+--    request is used here to avoid violating UQ_ReferralOutcome_ReferralRequest).
+DECLARE @Out TABLE (Seq INT, AssignID UNIQUEIDENTIFIER, ProID UNIQUEIDENTIFIER, Status NVARCHAR(60), EstFee DECIMAL(12,2), RepFee DECIMAL(12,2), ReportedByType NVARCHAR(20), DaysAgo INT);
 INSERT INTO @Out VALUES
-(1, 'F2000001-0000-0000-0000-000000000101', 'E2000001-0000-0000-0000-000000000101', NULL, N'Resolved', 12000.00, 12500.00, N'Professional'),
-(2, 'F2000001-0000-0000-0000-000000000103', 'E2000001-0000-0000-0000-000000000103', NULL, N'Engaged', 8000.00, NULL, N'Professional'),
-(3, 'F2000001-0000-0000-0000-000000000105', 'E2000001-0000-0000-0000-000000000105', NULL, N'Withdrawn', NULL, NULL, N'Seeker'),
-(4, 'F2000001-0000-0000-0000-000000000108', 'E2000001-0000-0000-0000-000000000108', NULL, N'NoEngagement', NULL, NULL, N'Operator'),
-(5, 'F2000001-0000-0000-0000-000000000110', 'E2000001-0000-0000-0000-000000000110', NULL, N'Lost', 5000.00, NULL, N'Operator'),
-(6, 'F2000001-0000-0000-0000-000000000102', 'E2000001-0000-0000-0000-000000000102', NULL, N'Resolved', 15000.00, 15800.00, N'Professional'),
-(7, 'F2000001-0000-0000-0000-000000000104', 'E2000001-0000-0000-0000-000000000104', NULL, N'Engaged', 9500.00, NULL, N'Professional'),
-(8, 'F2000001-0000-0000-0000-000000000106', 'E2000001-0000-0000-0000-000000000106', NULL, N'Resolved', 22000.00, 21000.00, N'Professional'),
-(9, 'F2000001-0000-0000-0000-000000000111', 'E2000001-0000-0000-0000-000000000109', NULL, N'Withdrawn', NULL, NULL, N'Seeker'),
-(10, 'F2000001-0000-0000-0000-000000000113', 'E2000001-0000-0000-0000-000000000112', NULL, N'NoEngagement', NULL, NULL, N'Operator'),
-(11, 'F2000001-0000-0000-0000-000000000115', 'E2000001-0000-0000-0000-000000000113', NULL, N'Lost', 3000.00, NULL, N'Operator'),
-(12, 'F2000001-0000-0000-0000-000000000116', 'E2000001-0000-0000-0000-000000000114', NULL, N'Resolved', 18000.00, 18750.00, N'Professional'),
-(13, 'F2000001-0000-0000-0000-000000000120', 'E2000001-0000-0000-0000-000000000120', NULL, N'Engaged', 7000.00, NULL, N'Professional'),
-(14, 'F2000001-0000-0000-0000-000000000122', 'E2000001-0000-0000-0000-000000000122', NULL, N'Resolved', 26000.00, 25500.00, N'Professional'),
-(15, 'F2000001-0000-0000-0000-000000000107', 'E2000001-0000-0000-0000-000000000107', NULL, N'Withdrawn', NULL, NULL, N'Seeker'),
-(16, 'F2000001-0000-0000-0000-000000000117', 'E2000001-0000-0000-0000-000000000117', NULL, N'NoEngagement', NULL, NULL, N'Operator'),
-(17, 'F2000001-0000-0000-0000-000000000112', 'E2000001-0000-0000-0000-000000000110', NULL, N'Engaged', 6200.00, NULL, N'Professional'),
-(18, 'F2000001-0000-0000-0000-000000000118', 'E2000001-0000-0000-0000-000000000118', NULL, N'Resolved', 31000.00, 30200.00, N'Professional'),
-(19, 'F2000001-0000-0000-0000-000000000114', 'E2000001-0000-0000-0000-000000000111', NULL, N'Lost', 4100.00, NULL, N'Operator'),
-(20, 'F2000001-0000-0000-0000-000000000119', 'E2000001-0000-0000-0000-000000000119', NULL, N'Resolved', 19500.00, 20000.00, N'Professional');
+(1, 'F2000001-0000-0000-0000-000000000101', NULL, N'Resolved', 12000.00, 12500.00, N'Professional', 220),
+(2, 'F2000001-0000-0000-0000-000000000102', NULL, N'Engaged', 8000.00, NULL, N'Professional', 200),
+(3, 'F2000001-0000-0000-0000-000000000103', NULL, N'Withdrawn', NULL, NULL, N'Seeker', 190),
+(4, 'F2000001-0000-0000-0000-000000000104', NULL, N'NoEngagement', NULL, NULL, N'Operator', 180),
+(5, 'F2000001-0000-0000-0000-000000000105', NULL, N'Lost', 5000.00, NULL, N'Operator', 170),
+(6, 'F2000001-0000-0000-0000-000000000106', NULL, N'Resolved', 15000.00, 15800.00, N'Professional', 160),
+(7, 'F2000001-0000-0000-0000-000000000109', NULL, N'Engaged', 9500.00, NULL, N'Professional', 150),
+(8, 'F2000001-0000-0000-0000-000000000110', NULL, N'Resolved', 22000.00, 21000.00, N'Professional', 140),
+(9, 'F2000001-0000-0000-0000-000000000111', NULL, N'Withdrawn', NULL, NULL, N'Seeker', 130),
+(10, 'F2000001-0000-0000-0000-000000000112', NULL, N'NoEngagement', NULL, NULL, N'Operator', 120),
+(11, 'F2000001-0000-0000-0000-000000000113', NULL, N'Lost', 3000.00, NULL, N'Operator', 110),
+(12, 'F2000001-0000-0000-0000-000000000114', NULL, N'Resolved', 18000.00, 18750.00, N'Professional', 100),
+(13, 'F2000001-0000-0000-0000-000000000115', NULL, N'Engaged', 7000.00, NULL, N'Professional', 90),
+(14, 'F2000001-0000-0000-0000-000000000116', NULL, N'Resolved', 26000.00, 25500.00, N'Professional', 80),
+(15, 'F2000001-0000-0000-0000-000000000117', NULL, N'Withdrawn', NULL, NULL, N'Seeker', 70),
+(16, 'F2000001-0000-0000-0000-000000000118', NULL, N'NoEngagement', NULL, NULL, N'Operator', 60),
+(17, 'F2000001-0000-0000-0000-000000000121', NULL, N'Engaged', 6200.00, NULL, N'Professional', 40),
+(18, 'F2000001-0000-0000-0000-000000000122', NULL, N'Resolved', 31000.00, 30200.00, N'Professional', 25),
+(19, 'F3000002-0000-0000-0000-000000000001', NULL, N'Lost', 4100.00, NULL, N'Operator', 15),
+(20, 'F3000002-0000-0000-0000-000000000002', NULL, N'Resolved', 19500.00, 20000.00, N'Professional', 10);
 
-INSERT INTO [__mj_BizAppsReferrals].[ReferralOutcome] ([ID],[ReferralRequestID],[ReferralAssignmentID],[ProfessionalProfileID],[OutcomeStatus],[EngagedAt],[ClosedAt],[EstimatedFeeAmount],[ReportedFeeAmount],[CurrencyCode],[ReportedByType],[AttributionNotes])
+INSERT INTO [__mj_BizAppsReferrals].[ReferralOutcome] ([ID],[ReferralRequestID],[ReferralAssignmentID],[ProfessionalProfileID],[OutcomeStatus],[EngagedAt],[ClosedAt],[EstimatedFeeAmount],[ReportedFeeAmount],[CurrencyCode],[ReportedByType],[ReportedAt],[AttributionNotes])
 SELECT
   CAST('E3000004-0000-0000-0000-0000000000' + RIGHT('0' + CAST(o.Seq AS VARCHAR(2)), 2) AS UNIQUEIDENTIFIER),
   a.[ReferralRequestID], a.[ID], a.[ProfessionalProfileID], o.Status,
-  CASE WHEN o.Status IN (N'Engaged', N'Resolved') THEN DATEADD(DAY, -o.Seq, SYSDATETIMEOFFSET()) ELSE NULL END,
-  CASE WHEN o.Status IN (N'Resolved', N'Withdrawn', N'NoEngagement', N'Lost') THEN SYSDATETIMEOFFSET() ELSE NULL END,
+  CASE WHEN o.Status IN (N'Engaged', N'Resolved') THEN DATEADD(DAY, -o.DaysAgo - 2, SYSDATETIMEOFFSET()) ELSE NULL END,
+  CASE WHEN o.Status IN (N'Resolved', N'Withdrawn', N'NoEngagement', N'Lost') THEN DATEADD(DAY, -o.DaysAgo, SYSDATETIMEOFFSET()) ELSE NULL END,
   o.EstFee, o.RepFee, N'USD', o.ReportedByType,
+  DATEADD(DAY, -o.DaysAgo, SYSDATETIMEOFFSET()),
   N'Seed fixture outcome #' + CAST(o.Seq AS VARCHAR(2)) + N' (' + o.Status + N').'
 FROM @Out o
 INNER JOIN [__mj_BizAppsReferrals].[ReferralAssignment] a ON a.[ID] = o.AssignID
