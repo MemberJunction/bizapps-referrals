@@ -1250,7 +1250,7 @@ export class CascadeRoutingService {
             ReferralAssignmentID: assignment.ID,
             TriggerType: 'SLABreach',
             EscalationLevel: 1,
-            RecommendedAction: 'AdvanceCascade',
+            RecommendedAction: 'ReassignNextCandidate',
             Notes: `SLA deadline breached at ${asOfDate.toISOString()} for assignment offered to professional; cascading to next candidate.`,
             DedupKey: `SLABreach:${assignment.ID}`,
           },
@@ -1465,16 +1465,14 @@ export class CascadeRoutingService {
       outcome.ReferralAssignmentID = assignment.ID;
       outcome.ProfessionalProfileID = pro.ID;
       outcome.OutcomeStatus = params.OutcomeStatus ?? 'Resolved';
-      if (responseHours != null) {
-        outcome.ResponseHours = responseHours;
-      }
       if (params.CompletionNotes) {
-        outcome.CompletionNotes = params.CompletionNotes;
+        outcome.AttributionNotes = params.CompletionNotes;
       }
       if (params.FeeAmount != null) {
-        outcome.FeeAmount = params.FeeAmount;
+        outcome.ReportedFeeAmount = params.FeeAmount;
       }
-      outcome.CompletedAt = now;
+      outcome.ReportedByType = 'Professional';
+      outcome.ClosedAt = now;
       await saveOrThrow(outcome, 'ReferralOutcome');
       compensation?.registerCompensation(async () => {
         await outcome.Delete();

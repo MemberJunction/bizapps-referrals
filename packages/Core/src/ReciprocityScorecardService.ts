@@ -1,5 +1,6 @@
 import { IMetadataProvider, IRunViewProvider, RunView, UserInfo } from '@memberjunction/core';
 import {
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalProfileEntity,
   ReciprocitySnapshotEntity,
   ReferralAssignmentEntity,
@@ -36,7 +37,13 @@ type ScorecardAssignment = Pick<
 >;
 type ScorecardOutcome = Pick<
   ReferralOutcomeEntity,
-  'ID' | 'ReferralAssignmentID' | 'ProfessionalProfileID' | 'OutcomeStatus' | 'CompletedAt' | 'FeeAmount'
+  | 'ID'
+  | 'ReferralAssignmentID'
+  | 'ProfessionalProfileID'
+  | 'OutcomeStatus'
+  | 'ClosedAt'
+  | 'ReportedFeeAmount'
+  | 'EstimatedFeeAmount'
 >;
 
 export interface ReciprocityScorecardData {
@@ -122,11 +129,11 @@ export class ReciprocityScorecardService {
     const MedianResponseHours = median(responseHoursValues);
 
     const myOutcomes = data.outcomes.filter(
-      (o) => UUIDsEqual(o.ProfessionalProfileID, validProfileId) && inPeriod(o.CompletedAt, period),
+      (o) => UUIDsEqual(o.ProfessionalProfileID, validProfileId) && inPeriod(o.ClosedAt, period),
     );
     const Resolved = myOutcomes.filter((o) => o.OutcomeStatus === 'Resolved').length;
     const AttributedFeeTotal = roundTo(
-      myOutcomes.reduce((sum, o) => sum + (o.FeeAmount ?? 0), 0),
+      myOutcomes.reduce((sum, o) => sum + (o.ReportedFeeAmount ?? o.EstimatedFeeAmount ?? 0), 0),
       2,
     );
 
@@ -188,8 +195,14 @@ export class ReciprocityScorecardService {
       outcomes: outcomesRes.Results as ReferralOutcomeEntity[],
     };
 
-    const periodStartIso = effectivePeriod.Start.toISOString();
-    const periodEndIso = effectivePeriod.End.toISOString();
+    const toDateOnly = (d: Date): string => d.toISOString().slice(0, 10);
+    const periodStartDateOnly = toDateOnly(effectivePeriod.Start);
+    const periodEndDateOnly = toDateOnly(effectivePeriod.End);
+
+    const [windowsRes] = await rv.RunViews(
+      [{ EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows', ResultType: 'entity_object' }],
+      contextUser,
+    );
 
     let processedCount = 0;
     for (const profile of profilesRes.Results as ProfessionalProfileEntity[]) {
@@ -198,7 +211,7 @@ export class ReciprocityScorecardService {
       const existingRes = await rv.RunView<ReciprocitySnapshotEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
-          ExtraFilter: `ProfessionalProfileID = '${profile.ID}' AND PeriodStartDate = '${periodStartIso}' AND PeriodEndDate = '${periodEndIso}'`,
+          ExtraFilter: `ProfessionalProfileID = '${profile.ID}' AND PeriodStart = '${periodStartDateOnly}' AND PeriodEnd = '${periodEndDateOnly}'`,
           ResultType: 'entity_object',
         },
         contextUser,
@@ -210,13 +223,13 @@ export class ReciprocityScorecardService {
           : await dp.GetEntityObject<ReciprocitySnapshotEntity>('MJ_BizApps_Referrals: Reciprocity Snapshots', contextUser);
 
       snapshot.ProfessionalProfileID = profile.ID;
-      snapshot.SnapshotDate = new Date();
-      snapshot.PeriodStartDate = effectivePeriod.Start;
-      snapshot.PeriodEndDate = effectivePeriod.End;
-      snapshot.ReferralsGivenCount = scorecard.Sent;
-      snapshot.ReferralsReceivedCount = scorecard.Received;
-      snapshot.AcceptedCount = scorecard.Accepted;
-      snapshot.ResolvedCount = scorecard.Resolved;
+      snapshot.ComputedAt = new Date();
+      snapshot.PeriodStart = effectivePeriod.Start;
+      snapshot.PeriodEnd = effectivePeriod.End;
+      snapshot.ReferralsSent = scorecard.Sent;
+      snapshot.ReferralsReceived = scorecard.Received;
+      snapshot.ReferralsAccepted = scorecard.Accepted;
+      snapshot.ReferralsResolved = scorecard.Resolved;
       snapshot.SLABreachCount = scorecard.SLABreachCount;
       snapshot.AcceptanceRate = scorecard.AcceptanceRate;
       snapshot.MedianResponseHours = scorecard.MedianResponseHours;
@@ -228,7 +241,17 @@ export class ReciprocityScorecardService {
       }
 
       profile.ReciprocityIndex = scorecard.ReciprocityIndex;
-      const readiness = CapacityReadinessService.ComputeReadinessScore(profile, []);
+      const allWindows: ProfessionalAvailabilityWindowEntity[] = windowsRes?.Success
+        ? (windowsRes.Results as ProfessionalAvailabilityWindowEntity[])
+        : [];
+      const profileWindows = allWindows.filter((w) => UUIDsEqual(w.ProfessionalProfileID, profile.ID));
+      const recentAssignments = data.assignments.filter((a) => UUIDsEqual(a.ProfessionalProfileID, profile.ID));
+      const readiness = CapacityReadinessService.ComputeReadinessScore({
+        profile,
+        credentials: [],
+        windows: profileWindows,
+        recentAssignments,
+      });
       profile.ReadinessScore = readiness.Score;
       profile.ReadinessComputedAt = new Date();
       const profileSaved = await profile.Save();

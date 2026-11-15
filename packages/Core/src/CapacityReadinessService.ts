@@ -22,7 +22,7 @@ export interface ReadinessScoreResult {
 
 type AvailabilityWindowLike = Pick<
   ProfessionalAvailabilityWindowEntity,
-  'WindowType' | 'StartDate' | 'EndDate' | 'IsAvailable' | 'IsActive' | 'CapacityOverride'
+  'WindowType' | 'StartsAt' | 'EndsAt' | 'IsActive' | 'CapacityOverride'
 >;
 
 type ProfileLike = Pick<
@@ -32,15 +32,23 @@ type ProfileLike = Pick<
 
 type CredentialLike = Pick<ProfessionalCredentialEntity, 'IsPrimary' | 'ExpiresAt' | 'VerificationStatus'>;
 
+type RecentAssignmentLike = Pick<import('@mj-biz-apps/referrals-entities').ReferralAssignmentEntity, 'Status' | 'OfferedAt'>;
+
 export interface ReliabilityCounts {
   SLABreachCount?: number;
   DeclineCount?: number;
 }
 
+export interface EffectiveAvailabilityResult {
+  IsBlocked: boolean;
+  BlockReason: string | null;
+  EffectiveMaxConcurrent: number;
+}
+
 function isWindowCoveringNow(w: AvailabilityWindowLike, nowMs: number): boolean {
-  if (!w.StartDate || !w.EndDate) return false;
-  const start = new Date(w.StartDate).getTime();
-  const end = new Date(w.EndDate).getTime();
+  if (!w.StartsAt || !w.EndsAt) return false;
+  const start = new Date(w.StartsAt).getTime();
+  const end = new Date(w.EndsAt).getTime();
   return nowMs >= start && nowMs <= end;
 }
 
@@ -49,18 +57,23 @@ function isWindowCoveringNow(w: AvailabilityWindowLike, nowMs: number): boolean 
  * layering explicit ProfessionalAvailabilityWindow records on top of the coarse
  * ProfessionalProfile.AvailabilityStatus. An active `OnLeave` or `Paused` window
  * covering the instant always wins (even if AvailabilityStatus is `Available`).
- * `ReducedCapacity` windows do not block availability - they only reduce effective
- * capacity (see {@link GetEffectiveCapacityOverride}). Absent any windows, falls
- * back to `AvailabilityStatus`.
+ * `ReducedCapacity` windows do not block availability - they only reduce the
+ * returned `EffectiveMaxConcurrent`. Absent any windows, falls back to `AvailabilityStatus`.
  */
 export class CapacityReadinessService {
   public static ResolveEffectiveAvailability(
     profile: ProfileLike,
     windows: ReadonlyArray<AvailabilityWindowLike>,
     asOfDate: Date = new Date(),
-  ): boolean {
+  ): EffectiveAvailabilityResult {
+    const maxConcurrent = profile.MaxConcurrentReferrals > 0 ? profile.MaxConcurrentReferrals : 1;
+
     if (profile.AvailabilityStatus === 'Unavailable' || profile.AvailabilityStatus === 'OnLeave') {
-      return false;
+      return {
+        IsBlocked: true,
+        BlockReason: `No open availability window: AvailabilityStatus is '${profile.AvailabilityStatus}'.`,
+        EffectiveMaxConcurrent: 0,
+      };
     }
 
     const nowMs = asOfDate.getTime();
@@ -70,45 +83,51 @@ export class CapacityReadinessService {
         (w.WindowType === 'OnLeave' || w.WindowType === 'Paused') &&
         isWindowCoveringNow(w, nowMs),
     );
-    return !activeBlockingWindow;
-  }
+    if (activeBlockingWindow) {
+      return {
+        IsBlocked: true,
+        BlockReason: `An active '${activeBlockingWindow.WindowType}' availability window covers this date.`,
+        EffectiveMaxConcurrent: 0,
+      };
+    }
 
-  /**
-   * Returns the effective `MaxConcurrentReferrals` override from an active `ReducedCapacity`
-   * window covering `asOfDate`, or `null` when no such window applies (use the profile's own
-   * `MaxConcurrentReferrals` in that case).
-   */
-  public static GetEffectiveCapacityOverride(
-    windows: ReadonlyArray<AvailabilityWindowLike>,
-    asOfDate: Date = new Date(),
-  ): number | null {
-    const nowMs = asOfDate.getTime();
-    const activeOverride = windows.find(
-      (w) => w.IsActive !== false && w.WindowType === 'ReducedCapacity' && w.CapacityOverride != null && isWindowCoveringNow(w, nowMs),
+    const activeOverrideWindow = windows.find(
+      (w) =>
+        w.IsActive !== false &&
+        w.WindowType === 'ReducedCapacity' &&
+        w.CapacityOverride != null &&
+        isWindowCoveringNow(w, nowMs),
     );
-    return activeOverride?.CapacityOverride ?? null;
+
+    return {
+      IsBlocked: false,
+      BlockReason: null,
+      EffectiveMaxConcurrent: activeOverrideWindow?.CapacityOverride ?? maxConcurrent,
+    };
   }
 
   /**
-   * Computes a 0-100 readiness score from 5 named factors per Spec SS2.2:
-   * - `Credential` (0..25): 0 for an expired/revoked/rejected primary credential, a linear
-   *   ramp when the primary credential expires within 30 days, 25 when clear of any primary
-   *   credential (or no credentials supplied).
-   * - `Capacity` (0..25): headroom ratio against the effective capacity (profile
-   *   `MaxConcurrentReferrals`, overridden by an active `ReducedCapacity` window).
-   * - `Responsiveness` (0..20): from `AverageResponseHours` relative to the tier SLA.
-   * - `Reliability` (0..15): starts at 15, penalized by SLA breaches and declines.
-   * - `Availability` (0..15): 0 when an active `OnLeave`/`Paused` window covers `asOfDate`,
-   *   partial (7.5) when only an active `ReducedCapacity` window applies, 15 when clear.
+   * Computes a 0-100 readiness score from 5 named factors per Spec SS3.2:
+   * - `Credential` (25/15/0): 25 when the primary credential is clear, 15 when it expires
+   *   within 30 days, 0 when expired/revoked/rejected (or past its `ExpiresAt`).
+   * - `Capacity` (0..25): `round(25 * headroomRatio)` against `EffectiveMaxConcurrent`
+   *   (from {@link ResolveEffectiveAvailability}).
+   * - `Responsiveness` (0..20): from `AverageResponseHours`.
+   * - `Reliability` (0..20): `max(0, 20 - 5 * slaBreachesLast90Days)`, counted from
+   *   `recentAssignments` with `Status === 'Expired'` and `OfferedAt` within the trailing 90 days.
+   * - `Availability` (10/5/0): 10 when clear, 5 when only an active `ReducedCapacity` window
+   *   applies, 0 when blocked (per {@link ResolveEffectiveAvailability}).
    */
-  public static ComputeReadinessScore(
-    profile: ProfileLike,
-    windows: ReadonlyArray<AvailabilityWindowLike>,
-    credentials: ReadonlyArray<CredentialLike> = [],
-    reliability: ReliabilityCounts = {},
-    asOfDate: Date = new Date(),
-  ): ReadinessScoreResult {
-    // --- Credential (0..25) ---
+  public static ComputeReadinessScore(params: {
+    profile: ProfileLike;
+    credentials?: ReadonlyArray<CredentialLike>;
+    windows?: ReadonlyArray<AvailabilityWindowLike>;
+    recentAssignments?: ReadonlyArray<RecentAssignmentLike>;
+    asOf?: Date;
+  }): ReadinessScoreResult {
+    const { profile, credentials = [], windows = [], recentAssignments = [], asOf = new Date() } = params;
+
+    // --- Credential (25/15/0) ---
     const primaryCredential = credentials.find((c) => c.IsPrimary);
     let credentialFactor = 25;
     if (primaryCredential) {
@@ -119,20 +138,26 @@ export class CapacityReadinessService {
       ) {
         credentialFactor = 0;
       } else if (primaryCredential.ExpiresAt) {
-        const daysUntilExpiry = (new Date(primaryCredential.ExpiresAt).getTime() - asOfDate.getTime()) / (24 * 60 * 60 * 1000);
+        const daysUntilExpiry = (new Date(primaryCredential.ExpiresAt).getTime() - asOf.getTime()) / (24 * 60 * 60 * 1000);
         if (daysUntilExpiry <= 0) {
           credentialFactor = 0;
         } else if (daysUntilExpiry <= 30) {
-          credentialFactor = Math.round((daysUntilExpiry / 30) * 25 * 100) / 100;
+          credentialFactor = 15;
         }
       }
     }
 
+    // --- Availability & Capacity (shared with ResolveEffectiveAvailability) ---
+    const effectiveAvailability = CapacityReadinessService.ResolveEffectiveAvailability(profile, windows, asOf);
+    const nowMs = asOf.getTime();
+    const activeReducedCapacityWindow = windows.find(
+      (w) => w.IsActive !== false && w.WindowType === 'ReducedCapacity' && isWindowCoveringNow(w, nowMs),
+    );
+
     // --- Capacity (0..25) ---
-    const effectiveMax = CapacityReadinessService.GetEffectiveCapacityOverride(windows, asOfDate) ?? profile.MaxConcurrentReferrals;
-    const maxConcurrent = effectiveMax > 0 ? effectiveMax : 1;
+    const maxConcurrent = effectiveAvailability.EffectiveMaxConcurrent > 0 ? effectiveAvailability.EffectiveMaxConcurrent : 1;
     const headroomRatio = Math.max(0, Math.min(1, (maxConcurrent - profile.ActiveReferralCount) / maxConcurrent));
-    const capacityFactor = Math.round(headroomRatio * 25 * 100) / 100;
+    const capacityFactor = Math.round(25 * headroomRatio);
 
     // --- Responsiveness (0..20) ---
     let responsivenessFactor = 14;
@@ -144,24 +169,19 @@ export class CapacityReadinessService {
     }
     responsivenessFactor = Math.round(responsivenessFactor * 100) / 100;
 
-    // --- Reliability (0..15) ---
-    const breaches = reliability.SLABreachCount ?? 0;
-    const declines = reliability.DeclineCount ?? 0;
-    const reliabilityFactor = Math.round(Math.max(0, 15 - breaches * 3 - declines * 1.5) * 100) / 100;
+    // --- Reliability (0..20) ---
+    const ninetyDaysAgoMs = nowMs - 90 * 24 * 60 * 60 * 1000;
+    const slaBreachesLast90Days = recentAssignments.filter(
+      (a) => a.Status === 'Expired' && a.OfferedAt != null && new Date(a.OfferedAt).getTime() >= ninetyDaysAgoMs,
+    ).length;
+    const reliabilityFactor = Math.max(0, 20 - 5 * slaBreachesLast90Days);
 
-    // --- Availability (0..15) ---
-    const nowMs = asOfDate.getTime();
-    const activeBlockingWindow = windows.find(
-      (w) => w.IsActive !== false && (w.WindowType === 'OnLeave' || w.WindowType === 'Paused') && isWindowCoveringNow(w, nowMs),
-    );
-    const activeReducedCapacityWindow = windows.find(
-      (w) => w.IsActive !== false && w.WindowType === 'ReducedCapacity' && isWindowCoveringNow(w, nowMs),
-    );
-    let availabilityFactor = 15;
-    if (profile.AvailabilityStatus === 'Unavailable' || profile.AvailabilityStatus === 'OnLeave' || activeBlockingWindow) {
+    // --- Availability (10/5/0) ---
+    let availabilityFactor = 10;
+    if (effectiveAvailability.IsBlocked) {
       availabilityFactor = 0;
     } else if (activeReducedCapacityWindow) {
-      availabilityFactor = 7.5;
+      availabilityFactor = 5;
     }
 
     const breakdown: ReadinessScoreBreakdown = {
@@ -221,17 +241,11 @@ export class CapacityReadinessService {
       ProfessionalAvailabilityWindowID?: string;
       ProfessionalProfileID: string;
       WindowType: ProfessionalAvailabilityWindowEntity['WindowType'];
-      DayOfWeek?: number | null;
-      StartTimeMinutes?: number | null;
-      EndTimeMinutes?: number | null;
-      StartDate?: Date | null;
-      EndDate?: Date | null;
+      StartsAt: Date;
+      EndsAt: Date;
       CapacityOverride?: number | null;
       Reason?: string | null;
-      IsAvailable?: boolean;
       IsActive?: boolean;
-      TimeZone?: string;
-      Notes?: string | null;
     },
     contextUser: UserInfo,
     provider?: IMetadataProvider & IRunViewProvider,
@@ -272,23 +286,20 @@ export class CapacityReadinessService {
       }
     }
 
+    if (!(input.EndsAt.getTime() > input.StartsAt.getTime())) {
+      throw new PersistenceError('ProfessionalAvailabilityWindow EndsAt must be strictly after StartsAt.');
+    }
+    if (input.WindowType === 'ReducedCapacity' && (input.CapacityOverride == null || input.CapacityOverride < 0)) {
+      throw new PersistenceError("ProfessionalAvailabilityWindow of type 'ReducedCapacity' requires a non-negative CapacityOverride.");
+    }
+
     window.ProfessionalProfileID = validProfileId;
     window.WindowType = input.WindowType;
-    window.DayOfWeek = input.DayOfWeek ?? null;
-    window.StartTimeMinutes = input.StartTimeMinutes ?? null;
-    window.EndTimeMinutes = input.EndTimeMinutes ?? null;
-    window.StartDate = input.StartDate ?? null;
-    window.EndDate = input.EndDate ?? null;
-    window.StartsAt = input.StartDate ?? null;
-    window.EndsAt = input.EndDate ?? null;
+    window.StartsAt = input.StartsAt;
+    window.EndsAt = input.EndsAt;
     window.CapacityOverride = input.CapacityOverride ?? null;
     window.Reason = input.Reason ?? null;
-    window.IsAvailable = input.IsAvailable ?? true;
     window.IsActive = input.IsActive ?? true;
-    if (input.TimeZone) {
-      window.TimeZone = input.TimeZone;
-    }
-    window.Notes = input.Notes ?? null;
 
     const saved = await window.Save();
     if (!saved) {

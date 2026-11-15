@@ -3,7 +3,13 @@ import { RegisterClass } from '@memberjunction/global';
 import type { EscalationRecommendedAction } from '../types.js';
 
 /** Where an AI/rules rationale came from: a live AI advisor call, or the deterministic fallback. */
-export type AIRationaleSource = ExplainMatchRationaleEntry['Source'];
+export const AI_RATIONALE_SOURCES = ['AI', 'Deterministic'] as const;
+export type AIRationaleSource = (typeof AI_RATIONALE_SOURCES)[number];
+
+/** Runtime validator for a `Source` value read back from persisted `AIRationaleJSON`. */
+export function isValidAIRationaleSource(value: string): value is AIRationaleSource {
+  return (AI_RATIONALE_SOURCES as readonly string[]).includes(value);
+}
 
 /**
  * Per-candidate rationale returned by `Referrals.ExplainMatch`, persisted onto
@@ -11,7 +17,8 @@ export type AIRationaleSource = ExplainMatchRationaleEntry['Source'];
  */
 export interface ExplainMatchRationaleEntry {
   ProfessionalProfileID: string;
-  Source: 'AI' | 'Deterministic';
+  /** One of {@link AI_RATIONALE_SOURCES}; validated at runtime via {@link isValidAIRationaleSource}. */
+  Source: string;
   Summary: string;
   Rationale: string;
   Risks: string[];
@@ -37,7 +44,8 @@ export interface RecommendEscalationInput {
 export interface RecommendEscalationOutput {
   ReferralEscalationID: string;
   RecommendedAction: EscalationRecommendedAction;
-  Source: ExplainMatchRationaleEntry['Source'];
+  /** One of {@link AI_RATIONALE_SOURCES}; validated at runtime via {@link isValidAIRationaleSource}. */
+  Source: string;
   Summary: string;
   Rationale: string;
   GeneratedAt: string;

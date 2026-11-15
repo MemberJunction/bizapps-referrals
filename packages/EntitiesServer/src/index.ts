@@ -148,10 +148,10 @@ export class ProfessionalCredentialServerEntity extends ProfessionalCredentialEn
 export class ReferralEscalationServerEntity extends ReferralEscalationEntity {
   public override Validate(): ValidationResult {
     const result = super.Validate();
-    if (this.EscalationLevel <= 0) {
+    if (this.EscalationLevel < 1 || this.EscalationLevel > 3) {
       result.Success = false;
       result.Errors.push(
-        new ValidationErrorInfo('EscalationLevel', 'EscalationLevel must be greater than 0.', this.EscalationLevel, ValidationErrorType.Failure),
+        new ValidationErrorInfo('EscalationLevel', 'EscalationLevel must be between 1 and 3.', this.EscalationLevel, ValidationErrorType.Failure),
       );
     }
     if (this.Status === 'Resolved' && !this.ResolvedAt) {
@@ -168,10 +168,22 @@ export class ReferralEscalationServerEntity extends ReferralEscalationEntity {
 export class ReferralOutcomeServerEntity extends ReferralOutcomeEntity {
   public override Validate(): ValidationResult {
     const result = super.Validate();
-    if (this.ResponseHours != null && this.ResponseHours < 0) {
+    if (this.EstimatedFeeAmount != null && this.EstimatedFeeAmount < 0) {
       result.Success = false;
       result.Errors.push(
-        new ValidationErrorInfo('ResponseHours', 'ResponseHours cannot be negative.', this.ResponseHours, ValidationErrorType.Failure),
+        new ValidationErrorInfo('EstimatedFeeAmount', 'EstimatedFeeAmount cannot be negative.', this.EstimatedFeeAmount, ValidationErrorType.Failure),
+      );
+    }
+    if (this.ReportedFeeAmount != null && this.ReportedFeeAmount < 0) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('ReportedFeeAmount', 'ReportedFeeAmount cannot be negative.', this.ReportedFeeAmount, ValidationErrorType.Failure),
+      );
+    }
+    if (this.ClosedAt && this.EngagedAt && new Date(this.ClosedAt).getTime() < new Date(this.EngagedAt).getTime()) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('ClosedAt', 'ClosedAt cannot be before EngagedAt.', this.ClosedAt, ValidationErrorType.Failure),
       );
     }
     return result;
@@ -180,18 +192,37 @@ export class ReferralOutcomeServerEntity extends ReferralOutcomeEntity {
 
 @RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Availability Windows')
 export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvailabilityWindowEntity {
+  /**
+   * Validates the synchronous (non-DB-dependent) invariants: `EndsAt` strictly after
+   * `StartsAt`, and a `ReducedCapacity` window requires a non-null, non-negative
+   * `CapacityOverride`. The overlap check (CR-14) additionally requires a DB round-trip
+   * and therefore cannot run inside a synchronous `Validate()`; it is enforced in `Save()`
+   * below, which runs on every create/update path before any write occurs.
+   */
   public override Validate(): ValidationResult {
     const result = super.Validate();
 
-    if (!this.StartDate || !this.EndDate) {
+    if (!this.StartsAt || !this.EndsAt) {
       result.Success = false;
       result.Errors.push(
-        new ValidationErrorInfo('StartDate', `StartDate and EndDate are required for ${this.WindowType} availability windows.`, this.StartDate, ValidationErrorType.Failure),
+        new ValidationErrorInfo('StartsAt', `StartsAt and EndsAt are required for ${this.WindowType} availability windows.`, this.StartsAt, ValidationErrorType.Failure),
       );
-    } else if (new Date(this.EndDate).getTime() < new Date(this.StartDate).getTime()) {
+    } else if (new Date(this.EndsAt).getTime() <= new Date(this.StartsAt).getTime()) {
       result.Success = false;
       result.Errors.push(
-        new ValidationErrorInfo('EndDate', 'EndDate must be on or after StartDate.', this.EndDate, ValidationErrorType.Failure),
+        new ValidationErrorInfo('EndsAt', 'EndsAt must be strictly after StartsAt.', this.EndsAt, ValidationErrorType.Failure),
+      );
+    }
+
+    if (this.WindowType === 'ReducedCapacity' && (this.CapacityOverride == null || this.CapacityOverride < 0)) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo(
+          'CapacityOverride',
+          "A 'ReducedCapacity' availability window requires a non-null, non-negative CapacityOverride.",
+          this.CapacityOverride,
+          ValidationErrorType.Failure,
+        ),
       );
     }
 
@@ -200,11 +231,11 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
 
   /**
    * Rejects overlapping active windows of the same `WindowType` for the same
-   * `ProfessionalProfileID` (`StartDate < existing.EndDate && EndDate > existing.StartDate`)
+   * `ProfessionalProfileID` (`StartsAt < existing.EndsAt && EndsAt > existing.StartsAt`)
    * before delegating to the base `Save()`.
    */
   public override async Save(options?: EntitySaveOptions): Promise<boolean> {
-    if (this.IsActive !== false && this.StartDate && this.EndDate && this.ProfessionalProfileID) {
+    if (this.IsActive !== false && this.StartsAt && this.EndsAt && this.ProfessionalProfileID) {
       const rawProvider: object | undefined = this.ProviderToUse;
       const isMetadataAndRunView = (
         p: object | undefined,
@@ -221,12 +252,12 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
           this.ContextCurrentUser,
         );
         if (siblingsRes.Success) {
-          const newStart = new Date(this.StartDate).getTime();
-          const newEnd = new Date(this.EndDate).getTime();
+          const newStart = new Date(this.StartsAt).getTime();
+          const newEnd = new Date(this.EndsAt).getTime();
           const overlapping = siblingsRes.Results.find((w) => {
-            if (!w.StartDate || !w.EndDate) return false;
-            const existingStart = new Date(w.StartDate).getTime();
-            const existingEnd = new Date(w.EndDate).getTime();
+            if (!w.StartsAt || !w.EndsAt) return false;
+            const existingStart = new Date(w.StartsAt).getTime();
+            const existingEnd = new Date(w.EndsAt).getTime();
             return newStart < existingEnd && newEnd > existingStart;
           });
           if (overlapping) {

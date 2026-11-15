@@ -51,7 +51,7 @@ export class MatchingEngine {
     conflictParties: ReadonlyArray<Pick<ConflictCheckPartyEntity, 'PartyName' | 'PartyRole' | 'OrganizationName' | 'NormalizedName'>>;
     activeMatterParties: ReadonlyArray<ActiveMatterPartyRecord>;
     credentials?: ReadonlyArray<Pick<ProfessionalCredentialEntity, 'ProfessionalProfileID' | 'JurisdictionID' | 'VerificationStatus' | 'ExpiresAt' | 'IsPrimary'>>;
-    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'StartDate' | 'EndDate' | 'IsAvailable' | 'IsActive' | 'CapacityOverride'>>;
+    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'StartsAt' | 'EndsAt' | 'IsActive' | 'CapacityOverride'>>;
     asOfDate?: Date;
   }): MatchCandidateScore {
     const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials, availabilityWindows, asOfDate } = params;
@@ -62,6 +62,11 @@ export class MatchingEngine {
     ];
     const conflictResult = ConflictScreeningService.ScreenCandidate(profile, allParties, activeMatterParties);
 
+    const effectiveAvailability =
+      availabilityWindows !== undefined && availabilityWindows.length > 0
+        ? CapacityReadinessService.ResolveEffectiveAvailability(profile, availabilityWindows, asOfDate ?? new Date())
+        : undefined;
+
     let disqualificationReason: string | null = null;
     if (!profile.IsActive) {
       disqualificationReason = 'Profile is inactive.';
@@ -69,13 +74,9 @@ export class MatchingEngine {
       disqualificationReason = `Verification status is ${profile.VerificationStatus}.`;
     } else if (profile.AvailabilityStatus === 'Unavailable' || profile.AvailabilityStatus === 'OnLeave') {
       disqualificationReason = `Availability status is ${profile.AvailabilityStatus}.`;
-    } else if (
-      availabilityWindows !== undefined &&
-      availabilityWindows.length > 0 &&
-      !CapacityReadinessService.ResolveEffectiveAvailability(profile, availabilityWindows, asOfDate ?? new Date())
-    ) {
-      disqualificationReason = 'Professional is outside their configured availability window.';
-    } else if (profile.ActiveReferralCount >= profile.MaxConcurrentReferrals) {
+    } else if (effectiveAvailability?.IsBlocked) {
+      disqualificationReason = effectiveAvailability.BlockReason ?? 'Professional is outside their configured availability window.';
+    } else if (profile.ActiveReferralCount >= (effectiveAvailability?.EffectiveMaxConcurrent ?? profile.MaxConcurrentReferrals)) {
       disqualificationReason = 'Professional is at maximum concurrent referral capacity.';
     } else if (!practiceLink) {
       disqualificationReason = 'Professional does not cover the requested practice area.';

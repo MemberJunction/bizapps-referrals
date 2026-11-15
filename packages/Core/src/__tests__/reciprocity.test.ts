@@ -28,8 +28,8 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
         { ID: 'a5', ReferralRequestID: 'x5', ProfessionalProfileID: PROFILE_ID, Status: 'ConflictRejected', ResponseHours: null, OfferedAt: withinPeriod(5), RespondedAt: null },
       ],
       outcomes: [
-        { ID: 'o1', ReferralAssignmentID: 'a2', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', CompletedAt: withinPeriod(6), FeeAmount: 1500 },
-        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Withdrawn', CompletedAt: withinPeriod(7), FeeAmount: 0 },
+        { ID: 'o1', ReferralAssignmentID: 'a2', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', ClosedAt: withinPeriod(6), ReportedFeeAmount: 1500 },
+        { ID: 'o2', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Withdrawn', ClosedAt: withinPeriod(7), ReportedFeeAmount: 0 },
       ],
     };
 
@@ -110,7 +110,7 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
         { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: outOfPeriod, RespondedAt: null },
       ],
       outcomes: [
-        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', CompletedAt: outOfPeriod, FeeAmount: 500 },
+        { ID: 'o1', ReferralAssignmentID: 'a1', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', ClosedAt: outOfPeriod, ReportedFeeAmount: 500 },
       ],
     };
 
@@ -120,6 +120,36 @@ describe('ReciprocityScorecardService.ComputeScorecard', () => {
     expect(scorecard.Received).toBe(0);
     expect(scorecard.Resolved).toBe(0);
     expect(scorecard.AttributedFeeTotal).toBe(0);
+  });
+
+  it('Round 2 AC-26 exact fixture: Sent=3/Received=5/Accepted=4/Resolved=2/Expired=1, ResponseHours=[1,2,3,10]', () => {
+    const data: ReciprocityScorecardData = {
+      requests: [
+        { ID: 'r1', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(1) },
+        { ID: 'r2', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(2) },
+        { ID: 'r3', ReferringProfessionalID: PROFILE_ID, SubmittedAt: withinPeriod(3) },
+      ],
+      assignments: [
+        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: withinPeriod(1), RespondedAt: null },
+        { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: PROFILE_ID, Status: 'InProgress', ResponseHours: 2, OfferedAt: withinPeriod(2), RespondedAt: null },
+        { ID: 'a3', ReferralRequestID: 'x3', ProfessionalProfileID: PROFILE_ID, Status: 'Completed', ResponseHours: 3, OfferedAt: withinPeriod(3), RespondedAt: null },
+        { ID: 'a4', ReferralRequestID: 'x4', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 10, OfferedAt: withinPeriod(4), RespondedAt: null },
+        { ID: 'a5', ReferralRequestID: 'x5', ProfessionalProfileID: PROFILE_ID, Status: 'Expired', ResponseHours: null, OfferedAt: withinPeriod(5), RespondedAt: null },
+      ],
+      outcomes: [
+        { ID: 'o1', ReferralAssignmentID: 'a3', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', ClosedAt: withinPeriod(6), ReportedFeeAmount: 0 },
+        { ID: 'o2', ReferralAssignmentID: 'a4', ProfessionalProfileID: PROFILE_ID, OutcomeStatus: 'Resolved', ClosedAt: withinPeriod(7), ReportedFeeAmount: 0 },
+      ],
+    };
+
+    const scorecard = ReciprocityScorecardService.ComputeScorecard(PROFILE_ID, PERIOD, data);
+
+    expect(scorecard.Sent).toBe(3);
+    expect(scorecard.Received).toBe(5);
+    expect(scorecard.Accepted).toBe(4);
+    expect(scorecard.Resolved).toBe(2);
+    expect(scorecard.SLABreachCount).toBe(1);
+    expect(scorecard.MedianResponseHours).toBe(2.5);
   });
 });
 
@@ -249,8 +279,8 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
     expect(result.ProcessedCount).toBe(1);
     expect(store.snapshots.size).toBe(1);
     const [snapshot] = Array.from(store.snapshots.values());
-    expect(snapshot.ReferralsReceivedCount).toBe(1);
-    expect(snapshot.AcceptedCount).toBe(1);
+    expect(snapshot.ReferralsReceived).toBe(1);
+    expect(snapshot.ReferralsAccepted).toBe(1);
 
     const updatedProfile = store.profiles.get(PROFILE_ID.toLowerCase());
     // ReciprocityIndex = round((Sent=0 + 1) / (Accepted=1 + 1), 3) = 0.5
@@ -262,10 +292,10 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
     const existingSnapshotData: Record<string, FieldValue> = {
       ID: '30000000-0000-4000-8000-000000000001',
       ProfessionalProfileID: PROFILE_ID,
-      PeriodStartDate: PERIOD.Start,
-      PeriodEndDate: PERIOD.End,
-      ReferralsGivenCount: 0,
-      ReferralsReceivedCount: 0,
+      PeriodStart: PERIOD.Start,
+      PeriodEnd: PERIOD.End,
+      ReferralsSent: 0,
+      ReferralsReceived: 0,
     };
     const existingSnapshot = existingSnapshotData as ReciprocitySnapshotEntity;
     const store: MockStore = {
@@ -288,6 +318,37 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
     expect(store.snapshots.size).toBe(1);
     const [snapshot] = Array.from(store.snapshots.values());
     expect(snapshot.ID).toBe(existingSnapshot.ID);
-    expect(snapshot.ReferralsReceivedCount).toBe(2);
+    expect(snapshot.ReferralsReceived).toBe(2);
+  });
+
+  it('is idempotent: running RecomputeSnapshots twice in a row yields the same single snapshot and values', async () => {
+    const store: MockStore = {
+      profiles: new Map(),
+      requests: [],
+      assignments: [
+        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: withinPeriod(1), RespondedAt: null },
+        { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 2, OfferedAt: withinPeriod(2), RespondedAt: null },
+      ],
+      outcomes: [],
+      snapshots: new Map(),
+    };
+    store.profiles.set(PROFILE_ID.toLowerCase(), attachProfileSave(store, makeProfile(PROFILE_ID)));
+
+    const dp = new MockReciprocityProvider(store);
+    const user = { ID: 'u1', Name: 'Test' } as UserInfo;
+
+    const first = await ReciprocityScorecardService.RecomputeSnapshots(user, dp, PERIOD);
+    expect(first.ProcessedCount).toBe(1);
+    expect(store.snapshots.size).toBe(1);
+    const firstSnapshot = Array.from(store.snapshots.values())[0];
+
+    const second = await ReciprocityScorecardService.RecomputeSnapshots(user, dp, PERIOD);
+    expect(second.ProcessedCount).toBe(1);
+    expect(store.snapshots.size).toBe(1);
+    const secondSnapshot = Array.from(store.snapshots.values())[0];
+
+    expect(secondSnapshot.ID).toBe(firstSnapshot.ID);
+    expect(secondSnapshot.ReferralsReceived).toBe(firstSnapshot.ReferralsReceived);
+    expect(secondSnapshot.ReferralsAccepted).toBe(firstSnapshot.ReferralsAccepted);
   });
 });

@@ -7,6 +7,7 @@ import {
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
 import { IsCoordinatorOrAdmin, ResolvePersonIdForUser } from './CredentialVerification.js';
+import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import {
   AssertValidUUID,
@@ -284,22 +285,26 @@ export class SlaEscalationService {
             if (!saved) {
               throw new PersistenceError(`Failed to stamp SLAWarningSentAt on ReferralAssignment '${assignment.ID}'.`);
             }
-            const warningResult = await SlaEscalationService.RaiseEscalation(
-              {
-                ReferralRequestID: request.ID,
-                ReferralAssignmentID: assignment.ID,
-                TriggerType: 'SLAWarning',
-                EscalationLevel: 1,
-                RecommendedAction: 'ContactProfessional',
-                Notes: `SLA warning threshold (${tier.EscalationWarningPercent}%) crossed for assignment offered to professional on ${new Date(assignment.OfferedAt).toISOString()}.`,
-                DedupKey: `SLAWarning:${assignment.ID}`,
-              },
-              contextUser,
-              dp,
-              notifierKey,
-            );
-            if (warningResult.Raised) {
-              warningsRaised++;
+            try {
+              const warningResult = await SlaEscalationService.RaiseEscalation(
+                {
+                  ReferralRequestID: request.ID,
+                  ReferralAssignmentID: assignment.ID,
+                  TriggerType: 'SLAWarning',
+                  EscalationLevel: 1,
+                  RecommendedAction: 'ExtendSLA',
+                  Notes: `SLA warning threshold (${tier.EscalationWarningPercent}%) crossed for assignment offered to professional on ${new Date(assignment.OfferedAt).toISOString()}.`,
+                  DedupKey: `SLAWarning:${assignment.ID}`,
+                },
+                contextUser,
+                dp,
+                notifierKey,
+              );
+              if (warningResult.Raised) {
+                warningsRaised++;
+              }
+            } catch {
+              skipped++;
             }
           } else {
             skipped++;
@@ -339,24 +344,31 @@ export class SlaEscalationService {
           skipped++;
           continue;
         }
-        const effectiveSlaHours = tier.SLAResponseHours * (tier.UrgentSLAMultiplier > 0 ? tier.UrgentSLAMultiplier : 1);
-        const elapsedHours = (asOf.getTime() - new Date(request.SubmittedAt).getTime()) / (60 * 60 * 1000);
-        if (elapsedHours >= 2 * effectiveSlaHours) {
-          const urgentResult = await SlaEscalationService.RaiseEscalation(
-            {
-              ReferralRequestID: request.ID,
-              TriggerType: 'UrgentUnassigned',
-              EscalationLevel: 2,
-              RecommendedAction: 'ReassignTier',
-              Notes: `Urgent referral unassigned ${elapsedHours.toFixed(1)}h after submission (2x effective SLA of ${effectiveSlaHours.toFixed(1)}h).`,
-              DedupKey: `UrgentUnassigned:${request.ID}`,
-            },
-            contextUser,
-            dp,
-            notifierKey,
-          );
-          if (urgentResult.Raised) {
-            urgentRaised++;
+        const submittedAt = new Date(request.SubmittedAt);
+        const effectiveDeadline = CapacityReadinessService.ComputeSLADeadline(submittedAt, tier, 'Urgent');
+        const effectiveSlaHours = (effectiveDeadline.getTime() - submittedAt.getTime()) / (60 * 60 * 1000);
+        const doubleDeadlineMs = submittedAt.getTime() + 2 * (effectiveDeadline.getTime() - submittedAt.getTime());
+        const elapsedHours = (asOf.getTime() - submittedAt.getTime()) / (60 * 60 * 1000);
+        if (asOf.getTime() >= doubleDeadlineMs) {
+          try {
+            const urgentResult = await SlaEscalationService.RaiseEscalation(
+              {
+                ReferralRequestID: request.ID,
+                TriggerType: 'UrgentUnassigned',
+                EscalationLevel: 2,
+                RecommendedAction: 'ReassignNextCandidate',
+                Notes: `Urgent referral unassigned ${elapsedHours.toFixed(1)}h after submission (2x effective SLA of ${effectiveSlaHours.toFixed(1)}h).`,
+                DedupKey: `UrgentUnassigned:${request.ID}`,
+              },
+              contextUser,
+              dp,
+              notifierKey,
+            );
+            if (urgentResult.Raised) {
+              urgentRaised++;
+            }
+          } catch {
+            skipped++;
           }
         } else {
           skipped++;
@@ -393,7 +405,12 @@ export class SlaEscalationService {
       },
       contextUser,
     );
-    if (existingRes.Success && existingRes.Results.length > 0) {
+    if (!existingRes.Success) {
+      // Fail closed: if we cannot reliably determine whether this DedupKey has already
+      // fired, do not raise a (possibly duplicate) escalation.
+      throw new PersistenceError(`Failed to query existing ReferralEscalation rows for DedupKey '${input.DedupKey}'; refusing to raise a possibly-duplicate escalation.`);
+    }
+    if (existingRes.Results.length > 0) {
       return { Raised: false, ReferralEscalationID: existingRes.Results[0].ID };
     }
 
@@ -413,10 +430,11 @@ export class SlaEscalationService {
     escalation.EscalationLevel = cappedLevel;
     escalation.TriggerType = input.TriggerType;
     escalation.Status = 'Open';
-    escalation.RecommendedAction = input.RecommendedAction ?? 'ContactProfessional';
+    escalation.RecommendedAction = input.RecommendedAction ?? 'ExtendSLA';
     escalation.Notes = input.Notes ?? null;
-    escalation.TriggeredAt = new Date();
+    escalation.RaisedAt = new Date();
     escalation.DedupKey = input.DedupKey;
+    escalation.NotifierKey = notifierKey;
     const escalationSaved = await escalation.Save();
     if (!escalationSaved) {
       throw new PersistenceError(`Failed to save ReferralEscalation for ReferralRequest '${validRequestId}'.`);
