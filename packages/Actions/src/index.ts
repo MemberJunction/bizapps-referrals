@@ -574,6 +574,10 @@ export class ListCredentialProvidersAction extends BaseAction {
   }
 }
 
+export * from './lifecycle-actions.js';
+import { LoadReferralsLifecycleActions } from './lifecycle-actions.js';
+
 export function LoadReferralsActions(): void {
   LoadCredentialProviders();
+  LoadReferralsLifecycleActions();
 }

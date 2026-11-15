@@ -12,9 +12,11 @@ import {
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
 } from '@mj-biz-apps/referrals-entities';
+import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ActiveMatterPartyRecord, ConflictScreeningService, NormalizePartyName } from './ConflictScreeningService.js';
 import { MatchingEngine } from './MatchingEngine.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
@@ -35,6 +37,12 @@ import {
   PersistenceError,
   UUIDsEqual,
 } from './validation.js';
+
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+
+function roundTo2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 interface EntityTransactionHandle {
   Commit(): Promise<void>;
@@ -168,21 +176,22 @@ async function atomicClaimAssignmentOffer(
   respondedAt: Date,
   notes: string | null,
   contextUser: UserInfo,
+  responseHours: number | null = null,
 ): Promise<void> {
   if (hasSqlSupport(provider)) {
     const isPostgres = provider.PlatformKey === 'postgresql';
     const sql = isPostgres
       ? `UPDATE __mj_BizAppsReferrals."ReferralAssignment"
-         SET "Status" = $1, "RespondedAt" = $2, "ResponseNotes" = COALESCE($3, "ResponseNotes")
+         SET "Status" = $1, "RespondedAt" = $2, "ResponseNotes" = COALESCE($3, "ResponseNotes"), "ResponseHours" = COALESCE($5, "ResponseHours")
          WHERE "ID" = $4 AND "Status" = 'Offered'
          RETURNING "ID"`
       : `UPDATE [__mj_BizAppsReferrals].[ReferralAssignment]
-         SET [Status] = @p0, [RespondedAt] = @p1, [ResponseNotes] = COALESCE(@p2, [ResponseNotes])
+         SET [Status] = @p0, [RespondedAt] = @p1, [ResponseNotes] = COALESCE(@p2, [ResponseNotes]), [ResponseHours] = COALESCE(@p4, [ResponseHours])
          OUTPUT INSERTED.[ID]
          WHERE [ID] = @p3 AND [Status] = N'Offered'`;
     const rows = await provider.ExecuteSQL<{ ID: string }>(
       sql,
-      [nextStatus, respondedAt, notes, assignment.ID],
+      [nextStatus, respondedAt, notes, assignment.ID, responseHours],
       undefined,
       contextUser,
     );
@@ -204,7 +213,40 @@ async function atomicClaimAssignmentOffer(
   if (notes) {
     assignment.ResponseNotes = notes;
   }
+  if (responseHours != null) {
+    assignment.ResponseHours = responseHours;
+  }
   await saveOrThrow(assignment, `${nextStatus} ReferralAssignment`);
+}
+
+/**
+ * Recomputes ProfessionalProfile.AverageResponseHours as a rolling 90-day average
+ * across completed/accepted ReferralAssignments with a recorded ResponseHours.
+ */
+async function recompute90DayAverageResponseHours(
+  provider: TransactionalProvider & IRunViewProvider,
+  professionalProfileId: string,
+  contextUser: UserInfo,
+): Promise<number | null> {
+  const rv = new RunView(provider);
+  const cutoff = new Date(Date.now() - NINETY_DAYS_MS).toISOString();
+  const res = await rv.RunView<ReferralAssignmentEntity>(
+    {
+      EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+      ExtraFilter: `ProfessionalProfileID = '${professionalProfileId}' AND ResponseHours IS NOT NULL AND RespondedAt >= '${cutoff}'`,
+      ResultType: 'entity_object',
+    },
+    contextUser,
+  );
+  if (!res.Success || res.Results.length === 0) {
+    return null;
+  }
+  const values = res.Results.map((a) => a.ResponseHours).filter((v): v is number => v != null);
+  if (values.length === 0) {
+    return null;
+  }
+  const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+  return roundTo2(avg);
 }
 
 async function atomicIncrementProCapacity(
@@ -448,32 +490,42 @@ export class CascadeRoutingService {
         validRequestId,
       );
 
-      let conflictRejectedCount = 0;
       const eligibleCandidates = [];
+      const rejectedCandidates: Array<{ candidate: (typeof candidates)[number]; conflictStatus: 'ConflictFound' | 'Pending' }> = [];
       for (const c of candidates) {
         if (existingByPro.has(c.ProfessionalProfileID.toLowerCase())) {
           continue;
         }
         if (c.ConflictStatus === 'ConflictFound' || c.ConflictStatus === 'Unavailable') {
-          conflictRejectedCount++;
-          const rejected = await md.GetEntityObject<ReferralAssignmentEntity>(
-            'MJ_BizApps_Referrals: Referral Assignments',
-            contextUser,
-          );
-          rejected.ReferralRequestID = validRequestId;
-          rejected.ProfessionalProfileID = c.ProfessionalProfileID;
-          rejected.CascadeOrder = eligibleCandidates.length + conflictRejectedCount;
-          rejected.MatchScore = c.Score;
-          rejected.ScoreBreakdownJSON = JSON.stringify(c.Breakdown);
-          rejected.ConflictStatus = c.ConflictStatus === 'ConflictFound' ? 'ConflictFound' : 'Pending';
-          rejected.ConflictReason = c.ConflictReasons.join('; ');
-          rejected.Status = 'ConflictRejected';
-          await saveOrThrow(rejected, 'ConflictRejected ReferralAssignment');
+          rejectedCandidates.push({
+            candidate: c,
+            conflictStatus: c.ConflictStatus === 'ConflictFound' ? 'ConflictFound' : 'Pending',
+          });
           continue;
         }
         if (c.Eligible && eligibleCandidates.length < tier.MaxCascadeAttempts) {
           eligibleCandidates.push(c);
         }
+      }
+
+      // Conflict-rejected candidates are numbered after all eligible candidates so
+      // CascadeOrder stays unique and reflects eligible-first cascade priority.
+      const conflictRejectedCount = rejectedCandidates.length;
+      for (let i = 0; i < rejectedCandidates.length; i++) {
+        const { candidate: c, conflictStatus } = rejectedCandidates[i];
+        const rejected = await md.GetEntityObject<ReferralAssignmentEntity>(
+          'MJ_BizApps_Referrals: Referral Assignments',
+          contextUser,
+        );
+        rejected.ReferralRequestID = validRequestId;
+        rejected.ProfessionalProfileID = c.ProfessionalProfileID;
+        rejected.CascadeOrder = eligibleCandidates.length + i + 1;
+        rejected.MatchScore = c.Score;
+        rejected.ScoreBreakdownJSON = JSON.stringify(c.Breakdown);
+        rejected.ConflictStatus = conflictStatus;
+        rejected.ConflictReason = c.ConflictReasons.join('; ');
+        rejected.Status = 'ConflictRejected';
+        await saveOrThrow(rejected, 'ConflictRejected ReferralAssignment');
       }
 
       if (eligibleCandidates.length === 0) {
@@ -503,7 +555,8 @@ export class CascadeRoutingService {
       }
 
       const now = new Date();
-      const slaDeadline = new Date(now.getTime() + tier.SLAResponseHours * 60 * 60 * 1000);
+      const isUrgent = request.UrgencyLevel === 'Urgent';
+      const slaDeadline = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
       let activeAssignmentId: string | null = null;
       let activeProfessionalId: string | null = null;
 
@@ -743,6 +796,11 @@ export class CascadeRoutingService {
           );
         }
 
+        const acceptResponseHours =
+          assignment.OfferedAt != null
+            ? roundTo2((now.getTime() - new Date(assignment.OfferedAt).getTime()) / (60 * 60 * 1000))
+            : null;
+
         await atomicClaimAssignmentOffer(
           txProvider,
           assignment,
@@ -750,8 +808,21 @@ export class CascadeRoutingService {
           now,
           params.Notes ?? null,
           contextUser,
+          acceptResponseHours,
         );
         await atomicIncrementProCapacity(txProvider, pro, contextUser);
+
+        if (hasSqlSupport(txProvider) && 'RunView' in txProvider) {
+          const newAverage = await recompute90DayAverageResponseHours(
+            txProvider as TransactionalProvider & IRunViewProvider,
+            pro.ID,
+            contextUser,
+          );
+          if (newAverage != null) {
+            pro.AverageResponseHours = newAverage;
+            await saveOrThrow(pro, 'ProfessionalProfile AverageResponseHours update');
+          }
+        }
 
         request.Status = 'Accepted';
         request.AssignedProfessionalID = assignment.ProfessionalProfileID;
@@ -920,7 +991,7 @@ export class CascadeRoutingService {
     if (!(await tier.Load(request.ReferralTierID))) {
       throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
     }
-    const slaHours = tier.SLAResponseHours > 0 ? tier.SLAResponseHours : 24;
+    const isUrgent = request.UrgencyLevel === 'Urgent';
 
     for (const candidateAssignment of queuedList) {
       const validProId = AssertValidUUID(candidateAssignment.ProfessionalProfileID, 'ProfessionalProfileID');
@@ -984,7 +1055,7 @@ export class CascadeRoutingService {
       const now = new Date();
       candidateAssignment.Status = 'Offered';
       candidateAssignment.OfferedAt = now;
-      candidateAssignment.SLADeadlineAt = new Date(now.getTime() + slaHours * 60 * 60 * 1000);
+      candidateAssignment.SLADeadlineAt = CapacityReadinessService.ComputeSLADeadline(now, tier, isUrgent);
       await saveOrThrow(candidateAssignment, 'Promoted ReferralAssignment');
 
       request.Status = 'Routed';
@@ -1139,5 +1210,232 @@ export class CascadeRoutingService {
       ExhaustedCount: exhaustedCount,
       ProcessedAssignmentIDs: processedIds,
     };
+  }
+
+  /**
+   * Transitions an `Accepted` ReferralAssignment (and its parent ReferralRequest) to
+   * `InProgress`. Authorization: assigned professional (`ProfessionalProfile.UserID`)
+   * or Association Admin. Idempotent when already `InProgress` (zero additional writes).
+   */
+  public static async MarkInProgress(
+    referralAssignmentId: string,
+    contextUser: UserInfo,
+    provider?: IMetadataProvider & IRunViewProvider,
+  ): Promise<{
+    ReferralAssignmentID: string;
+    ReferralRequestID: string;
+    AssignmentStatus: ReferralAssignmentEntity['Status'];
+    RequestStatus: ReferralRequestStatus;
+  }> {
+    const validAssignmentId = AssertValidUUID(referralAssignmentId, 'ReferralAssignmentID');
+    const txProvider = resolveTransactionalProvider(provider);
+
+    return withEntityTransaction(txProvider, async (md) => {
+      const assignment = await md.GetEntityObject<ReferralAssignmentEntity>(
+        'MJ_BizApps_Referrals: Referral Assignments',
+        contextUser,
+      );
+      if (!(await assignment.Load(validAssignmentId))) {
+        throw new PersistenceError(`ReferralAssignment '${validAssignmentId}' not found.`);
+      }
+
+      const pro = await md.GetEntityObject<ProfessionalProfileEntity>(
+        'MJ_BizApps_Referrals: Professional Profiles',
+        contextUser,
+      );
+      if (!(await pro.Load(AssertValidUUID(assignment.ProfessionalProfileID, 'ProfessionalProfileID')))) {
+        throw new PersistenceError(`ProfessionalProfile '${assignment.ProfessionalProfileID}' not found.`);
+      }
+
+      if (!UUIDsEqual(pro.UserID, contextUser.ID) && !IsAssociationAdmin(contextUser)) {
+        throw new AuthorizationError(
+          `User '${contextUser.ID}' is not authorized to mark assignment '${validAssignmentId}' in progress for professional '${pro.ID}'.`,
+        );
+      }
+
+      const request = await md.GetEntityObject<ReferralRequestEntity>(
+        'MJ_BizApps_Referrals: Referral Requests',
+        contextUser,
+      );
+      if (!(await request.Load(AssertValidUUID(assignment.ReferralRequestID, 'ReferralRequestID')))) {
+        throw new PersistenceError(`ReferralRequest '${assignment.ReferralRequestID}' not found.`);
+      }
+
+      // Idempotent: already InProgress -> zero additional writes
+      if (assignment.Status === 'InProgress') {
+        return {
+          ReferralAssignmentID: assignment.ID,
+          ReferralRequestID: request.ID,
+          AssignmentStatus: assignment.Status,
+          RequestStatus: request.Status,
+        };
+      }
+
+      if (assignment.Status !== 'Accepted') {
+        throw new InvalidLifecycleStateError(
+          `Cannot mark ReferralAssignment '${validAssignmentId}' in progress from status '${assignment.Status}' (expected 'Accepted').`,
+        );
+      }
+
+      assignment.Status = 'InProgress';
+      await saveOrThrow(assignment, 'InProgress ReferralAssignment');
+
+      if (request.Status === 'Accepted') {
+        request.Status = 'InProgress';
+        await saveOrThrow(request, 'InProgress ReferralRequest');
+      }
+
+      return {
+        ReferralAssignmentID: assignment.ID,
+        ReferralRequestID: request.ID,
+        AssignmentStatus: assignment.Status,
+        RequestStatus: request.Status,
+      };
+    });
+  }
+
+  /**
+   * Transactionally completes a referral: creates a `ReferralOutcome`, marks the
+   * `ReferralAssignment` and parent `ReferralRequest` `Completed`, decrements
+   * `ProfessionalProfile.ActiveReferralCount` (never below 0), increments
+   * `TotalCompletedCount`, and recomputes the 90-day rolling `AverageResponseHours`.
+   * Authorization: assigned professional or Association Admin, checked before any
+   * writes. Idempotent when already `Completed` (zero additional writes).
+   */
+  public static async CompleteReferral(
+    params: {
+      ReferralAssignmentID: string;
+      OutcomeStatus?: ReferralOutcomeEntity['OutcomeStatus'];
+      CompletionNotes?: string;
+    },
+    contextUser: UserInfo,
+    provider?: IMetadataProvider & IRunViewProvider,
+  ): Promise<{
+    ReferralAssignmentID: string;
+    ReferralRequestID: string;
+    ReferralOutcomeID: string;
+    AssignmentStatus: ReferralAssignmentEntity['Status'];
+    RequestStatus: ReferralRequestStatus;
+  }> {
+    const validAssignmentId = AssertValidUUID(params.ReferralAssignmentID, 'ReferralAssignmentID');
+    const txProvider = resolveTransactionalProvider(provider);
+    const rv = new RunView(txProvider);
+
+    return withEntityTransaction(txProvider, async (md) => {
+      const assignment = await md.GetEntityObject<ReferralAssignmentEntity>(
+        'MJ_BizApps_Referrals: Referral Assignments',
+        contextUser,
+      );
+      if (!(await assignment.Load(validAssignmentId))) {
+        throw new PersistenceError(`ReferralAssignment '${validAssignmentId}' not found.`);
+      }
+
+      const pro = await md.GetEntityObject<ProfessionalProfileEntity>(
+        'MJ_BizApps_Referrals: Professional Profiles',
+        contextUser,
+      );
+      if (!(await pro.Load(AssertValidUUID(assignment.ProfessionalProfileID, 'ProfessionalProfileID')))) {
+        throw new PersistenceError(`ProfessionalProfile '${assignment.ProfessionalProfileID}' not found.`);
+      }
+
+      if (!UUIDsEqual(pro.UserID, contextUser.ID) && !IsAssociationAdmin(contextUser)) {
+        throw new AuthorizationError(
+          `User '${contextUser.ID}' is not authorized to complete assignment '${validAssignmentId}' for professional '${pro.ID}'.`,
+        );
+      }
+
+      const request = await md.GetEntityObject<ReferralRequestEntity>(
+        'MJ_BizApps_Referrals: Referral Requests',
+        contextUser,
+      );
+      if (!(await request.Load(AssertValidUUID(assignment.ReferralRequestID, 'ReferralRequestID')))) {
+        throw new PersistenceError(`ReferralRequest '${assignment.ReferralRequestID}' not found.`);
+      }
+
+      // Idempotent: already Completed -> return existing outcome, zero additional writes
+      if (assignment.Status === 'Completed') {
+        const existingRes = await rv.RunView<ReferralOutcomeEntity>(
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Outcomes',
+            ExtraFilter: `ReferralAssignmentID = '${assignment.ID}'`,
+            ResultType: 'entity_object',
+          },
+          contextUser,
+        );
+        const existingOutcome = existingRes.Success ? existingRes.Results[0] : undefined;
+        return {
+          ReferralAssignmentID: assignment.ID,
+          ReferralRequestID: request.ID,
+          ReferralOutcomeID: existingOutcome?.ID ?? '',
+          AssignmentStatus: assignment.Status,
+          RequestStatus: request.Status,
+        };
+      }
+
+      if (assignment.Status !== 'Accepted' && assignment.Status !== 'InProgress') {
+        throw new InvalidLifecycleStateError(
+          `Cannot complete ReferralAssignment '${validAssignmentId}' from status '${assignment.Status}' (expected 'Accepted' or 'InProgress').`,
+        );
+      }
+
+      const now = new Date();
+      const responseHours =
+        assignment.ResponseHours ??
+        (assignment.OfferedAt != null
+          ? roundTo2((now.getTime() - new Date(assignment.OfferedAt).getTime()) / (60 * 60 * 1000))
+          : null);
+
+      assignment.Status = 'Completed';
+      assignment.CompletedAt = now;
+      if (responseHours != null) {
+        assignment.ResponseHours = responseHours;
+      }
+      await saveOrThrow(assignment, 'Completed ReferralAssignment');
+
+      const outcome = await md.GetEntityObject<ReferralOutcomeEntity>(
+        'MJ_BizApps_Referrals: Referral Outcomes',
+        contextUser,
+      );
+      outcome.ReferralRequestID = request.ID;
+      outcome.ReferralAssignmentID = assignment.ID;
+      outcome.ProfessionalProfileID = pro.ID;
+      outcome.OutcomeStatus = params.OutcomeStatus ?? 'Completed';
+      if (responseHours != null) {
+        outcome.ResponseHours = responseHours;
+      }
+      if (params.CompletionNotes) {
+        outcome.CompletionNotes = params.CompletionNotes;
+      }
+      outcome.CompletedAt = now;
+      await saveOrThrow(outcome, 'ReferralOutcome');
+
+      pro.ActiveReferralCount = Math.max(0, pro.ActiveReferralCount - 1);
+      pro.TotalCompletedCount = pro.TotalCompletedCount + 1;
+      await saveOrThrow(pro, 'ProfessionalProfile completion counters');
+
+      if (hasSqlSupport(txProvider)) {
+        const newAverage = await recompute90DayAverageResponseHours(
+          txProvider as TransactionalProvider & IRunViewProvider,
+          pro.ID,
+          contextUser,
+        );
+        if (newAverage != null) {
+          pro.AverageResponseHours = newAverage;
+          await saveOrThrow(pro, 'ProfessionalProfile AverageResponseHours update');
+        }
+      }
+
+      request.Status = 'Completed';
+      request.CompletedAt = now;
+      await saveOrThrow(request, 'Completed ReferralRequest');
+
+      return {
+        ReferralAssignmentID: assignment.ID,
+        ReferralRequestID: request.ID,
+        ReferralOutcomeID: outcome.ID,
+        AssignmentStatus: assignment.Status,
+        RequestStatus: request.Status,
+      };
+    });
   }
 }

@@ -11,6 +11,87 @@
     "primaryKey": {
       "ID": "F2000001-0000-0000-0000-000000000001"
     },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PracticeAreaID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the PracticeArea to match against."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "JurisdictionID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Jurisdiction to match against."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "RequiresProBono",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Whether the referral requires a pro bono-accepting professional."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PreferredLanguage",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional preferred spoken language for the match."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "SLAResponseHours",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional target SLA response window in hours used for responsiveness scoring."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "MaxResults",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Maximum number of ranked candidates to return (default 20)."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralRequestID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional existing ReferralRequest UUID for conflict-screening context."
+          }
+        }
+      ]
+    },
     "sync": {
       "lastModified": "2026-11-13T23:25:07.022Z",
       "checksum": "28d53d42760a8ae89bd9cdf17e08d208b2dec282385a481e751fd16f59ad166f"
@@ -27,6 +108,21 @@
     },
     "primaryKey": {
       "ID": "F2000001-0000-0000-0000-000000000002"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralRequestID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ReferralRequest to route."
+          }
+        }
+      ]
     },
     "sync": {
       "lastModified": "2026-11-13T23:25:07.053Z",
@@ -45,6 +141,54 @@
     "primaryKey": {
       "ID": "F2000001-0000-0000-0000-000000000003"
     },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralAssignmentID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ReferralAssignment being responded to."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Action",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Response action: Accept, Decline, or ConflictReject."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Notes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text notes about the response."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "DeclineReason",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional structured reason when declining or conflict-rejecting."
+          }
+        }
+      ]
+    },
     "sync": {
       "lastModified": "2026-11-13T23:25:07.084Z",
       "checksum": "9f3e063f6db8f33a07d564f75f974e25f4f0a28a471497052a88e665bc74ebd1"
@@ -61,6 +205,21 @@
     },
     "primaryKey": {
       "ID": "F2000001-0000-0000-0000-000000000004"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "AsOfIso",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional ISO-8601 timestamp to sweep as-of (defaults to now)."
+          }
+        }
+      ]
     },
     "sync": {
       "lastModified": "2026-11-13T23:25:07.112Z",
@@ -269,6 +428,362 @@
             "IsArray": true,
             "IsRequired": false,
             "Description": "Array of registered CredentialProviderDescriptor objects."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.SubmitReferralIntake",
+      "Description": "Atomically creates a ReferralRequest and all ConflictCheckParty records in one transaction, marks it Submitted, and optionally routes it immediately.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.SubmitReferralIntake",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000008"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "SeekerName",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Name of the referral seeker."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "SeekerEmail",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Email address of the referral seeker."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PracticeAreaID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the requested PracticeArea."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "JurisdictionID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the requested Jurisdiction."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralTierID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ReferralTier governing SLA and cascade policy."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "MatterTitle",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Short title of the matter."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "MatterSummary",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Full-text summary of the matter."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "RequiresProBono",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Whether the matter requires a pro bono-accepting professional."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "PreferredLanguage",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional preferred spoken language."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ConflictPartiesJSON",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional JSON array of ConflictPartyInput records to screen."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "AutoRoute",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "When true, immediately routes the referral after submission."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.MarkReferralInProgress",
+      "Description": "Transitions an accepted referral assignment (and its parent request) to InProgress.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.MarkReferralInProgress",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-000000000009"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralAssignmentID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Accepted ReferralAssignment to mark InProgress."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.CompleteReferral",
+      "Description": "Transactionally completes a referral: creates a ReferralOutcome, marks the assignment and request Completed, and updates professional capacity/response metrics.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.CompleteReferral",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000A"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ReferralAssignmentID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the Accepted or InProgress ReferralAssignment to complete."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "OutcomeStatus",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "DefaultValue": "Completed",
+            "Description": "Outcome status: Completed, Cancelled, or NoEngagement."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "CompletionNotes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text completion notes."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Referrals.SetAvailabilityWindow",
+      "Description": "Creates or updates a recurring, date-range, or blackout availability window for a professional.",
+      "Type": "Custom",
+      "DriverClass": "Referrals.SetAvailabilityWindow",
+      "Status": "Active",
+      "CategoryID": "@lookup:MJ: Action Categories.Name=BizApps Referrals"
+    },
+    "primaryKey": {
+      "ID": "F2000001-0000-0000-0000-00000000000B"
+    },
+    "relatedEntities": {
+      "MJ: Action Params": [
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ProfessionalAvailabilityWindowID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional UUID of an existing window to update; omit to create a new one."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "ProfessionalProfileID",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "UUID of the ProfessionalProfile the window applies to."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "WindowType",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": true,
+            "Description": "Recurring, DateRange, or Blackout."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "DayOfWeek",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "0 (Sunday) through 6 (Saturday); required for Recurring windows."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "StartTimeMinutes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Minutes since midnight marking the start of a Recurring window."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "EndTimeMinutes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Minutes since midnight marking the end of a Recurring window."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "StartDate",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "ISO-8601 start timestamp for DateRange/Blackout windows."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "EndDate",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "ISO-8601 end timestamp for DateRange/Blackout windows."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "IsAvailable",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Whether this window marks availability (true) or unavailability (false)."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "TimeZone",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "DefaultValue": "UTC",
+            "Description": "IANA time zone identifier for the window."
+          }
+        },
+        {
+          "fields": {
+            "ActionID": "@parent:ID",
+            "Name": "Notes",
+            "Type": "Input",
+            "ValueType": "Scalar",
+            "IsArray": false,
+            "IsRequired": false,
+            "Description": "Optional free-text notes."
           }
         }
       ]

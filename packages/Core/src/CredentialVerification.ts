@@ -1764,7 +1764,7 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
       throw new PersistenceError(`ReferralAssignment '${validAssignmentId}' not found.`);
     }
 
-    const assignmentStatus: string = assignment.Status;
+    const assignmentStatus: ReferralAssignmentEntity['Status'] = assignment.Status;
     if (
       assignmentStatus !== 'Accepted' &&
       assignmentStatus !== 'InProgress' &&

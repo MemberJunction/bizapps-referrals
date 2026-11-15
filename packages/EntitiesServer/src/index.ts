@@ -8,8 +8,11 @@ import {
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalProfileEntity,
+  ReferralEscalationEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 
@@ -140,6 +143,86 @@ export class ProfessionalCredentialServerEntity extends ProfessionalCredentialEn
   }
 }
 
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Referral Escalations')
+export class ReferralEscalationServerEntity extends ReferralEscalationEntity {
+  public override Validate(): ValidationResult {
+    const result = super.Validate();
+    if (this.EscalationLevel <= 0) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('EscalationLevel', 'EscalationLevel must be greater than 0.', this.EscalationLevel, ValidationErrorType.Failure),
+      );
+    }
+    if (this.Status === 'Resolved' && !this.ResolvedAt) {
+      this.ResolvedAt = new Date();
+    }
+    if (this.Status === 'Acknowledged' && !this.AcknowledgedAt) {
+      this.AcknowledgedAt = new Date();
+    }
+    return result;
+  }
+}
+
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Referral Outcomes')
+export class ReferralOutcomeServerEntity extends ReferralOutcomeEntity {
+  public override Validate(): ValidationResult {
+    const result = super.Validate();
+    if (this.ResponseHours != null && this.ResponseHours < 0) {
+      result.Success = false;
+      result.Errors.push(
+        new ValidationErrorInfo('ResponseHours', 'ResponseHours cannot be negative.', this.ResponseHours, ValidationErrorType.Failure),
+      );
+    }
+    return result;
+  }
+}
+
+@RegisterClass(BaseEntity, 'MJ_BizApps_Referrals: Professional Availability Windows')
+export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvailabilityWindowEntity {
+  public override Validate(): ValidationResult {
+    const result = super.Validate();
+
+    if (this.WindowType === 'Recurring') {
+      if (this.DayOfWeek == null) {
+        result.Success = false;
+        result.Errors.push(
+          new ValidationErrorInfo('DayOfWeek', 'DayOfWeek is required for Recurring availability windows.', this.DayOfWeek, ValidationErrorType.Failure),
+        );
+      }
+      if (this.StartTimeMinutes == null || this.EndTimeMinutes == null) {
+        result.Success = false;
+        result.Errors.push(
+          new ValidationErrorInfo('StartTimeMinutes', 'StartTimeMinutes and EndTimeMinutes are required for Recurring availability windows.', this.StartTimeMinutes, ValidationErrorType.Failure),
+        );
+      } else if (this.EndTimeMinutes <= this.StartTimeMinutes) {
+        result.Success = false;
+        result.Errors.push(
+          new ValidationErrorInfo('EndTimeMinutes', 'EndTimeMinutes must be greater than StartTimeMinutes.', this.EndTimeMinutes, ValidationErrorType.Failure),
+        );
+      }
+    }
+
+    if (this.WindowType === 'DateRange' || this.WindowType === 'Blackout') {
+      if (!this.StartDate || !this.EndDate) {
+        result.Success = false;
+        result.Errors.push(
+          new ValidationErrorInfo('StartDate', `StartDate and EndDate are required for ${this.WindowType} availability windows.`, this.StartDate, ValidationErrorType.Failure),
+        );
+      } else if (new Date(this.EndDate).getTime() < new Date(this.StartDate).getTime()) {
+        result.Success = false;
+        result.Errors.push(
+          new ValidationErrorInfo('EndDate', 'EndDate must be on or after StartDate.', this.EndDate, ValidationErrorType.Failure),
+        );
+      }
+    }
+
+    return result;
+  }
+}
+
 export function LoadReferralsServerEntities(): void {
   // Ensures module side-effect class registrations are preserved by bundlers.
+  void ReferralEscalationServerEntity;
+  void ReferralOutcomeServerEntity;
+  void ProfessionalAvailabilityWindowServerEntity;
 }

@@ -1,10 +1,13 @@
 import type {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
+  ReferralEscalationEntity,
   ReferralFeedbackEntity,
+  ReferralOutcomeEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 
@@ -19,6 +22,14 @@ export type ConflictStatus = ReferralAssignmentEntity['ConflictStatus'];
 export type ReferralAssignmentStatus = ReferralAssignmentEntity['Status'];
 export type FeedbackSubmittedByType = ReferralFeedbackEntity['SubmittedByType'];
 export type FeedbackOutcomeStatus = ReferralFeedbackEntity['OutcomeStatus'];
+
+// Wave 3 Slice 1: SLA Escalation, Outcomes & Readiness
+export type EscalationTriggerType = ReferralEscalationEntity['TriggerType'];
+export type EscalationStatus = ReferralEscalationEntity['Status'];
+export type EscalationRecommendedAction = ReferralEscalationEntity['RecommendedAction'];
+export type OutcomeStatus = ReferralOutcomeEntity['OutcomeStatus'];
+export type AvailabilityWindowType = ProfessionalAvailabilityWindowEntity['WindowType'];
+export type ReferralSourceChannel = ReferralRequestEntity['SourceChannel'];
 
 export interface ScoreBreakdown {
   PracticeAreaScore: number;

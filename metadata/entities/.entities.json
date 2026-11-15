@@ -174,5 +174,69 @@
         }
       }
     }
+  },
+  {
+    "primaryKey": {
+      "ID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Escalations"
+    },
+    "fields": {
+      "Configuration": {
+        "UI": {
+          "Form": {
+            "Layout": "left-nav",
+            "RelatedRolePolicy": "smart",
+            "PrimaryRelatedBudget": 4
+          }
+        }
+      }
+    }
+  },
+  {
+    "primaryKey": {
+      "ID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Referral Outcomes"
+    },
+    "fields": {
+      "Configuration": {
+        "UI": {
+          "Form": {
+            "Layout": "left-nav",
+            "RelatedRolePolicy": "smart",
+            "PrimaryRelatedBudget": 4
+          }
+        }
+      }
+    }
+  },
+  {
+    "primaryKey": {
+      "ID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Professional Availability Windows"
+    },
+    "fields": {
+      "Configuration": {
+        "UI": {
+          "Form": {
+            "Layout": "left-nav",
+            "RelatedRolePolicy": "smart",
+            "PrimaryRelatedBudget": 4
+          }
+        }
+      }
+    }
+  },
+  {
+    "primaryKey": {
+      "ID": "@lookup:MJ: Entities.Name=MJ_BizApps_Referrals: Reciprocity Snapshots"
+    },
+    "fields": {
+      "Configuration": {
+        "UI": {
+          "Form": {
+            "Layout": "left-nav",
+            "RelatedRolePolicy": "smart",
+            "PrimaryRelatedBudget": 4
+          }
+        }
+      }
+    }
   }
 ]

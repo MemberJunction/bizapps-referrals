@@ -4,7 +4,7 @@
   "name": "mj-bizapps-referrals",
   "displayName": "Referrals",
   "description": "Professional Referral & Verified Member Directory Open App ('Find a Lawyer / Find a Pro'): AI-guided client intake, credentialed professional matching, conflict-of-interest checks, SLA-backed referral routing, confidential messaging, and association conversion telemetry.",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "license": "BUSL-1.1",
   "icon": "fa-solid fa-scale-balanced",
   "publisher": {

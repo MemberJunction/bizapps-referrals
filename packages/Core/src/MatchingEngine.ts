@@ -1,6 +1,7 @@
 import { IRunViewProvider, RunView, UserInfo } from '@memberjunction/core';
 import {
   ConflictCheckPartyEntity,
+  ProfessionalAvailabilityWindowEntity,
   ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
@@ -8,6 +9,7 @@ import {
   ReferralAssignmentEntity,
   ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
+import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ActiveMatterPartyRecord, ConflictScreeningService } from './ConflictScreeningService.js';
 import { ReferralTelemetry } from './ReferralTelemetry.js';
 import { MatchCandidateScore, MatchCriteria, ScoreBreakdown } from './types.js';
@@ -49,8 +51,10 @@ export class MatchingEngine {
     conflictParties: ReadonlyArray<Pick<ConflictCheckPartyEntity, 'PartyName' | 'PartyRole' | 'OrganizationName' | 'NormalizedName'>>;
     activeMatterParties: ReadonlyArray<ActiveMatterPartyRecord>;
     credentials?: ReadonlyArray<Pick<ProfessionalCredentialEntity, 'ProfessionalProfileID' | 'JurisdictionID' | 'VerificationStatus' | 'ExpiresAt' | 'IsPrimary'>>;
+    availabilityWindows?: ReadonlyArray<Pick<ProfessionalAvailabilityWindowEntity, 'WindowType' | 'DayOfWeek' | 'StartTimeMinutes' | 'EndTimeMinutes' | 'StartDate' | 'EndDate' | 'IsAvailable'>>;
+    asOfDate?: Date;
   }): MatchCandidateScore {
-    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials } = params;
+    const { profile, practiceLink, jurisdictionLink, criteria, conflictParties, activeMatterParties, credentials, availabilityWindows, asOfDate } = params;
 
     const allParties = [
       ...conflictParties,
@@ -65,6 +69,12 @@ export class MatchingEngine {
       disqualificationReason = `Verification status is ${profile.VerificationStatus}.`;
     } else if (profile.AvailabilityStatus === 'Unavailable' || profile.AvailabilityStatus === 'OnLeave') {
       disqualificationReason = `Availability status is ${profile.AvailabilityStatus}.`;
+    } else if (
+      availabilityWindows !== undefined &&
+      availabilityWindows.length > 0 &&
+      !CapacityReadinessService.ResolveEffectiveAvailability(profile, availabilityWindows, asOfDate ?? new Date())
+    ) {
+      disqualificationReason = 'Professional is outside their configured availability window.';
     } else if (profile.ActiveReferralCount >= profile.MaxConcurrentReferrals) {
       disqualificationReason = 'Professional is at maximum concurrent referral capacity.';
     } else if (!practiceLink) {
@@ -424,6 +434,25 @@ export class MatchingEngine {
       }
     }
 
+    const windowsByPro = new Map<string, ProfessionalAvailabilityWindowEntity[]>();
+    if (profiles.length > 0) {
+      const windowRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
+        {
+          EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+          ResultType: 'entity_object',
+        },
+        contextUser,
+      );
+      if (windowRes.Success) {
+        for (const w of windowRes.Results) {
+          const key = w.ProfessionalProfileID.toLowerCase();
+          const list = windowsByPro.get(key) ?? [];
+          list.push(w);
+          windowsByPro.set(key, list);
+        }
+      }
+    }
+
     const scored = profiles.map((profile) =>
       MatchingEngine.ScoreCandidate({
         profile,
@@ -433,6 +462,7 @@ export class MatchingEngine {
         conflictParties: requestConflictParties,
         activeMatterParties,
         credentials: credentialQueryFailed ? [] : credsByPro.get(profile.ID.toLowerCase()) ?? [],
+        availabilityWindows: windowsByPro.get(profile.ID.toLowerCase()) ?? [],
       }),
     );
 

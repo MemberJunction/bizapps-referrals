@@ -6,3 +6,4 @@ export * from './MatchingEngine.js';
 export * from './CascadeRoutingService.js';
 export * from './VocabularyService.js';
 export * from './CredentialVerification.js';
+export * from './CapacityReadinessService.js';
