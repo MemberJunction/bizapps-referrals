@@ -100,14 +100,15 @@ flowchart LR
 
 ## What You Get
 
-### 10 Database Tables (`__mj_BizAppsReferrals` schema)
+### 14 Database Tables (`__mj_BizAppsReferrals` schema)
 
 | Category | Tables | Purpose |
 |---|---|---|
-| **Taxonomy & Tiers** | `PracticeArea`, `Jurisdiction`, `ReferralTier` | Hierarchical practice-area tree, geographic/bar jurisdictions, and SLA/cascade tier policies |
-| **Directory & Credentials** | `ProfessionalProfile`, `ProfessionalPracticeArea`, `ProfessionalJurisdiction` | Member profiles linked to `Person`/`Organization`, practice proficiencies, capacity caps, and verified license admissions |
-| **Intake & Screening** | `ReferralRequest`, `ConflictCheckParty` | Seeker matter intake, urgency/budget metadata, and opposing/related parties for conflict checks |
-| **Routing & Outcomes** | `ReferralAssignment`, `ReferralFeedback` | Sequential cascade offers with `MatchScore`, `MatchRationaleJSON`, SLA deadlines, and post-referral outcome ratings |
+| **Taxonomy & Tiers** | `PracticeArea`, `Jurisdiction`, `ReferralTier` | Hierarchical practice-area tree, geographic/bar jurisdictions, and SLA/cascade/escalation tier policies |
+| **Directory & Credentials** | `ProfessionalProfile`, `ProfessionalPracticeArea`, `ProfessionalJurisdiction`, `ProfessionalCredential` | Member profiles linked to `Person`/`Organization`, practice proficiencies, capacity caps, verified license admissions, and normalized credentials |
+| **Intake & Screening** | `ReferralRequest`, `ConflictCheckParty` | Seeker matter intake, urgency/budget metadata, source channel, and opposing/related parties for conflict checks |
+| **Routing & Outcomes** | `ReferralAssignment`, `ReferralFeedback`, `ReferralOutcome` | Sequential cascade offers with `MatchScore`, `MatchRationaleJSON`, SLA deadlines, post-referral outcome ratings, and terminal completion records |
+| **Escalation & Readiness** | `ReferralEscalation`, `ProfessionalAvailabilityWindow`, `ReciprocitySnapshot` | SLA warning/breach escalation events, recurring/date-range/blackout availability windows, and periodic give/receive reciprocity snapshots |
 
 ### 7 TypeScript Packages
 
@@ -156,6 +157,16 @@ Every core workflow is exposed both as a MemberJunction Action (`@mj-biz-apps/re
 - **Pluggable Verification Providers (`@mj-biz-apps/referrals-core`)**: `ReferralCredentialService` supports `Manual` (coordinator/admin-verified with `ContextUser` derivation), `ExternalAction` (requires configured adapter or HMAC-SHA256 signed verification payload; fails closed), and `BizAppsCredentialingBridge` (dynamic discovery of `MJ_BizApps_Credentialing` entities with person-level subject matching and ambiguity fail-closed).
 - **Credential Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.VerifyCredential`, `Referrals.SyncProfileCredentials`, and `Referrals.ListCredentialProviders`.
 - **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: Includes `Directory & Pros` (`ReferralsCredentialDirectoryResource`), `BaseFormComponent` + `BaseFormPanel` registrations for all 11 entities, and `--mj-*` design token compliance.
+
+---
+
+## Wave 3 Slice 1: SLA Escalation, Lifecycle Completion & Capacity Readiness
+
+- **Schema v1.2.0 (`V202611151000`)**: Adds `ReferralEscalation`, `ReferralOutcome`, `ProfessionalAvailabilityWindow`, and `ReciprocitySnapshot` across both SQL Server (`migrations/`) and PostgreSQL (`migrations-pg/`), plus additive escalation/readiness columns on `ReferralTier`, `ReferralRequest`, `ReferralAssignment` (widening `Status` to include `InProgress`/`Completed`), and `ProfessionalProfile`.
+- **`CapacityReadinessService` (`@mj-biz-apps/referrals-core`)**: `ResolveEffectiveAvailability` layers explicit `ProfessionalAvailabilityWindow` records (Recurring / DateRange / Blackout) on top of `AvailabilityStatus`; `ComputeReadinessScore` produces a 5-factor 0-100 breakdown (Availability, Capacity, Responsiveness, Rating, Reciprocity); `ComputeSLADeadline` applies the tier's `UrgentSLAMultiplier` for `Urgent` referrals. `MatchingEngine` now disqualifies candidates outside their configured availability windows.
+- **Lifecycle Completion (`CascadeRoutingService`)**: `MarkInProgress` and `CompleteReferral` are transactional, authorization-checked *before* any writes, and idempotent on repeat calls. `CompleteReferral` creates a `ReferralOutcome`, decrements `ActiveReferralCount` (never below 0), increments `TotalCompletedCount`, and recomputes a 90-day rolling `AverageResponseHours`. Cascade `CascadeOrder` numbering was fixed so conflict-rejected candidates are always numbered after eligible ones.
+- **New Actions (`@mj-biz-apps/referrals-actions`)**: `Referrals.MarkReferralInProgress`, `Referrals.CompleteReferral`, `Referrals.SetAvailabilityWindow`.
+- **Explorer Workspace (`@mj-biz-apps/referrals-ng`)**: `BaseFormComponent` + `BaseFormPanel` registrations for all 15 entities.
 
 ---
 
