@@ -24,7 +24,7 @@ IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[Refe
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt],[AcceptedAt],[CompletedAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000001', N'REF-WAVE3-DEMO-001', N'Northwind Cloud Migration', N'ops@northwind-demo.example.com', @PA_CLOUD, @J_CA, @T_STD, N'Multi-region AWS landing zone cutover', N'Need a principal cloud architect to lead a 6-week multi-region AWS landing zone cutover with FinOps guardrails.', N'Standard', N'Completed', @Pro1, N'Web', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+    ('E3000001-0000-0000-0000-000000000001', N'REF-WAVE3-DEMO-001', N'Northwind Cloud Migration', N'ops@northwind-demo.example.com', @PA_CLOUD, @J_CA, @T_STD, N'Multi-region AWS landing zone cutover', N'Need a principal cloud architect to lead a 6-week multi-region AWS landing zone cutover with FinOps guardrails.', N'Standard', N'Completed', @Pro1, N'SeekerPortal', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
 
 IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'E3000001-0000-0000-0000-000000000002')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -36,13 +36,13 @@ IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[Refe
   INSERT INTO [__mj_BizAppsReferrals].[ReferralOutcome]
     ([ID],[ReferralRequestID],[ReferralAssignmentID],[ProfessionalProfileID],[OutcomeStatus],[ResponseHours],[CompletionNotes],[CompletedAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000003', 'E3000001-0000-0000-0000-000000000001', 'E3000001-0000-0000-0000-000000000002', @Pro1, N'Completed', 1.20, N'Landing zone cutover delivered on schedule; client extended a 12-month FinOps retainer.', SYSDATETIMEOFFSET());
+    ('E3000001-0000-0000-0000-000000000003', 'E3000001-0000-0000-0000-000000000001', 'E3000001-0000-0000-0000-000000000002', @Pro1, N'Resolved', 1.20, N'Landing zone cutover delivered on schedule; client extended a 12-month FinOps retainer.', SYSDATETIMEOFFSET());
 
 IF @Pro2 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralRequest] WHERE [RequestNumber] = N'REF-WAVE3-DEMO-002')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt],[AcceptedAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000004', N'REF-WAVE3-DEMO-002', N'Aurora Robotics RAG Rollout', N'cto@aurora-robotics-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Production RAG pipeline for field service copilot', N'Urgent production RAG rollout for a field-service copilot with strict EU AI Act documentation requirements.', N'Urgent', N'InProgress', @Pro2, N'Referral', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+    ('E3000001-0000-0000-0000-000000000004', N'REF-WAVE3-DEMO-002', N'Aurora Robotics RAG Rollout', N'cto@aurora-robotics-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Production RAG pipeline for field service copilot', N'Urgent production RAG rollout for a field-service copilot with strict EU AI Act documentation requirements.', N'Urgent', N'InProgress', @Pro2, N'ProfessionalReferral', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
 
 IF @Pro2 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'E3000001-0000-0000-0000-000000000005')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -54,7 +54,7 @@ IF @Pro3 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[Refe
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt],[EscalationLevel],[LastEscalatedAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000006', N'REF-WAVE3-DEMO-003', N'Beacon Analytics R&D Study', N'finance@beacon-analytics-demo.example.com', @PA_TAX, @J_NY, @T_STD, N'Section 174 R&D credit study', N'Section 174 R&D tax credit study for a 40-person SaaS analytics company ahead of a Q1 financing round.', N'Standard', N'Routed', @Pro3, N'Email', SYSDATETIMEOFFSET(), 1, SYSDATETIMEOFFSET());
+    ('E3000001-0000-0000-0000-000000000006', N'REF-WAVE3-DEMO-003', N'Beacon Analytics R&D Study', N'finance@beacon-analytics-demo.example.com', @PA_TAX, @J_NY, @T_STD, N'Section 174 R&D credit study', N'Section 174 R&D tax credit study for a 40-person SaaS analytics company ahead of a Q1 financing round.', N'Standard', N'Routed', @Pro3, N'ConciergeAgent', SYSDATETIMEOFFSET(), 1, SYSDATETIMEOFFSET());
 
 IF @Pro3 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'E3000001-0000-0000-0000-000000000007')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -67,39 +67,40 @@ IF @Pro3 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[Refe
   INSERT INTO [__mj_BizAppsReferrals].[ReferralEscalation]
     ([ID],[ReferralRequestID],[ReferralAssignmentID],[EscalationLevel],[TriggerType],[Status],[RecommendedAction],[Notes],[TriggeredAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000008', 'E3000001-0000-0000-0000-000000000006', 'E3000001-0000-0000-0000-000000000007', 1, N'SLAWarning', N'Open', N'Notify', N'75% of SLA window elapsed with no response yet; coordinator notified.', SYSDATETIMEOFFSET());
+    ('E3000001-0000-0000-0000-000000000008', 'E3000001-0000-0000-0000-000000000006', 'E3000001-0000-0000-0000-000000000007', 1, N'SLAWarning', N'Open', N'ContactProfessional', N'75% of SLA window elapsed with no response yet; coordinator notified.', SYSDATETIMEOFFSET());
 
 IF @Pro2 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralEscalation] WHERE [ID] = 'E3000001-0000-0000-0000-000000000009')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralEscalation]
     ([ID],[ReferralRequestID],[ReferralAssignmentID],[EscalationLevel],[TriggerType],[Status],[RecommendedAction],[Notes],[TriggeredAt],[AcknowledgedAt],[ResolvedAt])
   VALUES
-    ('E3000001-0000-0000-0000-000000000009', 'E3000001-0000-0000-0000-000000000004', 'E3000001-0000-0000-0000-000000000005', 1, N'ManualEscalation', N'Resolved', N'AdminAlert', N'Seeker requested a status check; professional confirmed on-track delivery.', DATEADD(HOUR, -3, SYSDATETIMEOFFSET()), DATEADD(HOUR, -2, SYSDATETIMEOFFSET()), DATEADD(HOUR, -1, SYSDATETIMEOFFSET()));
+    ('E3000001-0000-0000-0000-000000000009', 'E3000001-0000-0000-0000-000000000004', 'E3000001-0000-0000-0000-000000000005', 1, N'ManualOverride', N'Resolved', N'ContactProfessional', N'Seeker requested a status check; professional confirmed on-track delivery.', DATEADD(HOUR, -3, SYSDATETIMEOFFSET()), DATEADD(HOUR, -2, SYSDATETIMEOFFSET()), DATEADD(HOUR, -1, SYSDATETIMEOFFSET()));
 
--- 3. ProfessionalAvailabilityWindow records: recurring weekday hours for Pro1/Pro2,
---    plus a blackout window for Pro3.
+-- 3. ProfessionalAvailabilityWindow records (Spec SS2.2 vocabulary: OnLeave/
+--    Paused/ReducedCapacity) covering a reduced-capacity window for Pro1, a
+--    short pause for Pro2, and on-leave windows for Pro2/Pro3.
 IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] WHERE [ID] = 'E3000001-0000-0000-0000-00000000000A')
   INSERT INTO [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ([ID],[ProfessionalProfileID],[WindowType],[DayOfWeek],[StartTimeMinutes],[EndTimeMinutes],[IsAvailable],[TimeZone],[Notes])
+    ([ID],[ProfessionalProfileID],[WindowType],[StartDate],[EndDate],[CapacityOverride],[IsAvailable],[IsActive],[TimeZone],[Notes],[Reason])
   VALUES
-    ('E3000001-0000-0000-0000-00000000000A', @Pro1, N'Recurring', 1, 480, 1020, 1, N'America/Los_Angeles', N'Weekday core hours.');
+    ('E3000001-0000-0000-0000-00000000000A', @Pro1, N'ReducedCapacity', SYSDATETIMEOFFSET(), DATEADD(DAY, 14, SYSDATETIMEOFFSET()), 2, 1, 1, N'America/Los_Angeles', N'Reduced capacity during a concurrent internal audit engagement.', N'Internal audit engagement');
 
 IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] WHERE [ID] = 'E3000001-0000-0000-0000-00000000000B')
   INSERT INTO [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ([ID],[ProfessionalProfileID],[WindowType],[DayOfWeek],[StartTimeMinutes],[EndTimeMinutes],[IsAvailable],[TimeZone],[Notes])
+    ([ID],[ProfessionalProfileID],[WindowType],[StartDate],[EndDate],[IsAvailable],[IsActive],[TimeZone],[Notes],[Reason])
   VALUES
-    ('E3000001-0000-0000-0000-00000000000B', @Pro1, N'Recurring', 2, 480, 1020, 1, N'America/Los_Angeles', N'Weekday core hours.');
+    ('E3000001-0000-0000-0000-00000000000B', @Pro1, N'Paused', DATEADD(DAY, 30, SYSDATETIMEOFFSET()), DATEADD(DAY, 33, SYSDATETIMEOFFSET()), 0, 1, N'America/Los_Angeles', N'Short pause for a conference.', N'Conference attendance');
 
 IF @Pro2 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] WHERE [ID] = 'E3000001-0000-0000-0000-00000000000C')
   INSERT INTO [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ([ID],[ProfessionalProfileID],[WindowType],[DayOfWeek],[StartTimeMinutes],[EndTimeMinutes],[IsAvailable],[TimeZone],[Notes])
+    ([ID],[ProfessionalProfileID],[WindowType],[StartDate],[EndDate],[IsAvailable],[IsActive],[TimeZone],[Notes],[Reason])
   VALUES
-    ('E3000001-0000-0000-0000-00000000000C', @Pro2, N'Recurring', 3, 540, 1080, 1, N'America/Los_Angeles', N'Mid-week availability for urgent engagements.');
+    ('E3000001-0000-0000-0000-00000000000C', @Pro2, N'OnLeave', DATEADD(DAY, 45, SYSDATETIMEOFFSET()), DATEADD(DAY, 52, SYSDATETIMEOFFSET()), 0, 1, N'America/Los_Angeles', N'Planned leave.', N'Planned leave');
 
 IF @Pro3 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow] WHERE [ID] = 'E3000001-0000-0000-0000-00000000000D')
   INSERT INTO [__mj_BizAppsReferrals].[ProfessionalAvailabilityWindow]
-    ([ID],[ProfessionalProfileID],[WindowType],[StartDate],[EndDate],[IsAvailable],[TimeZone],[Notes])
+    ([ID],[ProfessionalProfileID],[WindowType],[StartDate],[EndDate],[IsAvailable],[IsActive],[TimeZone],[Notes],[Reason])
   VALUES
-    ('E3000001-0000-0000-0000-00000000000D', @Pro3, N'Blackout', DATEADD(DAY, 10, SYSDATETIMEOFFSET()), DATEADD(DAY, 17, SYSDATETIMEOFFSET()), 0, N'America/New_York', N'Annual tax-season leave.');
+    ('E3000001-0000-0000-0000-00000000000D', @Pro3, N'OnLeave', DATEADD(DAY, 10, SYSDATETIMEOFFSET()), DATEADD(DAY, 17, SYSDATETIMEOFFSET()), 0, 1, N'America/New_York', N'Annual tax-season leave.', N'Annual leave');
 
 -- 4. ReciprocitySnapshot records: one 30-day rolling snapshot per professional.
 IF @Pro1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReciprocitySnapshot] WHERE [ID] = 'E3000001-0000-0000-0000-00000000000E')
@@ -138,7 +139,7 @@ IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralRequest] WHERE [Re
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt],[EscalationLevel],[LastEscalatedAt])
   VALUES
-    ('E3000002-0000-0000-0000-000000000001', N'REF-WAVE3-S2-A', N'Cascadia Rail Signaling Upgrade', N'ops@cascadia-rail-demo.example.com', @PA_CLOUD, @J_CA, @T_STD, N'Legacy SCADA cloud migration', N'Multi-site SCADA-to-cloud migration for regional rail signaling; two prior cascade candidates both declined on capacity.', N'Standard', N'Exhausted', NULL, N'Web', DATEADD(DAY, -6, SYSDATETIMEOFFSET()), 2, DATEADD(HOUR, -2, SYSDATETIMEOFFSET()));
+    ('E3000002-0000-0000-0000-000000000001', N'REF-WAVE3-S2-A', N'Cascadia Rail Signaling Upgrade', N'ops@cascadia-rail-demo.example.com', @PA_CLOUD, @J_CA, @T_STD, N'Legacy SCADA cloud migration', N'Multi-site SCADA-to-cloud migration for regional rail signaling; two prior cascade candidates both declined on capacity.', N'Standard', N'Exhausted', NULL, N'SeekerPortal', DATEADD(DAY, -6, SYSDATETIMEOFFSET()), 2, DATEADD(HOUR, -2, SYSDATETIMEOFFSET()));
 
 IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'F3000002-0000-0000-0000-000000000001')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -153,7 +154,7 @@ IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralRequest] WHERE [Re
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt])
   VALUES
-    ('E3000002-0000-0000-0000-000000000002', N'REF-WAVE3-S2-B', N'Harrow Biotech Cold-Chain Audit', N'ops@harrow-biotech-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Cold-chain IoT anomaly detection model audit', N'Independent audit of a cold-chain IoT anomaly-detection model ahead of an FDA pre-submission meeting.', N'Standard', N'Routed', NULL, N'Referral', DATEADD(DAY, -2, SYSDATETIMEOFFSET()));
+    ('E3000002-0000-0000-0000-000000000002', N'REF-WAVE3-S2-B', N'Harrow Biotech Cold-Chain Audit', N'ops@harrow-biotech-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Cold-chain IoT anomaly detection model audit', N'Independent audit of a cold-chain IoT anomaly-detection model ahead of an FDA pre-submission meeting.', N'Standard', N'Routed', NULL, N'ProfessionalReferral', DATEADD(DAY, -2, SYSDATETIMEOFFSET()));
 
 IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'F3000002-0000-0000-0000-000000000002')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -168,7 +169,7 @@ IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralRequest] WHERE [Re
   INSERT INTO [__mj_BizAppsReferrals].[ReferralRequest]
     ([ID],[RequestNumber],[SeekerName],[SeekerEmail],[PracticeAreaID],[JurisdictionID],[ReferralTierID],[MatterTitle],[MatterSummary],[UrgencyLevel],[Status],[AssignedProfessionalID],[SourceChannel],[SubmittedAt])
   VALUES
-    ('E3000002-0000-0000-0000-000000000003', N'REF-WAVE3-S2-C', N'Solace Grid Outage Forensics', N'ops@solace-grid-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Urgent outage root-cause ML triage', N'Urgent post-incident forensic review of an ML-based grid outage triage model following a 6-hour regional outage.', N'Urgent', N'Routed', NULL, N'Web', DATEADD(HOUR, -9, SYSDATETIMEOFFSET()));
+    ('E3000002-0000-0000-0000-000000000003', N'REF-WAVE3-S2-C', N'Solace Grid Outage Forensics', N'ops@solace-grid-demo.example.com', @PA_AI, @J_CA, @T_PRI, N'Urgent outage root-cause ML triage', N'Urgent post-incident forensic review of an ML-based grid outage triage model following a 6-hour regional outage.', N'Urgent', N'Routed', NULL, N'ConciergeAgent', DATEADD(HOUR, -9, SYSDATETIMEOFFSET()));
 
 IF NOT EXISTS (SELECT 1 FROM [__mj_BizAppsReferrals].[ReferralAssignment] WHERE [ID] = 'F3000002-0000-0000-0000-000000000003')
   INSERT INTO [__mj_BizAppsReferrals].[ReferralAssignment]
@@ -191,20 +192,20 @@ DECLARE @Esc TABLE (
 );
 
 INSERT INTO @Esc VALUES
-(1, 'E3000002-0000-0000-0000-000000000011', 'E2000001-0000-0000-0000-000000000110', 'F2000001-0000-0000-0000-000000000112', 1, N'SLAWarning', N'Open', N'Notify', N'75% of SLA window elapsed on the SAP integration lead review; no response yet.', N'SLAWARN:F2000001-0000-0000-0000-000000000112', 2, NULL, NULL, NULL),
-(2, 'E3000002-0000-0000-0000-000000000012', 'E2000001-0000-0000-0000-000000000114', 'F2000001-0000-0000-0000-000000000116', 1, N'SLAWarning', N'Dismissed', N'Notify', N'SLA warning fired while professional confirmation was in flight by phone.', N'SLAWARN:F2000001-0000-0000-0000-000000000116', 20, 19, 18, N'False positive; professional had already accepted by phone before the system recorded the response.'),
-(3, 'E3000002-0000-0000-0000-000000000013', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000119', 2, N'SLABreach', N'Open', N'Reassign', N'First cascade step exceeded its SLA window without a response during the holiday week.', N'SLABREACH:F2000001-0000-0000-0000-000000000119', 16, NULL, NULL, NULL),
-(4, 'E3000002-0000-0000-0000-000000000014', 'E2000001-0000-0000-0000-000000000106', 'F2000001-0000-0000-0000-000000000107', 2, N'SLABreach', N'Acknowledged', N'Reassign', N'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', N'SLABREACH:F2000001-0000-0000-0000-000000000107', 4, 3, NULL, NULL),
-(5, 'E3000002-0000-0000-0000-000000000015', 'E2000001-0000-0000-0000-000000000113', 'F2000001-0000-0000-0000-000000000115', 1, N'ManualEscalation', N'Open', N'Notify', N'Seeker requested a manual status check on the FHIR R4 telehealth audit.', N'MANUAL:E2000001-0000-0000-0000-000000000113:1', 1, NULL, NULL, NULL),
-(6, 'E3000002-0000-0000-0000-000000000016', 'E2000001-0000-0000-0000-000000000109', 'F2000001-0000-0000-0000-000000000111', 2, N'ManualEscalation', N'Resolved', N'AdminAlert', N'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', N'MANUAL:E2000001-0000-0000-0000-000000000109:2', 14, 13, 12, N'Confirmed engagement is on-track; no compliance gap found.'),
-(7, 'E3000002-0000-0000-0000-000000000017', 'E2000001-0000-0000-0000-000000000117', NULL, 2, N'CapacityExhausted', N'Open', N'Reassign', N'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', N'CAPACITY:E2000001-0000-0000-0000-000000000117', 3, NULL, NULL, NULL),
-(8, 'E3000002-0000-0000-0000-000000000018', 'E2000001-0000-0000-0000-000000000118', NULL, 3, N'CapacityExhausted', N'Acknowledged', N'EscalateToTier', N'No supply-chain security specialists available at the Standard tier; considering Priority tier escalation.', N'CAPACITY:E2000001-0000-0000-0000-000000000118', 6, 5, NULL, NULL),
-(9, 'E3000002-0000-0000-0000-000000000019', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'CapacityExhausted', N'Dismissed', N'Notify', N'Capacity check fired moments before the seeker cancelled the request.', N'CAPACITY:E2000001-0000-0000-0000-000000000121', 40, 39, 39, N'Request was cancelled by the seeker; no further capacity action needed.'),
-(10, 'E3000002-0000-0000-0000-00000000001A', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000121', 3, N'CascadeExhausted', N'Resolved', N'Reassign', N'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', N'CASCADE:E2000001-0000-0000-0000-000000000119', 16, 15, 2, N'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.'),
-(11, 'E3000002-0000-0000-0000-00000000001B', 'E3000002-0000-0000-0000-000000000001', 'F3000002-0000-0000-0000-000000000001', 2, N'CascadeExhausted', N'Open', N'Reassign', N'Both cascade candidates for the SCADA cloud migration declined on capacity.', N'CASCADE:F3000002-0000-0000-0000-000000000001', 2, NULL, NULL, NULL),
-(12, 'E3000002-0000-0000-0000-00000000001C', 'E3000002-0000-0000-0000-000000000002', 'F3000002-0000-0000-0000-000000000002', 1, N'SLABreach', N'Acknowledged', N'Reassign', N'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', N'SLABREACH:F3000002-0000-0000-0000-000000000002', 6, 5, NULL, NULL),
-(13, 'E3000002-0000-0000-0000-00000000001D', 'E3000002-0000-0000-0000-000000000003', 'F3000002-0000-0000-0000-000000000003', 3, N'UrgentUnassigned', N'Resolved', N'EscalateToTier', N'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', N'URGENT:F3000002-0000-0000-0000-000000000003', 9, 8, 1, N'Coordinator manually matched an available senior professional outside the automated cascade.'),
-(14, 'E3000002-0000-0000-0000-00000000001E', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'UrgentUnassigned', N'Open', N'Notify', N'Urgent ransomware tabletop request left unassigned after cancellation review.', N'URGENT:E2000001-0000-0000-0000-000000000121', 1, NULL, NULL, NULL);
+(1, 'E3000002-0000-0000-0000-000000000011', 'E2000001-0000-0000-0000-000000000110', 'F2000001-0000-0000-0000-000000000112', 1, N'SLAWarning', N'Open', N'ContactProfessional', N'75% of SLA window elapsed on the SAP integration lead review; no response yet.', N'SLAWARN:F2000001-0000-0000-0000-000000000112', 2, NULL, NULL, NULL),
+(2, 'E3000002-0000-0000-0000-000000000012', 'E2000001-0000-0000-0000-000000000114', 'F2000001-0000-0000-0000-000000000116', 1, N'SLAWarning', N'Dismissed', N'ContactProfessional', N'SLA warning fired while professional confirmation was in flight by phone.', N'SLAWARN:F2000001-0000-0000-0000-000000000116', 20, 19, 18, N'False positive; professional had already accepted by phone before the system recorded the response.'),
+(3, 'E3000002-0000-0000-0000-000000000013', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000119', 2, N'SLABreach', N'Open', N'AdvanceCascade', N'First cascade step exceeded its SLA window without a response during the holiday week.', N'SLABREACH:F2000001-0000-0000-0000-000000000119', 16, NULL, NULL, NULL),
+(4, 'E3000002-0000-0000-0000-000000000014', 'E2000001-0000-0000-0000-000000000106', 'F2000001-0000-0000-0000-000000000107', 2, N'SLABreach', N'Acknowledged', N'AdvanceCascade', N'Step 2 cascade candidate approaching SLA breach on the Azure private-endpoint engagement.', N'SLABREACH:F2000001-0000-0000-0000-000000000107', 4, 3, NULL, NULL),
+(5, 'E3000002-0000-0000-0000-000000000015', 'E2000001-0000-0000-0000-000000000113', 'F2000001-0000-0000-0000-000000000115', 1, N'ManualOverride', N'Open', N'ContactProfessional', N'Seeker requested a manual status check on the FHIR R4 telehealth audit.', N'MANUAL:E2000001-0000-0000-0000-000000000113:1', 1, NULL, NULL, NULL),
+(6, 'E3000002-0000-0000-0000-000000000016', 'E2000001-0000-0000-0000-000000000109', 'F2000001-0000-0000-0000-000000000111', 2, N'ManualOverride', N'Resolved', N'ContactProfessional', N'Coordinator flagged for a manual compliance check on the FCA model-risk governance engagement.', N'MANUAL:E2000001-0000-0000-0000-000000000109:2', 14, 13, 12, N'Confirmed engagement is on-track; no compliance gap found.'),
+(7, 'E3000002-0000-0000-0000-000000000017', 'E2000001-0000-0000-0000-000000000117', NULL, 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'All matched Snowflake/Kafka specialists are at MaxConcurrentReferrals capacity.', N'CAPACITY:E2000001-0000-0000-0000-000000000117', 3, NULL, NULL, NULL),
+(8, 'E3000002-0000-0000-0000-000000000018', 'E2000001-0000-0000-0000-000000000118', NULL, 3, N'CascadeExhausted', N'Acknowledged', N'ReassignTier', N'No supply-chain security specialists available at the Standard tier; considering Priority tier escalation.', N'CAPACITY:E2000001-0000-0000-0000-000000000118', 6, 5, NULL, NULL),
+(9, 'E3000002-0000-0000-0000-000000000019', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'ConflictDeadlock', N'Dismissed', N'ContactProfessional', N'Conflict screening flagged a potential adverse-party overlap moments before the seeker cancelled the request.', N'CONFLICT:E2000001-0000-0000-0000-000000000121', 40, 39, 39, N'Request was cancelled by the seeker; no further conflict action needed.'),
+(10, 'E3000002-0000-0000-0000-00000000001A', 'E2000001-0000-0000-0000-000000000119', 'F2000001-0000-0000-0000-000000000121', 3, N'CascadeExhausted', N'Resolved', N'ExpandPracticeArea', N'Final cascade step (3 of 3) expired with no acceptance; all practice-area candidates exhausted.', N'CASCADE:E2000001-0000-0000-0000-000000000119', 16, 15, 2, N'Reopened with an expanded parent-practice-area match; new candidate accepted the referral.'),
+(11, 'E3000002-0000-0000-0000-00000000001B', 'E3000002-0000-0000-0000-000000000001', 'F3000002-0000-0000-0000-000000000001', 2, N'CascadeExhausted', N'Open', N'ExpandPracticeArea', N'Both cascade candidates for the SCADA cloud migration declined on capacity.', N'CASCADE:F3000002-0000-0000-0000-000000000001', 2, NULL, NULL, NULL),
+(12, 'E3000002-0000-0000-0000-00000000001C', 'E3000002-0000-0000-0000-000000000002', 'F3000002-0000-0000-0000-000000000002', 1, N'SLABreach', N'Acknowledged', N'AdvanceCascade', N'Cold-chain IoT audit assignment expired 6.5 hours past its 24h SLA window.', N'SLABREACH:F3000002-0000-0000-0000-000000000002', 6, 5, NULL, NULL),
+(13, 'E3000002-0000-0000-0000-00000000001D', 'E3000002-0000-0000-0000-000000000003', 'F3000002-0000-0000-0000-000000000003', 3, N'UrgentUnassigned', N'Resolved', N'ReassignTier', N'Urgent grid-outage forensic review approaching 2x its SLA window without acceptance.', N'URGENT:F3000002-0000-0000-0000-000000000003', 9, 8, 1, N'Coordinator manually matched an available senior professional outside the automated cascade.'),
+(14, 'E3000002-0000-0000-0000-00000000001E', 'E2000001-0000-0000-0000-000000000121', NULL, 1, N'UrgentUnassigned', N'Open', N'ContactProfessional', N'Urgent ransomware tabletop request left unassigned after cancellation review.', N'URGENT:E2000001-0000-0000-0000-000000000121', 1, NULL, NULL, NULL);
 
 INSERT INTO [__mj_BizAppsReferrals].[ReferralEscalation]
   ([ID],[ReferralRequestID],[ReferralAssignmentID],[EscalationLevel],[TriggerType],[Status],[RecommendedAction],[Notes],[DedupKey],[TriggeredAt],[AcknowledgedAt],[ResolvedAt],[ResolutionNotes])
@@ -253,7 +254,7 @@ SELECT
   CASE WHEN s.PeriodTag = 1 THEN @Q1End ELSE @Q2End END,
   s.GivenCount,
   s.ReceivedCount,
-  CAST(ROUND((s.GivenCount + 1.0) / (s.AcceptedCount + 1.0), 3) AS DECIMAL(5,2)),
+  CAST(ROUND((s.GivenCount + 1.0) / (s.AcceptedCount + 1.0), 3) AS DECIMAL(8,3)),
   s.AcceptedCount,
   s.ResolvedCount,
   s.SLABreachCount,

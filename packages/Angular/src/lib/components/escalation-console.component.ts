@@ -308,6 +308,7 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
 
   async ngOnInit(): Promise<void> {
     super.ngOnInit();
+    queueMicrotask(() => this.NotifyLoadStarted());
     const md = new Metadata();
     this.CurrentUserIsAdmin = IsAssociationAdmin(md.CurrentUser);
     await this.Refresh();

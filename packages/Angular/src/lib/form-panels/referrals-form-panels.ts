@@ -5,6 +5,7 @@ import { UserInfoEngine } from '@memberjunction/core-entities';
 import { RegisterClassEx } from '@memberjunction/global';
 import { BaseFormPanel } from '@memberjunction/ng-base-forms';
 import { NavigationService } from '@memberjunction/ng-shared';
+import { MJButtonDirective } from '@memberjunction/ng-ui-components';
 import { AssertValidUUID, CascadeRoutingService } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
@@ -97,7 +98,7 @@ const HERO_PANEL_STYLES = `
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-request-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -221,7 +222,7 @@ export class ReferralRequestHeroPanel extends BaseFormPanel implements OnInit {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-professional-profile-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -303,7 +304,7 @@ export class ProfessionalProfileHeroPanel extends BaseFormPanel implements OnIni
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-assignment-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -364,7 +365,7 @@ export class ReferralAssignmentHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-conflict-check-party-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -403,7 +404,7 @@ export class ConflictCheckPartyHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-practice-area-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -444,7 +445,7 @@ export class PracticeAreaHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-jurisdiction-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -484,7 +485,7 @@ export class JurisdictionHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-tier-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -525,7 +526,7 @@ export class ReferralTierHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-pro-practice-area-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -566,7 +567,7 @@ export class ProfessionalPracticeAreaHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-pro-jurisdiction-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -609,7 +610,7 @@ export class ProfessionalJurisdictionHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-feedback-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -657,7 +658,7 @@ export class ReferralFeedbackHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-escalation-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -716,7 +717,7 @@ export class ReferralEscalationHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-referral-outcome-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -770,7 +771,7 @@ export class ReferralOutcomeHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-professional-availability-window-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -830,7 +831,7 @@ export class ProfessionalAvailabilityWindowHeroPanel extends BaseFormPanel {
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-person-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -923,7 +924,7 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-organization-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -1006,7 +1007,7 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-user-referrals-overview-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],
@@ -1095,7 +1096,7 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
 })
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MJButtonDirective],
   selector: 'mj-professional-credential-hero-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [HERO_PANEL_STYLES],

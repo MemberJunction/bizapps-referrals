@@ -2202,6 +2202,7 @@ export class ProfessionalCredentialFormComponent extends BaseFormComponent {
 @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Escalations')
 @Component({
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'mj-referrals-referral-escalation-form',
   template: `
     <mj-record-form-container [Record]="record" [FormComponent]="this"
@@ -2274,6 +2275,7 @@ export class ReferralEscalationFormComponent extends BaseFormComponent {
 @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Referral Outcomes')
 @Component({
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'mj-referrals-referral-outcome-form',
   template: `
     <mj-record-form-container [Record]="record" [FormComponent]="this"
@@ -2334,6 +2336,7 @@ export class ReferralOutcomeFormComponent extends BaseFormComponent {
 @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Professional Availability Windows')
 @Component({
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'mj-referrals-professional-availability-window-form',
   template: `
     <mj-record-form-container [Record]="record" [FormComponent]="this"
@@ -2397,6 +2400,7 @@ export class ProfessionalAvailabilityWindowFormComponent extends BaseFormCompone
 @RegisterClass(BaseFormComponent, 'MJ_BizApps_Referrals: Reciprocity Snapshots')
 @Component({
   standalone: false,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'mj-referrals-reciprocity-snapshot-form',
   template: `
     <mj-record-form-container [Record]="record" [FormComponent]="this"

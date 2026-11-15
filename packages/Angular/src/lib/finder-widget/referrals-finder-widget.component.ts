@@ -143,7 +143,7 @@ export interface FinderMatchItem {
     }
     .span-2 { grid-column: span 2; }
     .probono-label { font-size: 0.8rem; color: var(--mj-text-muted); display: flex; align-items: center; gap: 0.35rem; }
-    .btn-full-width { width: 100%; margin-top: 0.65rem; }
+    .finder-action-full-width { width: 100%; margin-top: 0.65rem; }
     .no-results { text-align: center; padding: 2rem; color: var(--mj-text-muted); }
     .card-badges { display: flex; gap: 0.35rem; margin: 0.3rem 0; }
     .readiness-badge {
@@ -361,7 +361,7 @@ export interface FinderMatchItem {
                     type="button"
                     mjButton
                     Variant="primary"
-                    class="btn-full-width"
+                    class="finder-action-full-width"
                     (click)="SelectProfessional(pro)">
                     Request Referral
                   </button>

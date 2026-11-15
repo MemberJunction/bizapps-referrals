@@ -70,6 +70,7 @@ vi.mock('@memberjunction/ng-shared', async (importOriginal) => {
     ...actual,
     BaseResourceComponent: class {
       ngOnInit(): void {}
+      NotifyLoadStarted(): void {}
       NotifyLoadComplete(): void {}
     },
     NavigationService: class {

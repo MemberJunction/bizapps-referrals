@@ -54,6 +54,19 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
     const panelRegs = MJGlobal.Instance.ClassFactory.GetRegistrationsByRootClass(BaseFormPanel);
     expect(panelRegs.length).toBeGreaterThanOrEqual(17);
 
+    // AC-44: the 3 new Wave 3 Slice 4 hero panels are reachable by their exact
+    // @RegisterClassEx(BaseFormPanel, { key: ... }) registration key.
+    for (const key of [
+      'referrals:referral-escalation-hero-panel',
+      'referrals:referral-outcome-hero-panel',
+      'referrals:professional-availability-window-hero-panel',
+    ]) {
+      expect(
+        MJGlobal.Instance.ClassFactory.GetRegistration(BaseFormPanel, key),
+        `Missing BaseFormPanel registration for key '${key}'`,
+      ).toBeDefined();
+    }
+
     const appJsonPath = path.join(repoRoot, 'metadata/applications/.referrals-application.json');
     const parsed = JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as Array<{
       fields: { DefaultNavItems: Array<{ Label: string; DriverClass: string; Icon: string }> };
@@ -156,6 +169,32 @@ describe('Referrals Wave 2 OpenApp v3 Readiness', () => {
       for (const file of files) {
         const content = fs.readFileSync(file, 'utf8');
         expect(content, `Forbidden ${forbiddenWord} type/cast in ${file}`).not.toMatch(forbiddenRegex);
+      }
+    }
+  });
+
+  it('AC-2: enforces zero `: any` / `as any` / `<any>` type annotations or casts across all handwritten packages', () => {
+    const handwrittenDirs = [
+      'packages/Core/src',
+      'packages/Actions/src',
+      'packages/Angular/src',
+      'packages/EntitiesServer/src',
+      'packages/Server/src',
+      'packages/IntegrationTests/src',
+    ];
+    // Strip comments before matching so prose like "as well as any active matter parties"
+    // in a /** */ or // comment is never mistaken for a real `as any` cast.
+    const stripComments = (src: string): string =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const anyRegex = /:\s*any\b|\bas\s+any\b|<any>/;
+
+    for (const rel of handwrittenDirs) {
+      const files = walkFiles(path.join(repoRoot, rel), ['.ts']).filter(
+        (f) => !f.includes('generated') && !f.includes('__tests__'),
+      );
+      for (const file of files) {
+        const content = stripComments(fs.readFileSync(file, 'utf8'));
+        expect(content, `Forbidden 'any' type/cast in ${file}`).not.toMatch(anyRegex);
       }
     }
   });

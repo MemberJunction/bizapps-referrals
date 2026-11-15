@@ -189,27 +189,39 @@ export class GetReciprocityScorecardOperation extends BaseRemotableOperation<
     user: UserInfo,
     context: RemoteOpServerContext,
   ): Promise<ReciprocityScorecard> {
-    if (!input.ProfessionalProfileID) {
-      throw new RemoteOperationError('INVALID_INPUT', 'ProfessionalProfileID is required.');
+    const startMs = Date.now();
+    let outcome: 'success' | 'error' = 'success';
+    try {
+      if (!input.ProfessionalProfileID) {
+        throw new RemoteOperationError('INVALID_INPUT', 'ProfessionalProfileID is required.');
+      }
+      const dp = requireProvider(resolveProvider(provider, context));
+      const data = await loadScorecardData(dp, user);
+      return ReciprocityScorecardService.ComputeScorecard(
+        AssertValidUUID(input.ProfessionalProfileID, 'ProfessionalProfileID'),
+        resolvePeriod(input.PeriodStartIso, input.PeriodEndIso),
+        data,
+      );
+    } catch (error) {
+      outcome = 'error';
+      throw error;
+    } finally {
+      recordTelemetry('GetReciprocityScorecard', startMs, user, { outcome });
     }
-    const dp = requireProvider(resolveProvider(provider, context));
-    const data = await loadScorecardData(dp, user);
-    return ReciprocityScorecardService.ComputeScorecard(
-      AssertValidUUID(input.ProfessionalProfileID, 'ProfessionalProfileID'),
-      resolvePeriod(input.PeriodStartIso, input.PeriodEndIso),
-      data,
-    );
   }
 }
 
 @RegisterClass(BaseAction, 'Referrals.GetReciprocityScorecard')
 export class GetReciprocityScorecardAction extends BaseAction {
   protected override async InternalRunAction(params: RunActionParams): Promise<ActionResultSimple> {
-    const professionalProfileId = getStringParam(params, 'ProfessionalProfileID');
-    if (!professionalProfileId) {
-      return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ProfessionalProfileID is required.' };
-    }
+    const startMs = Date.now();
+    let outcome: 'success' | 'error' = 'success';
     try {
+      const professionalProfileId = getStringParam(params, 'ProfessionalProfileID');
+      if (!professionalProfileId) {
+        outcome = 'error';
+        return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: 'ProfessionalProfileID is required.' };
+      }
       const validId = AssertValidUUID(professionalProfileId, 'ProfessionalProfileID');
       const dp = requireProvider(resolveActionProvider());
       const data = await loadScorecardData(dp, params.ContextUser);
@@ -217,6 +229,7 @@ export class GetReciprocityScorecardAction extends BaseAction {
       const scorecard = ReciprocityScorecardService.ComputeScorecard(validId, period, data);
       return { Success: true, ResultCode: 'SUCCESS', Message: JSON.stringify(scorecard) };
     } catch (error) {
+      outcome = 'error';
       if (error instanceof InvalidUUIDError) {
         return { Success: false, ResultCode: 'INVALID_PARAMETERS', Message: error.message };
       }
@@ -225,6 +238,8 @@ export class GetReciprocityScorecardAction extends BaseAction {
         ResultCode: error instanceof Error ? error.name : 'GET_RECIPROCITY_SCORECARD_ERROR',
         Message: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      recordTelemetry('GetReciprocityScorecard', startMs, params.ContextUser, { outcome });
     }
   }
 }

@@ -239,6 +239,7 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
 
   async ngOnInit(): Promise<void> {
     super.ngOnInit();
+    queueMicrotask(() => this.NotifyLoadStarted());
     this.BuildAvailableQuarters();
     const prefs = ReferralsUiStateHelper.LoadReciprocityScorecardPreferences();
     const matching = this.AvailableQuarters.find((q) => periodKey(q.Period) === prefs.SelectedPeriodStartIso);
