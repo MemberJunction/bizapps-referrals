@@ -17,7 +17,7 @@ importers:
         specifier: ^2.29.8
         version: 2.31.1(@types/node@26.6.6)
       '@memberjunction/cli':
-        specifier: ^6.2.1
+        specifier: '>=6.2.1 <6.3.0'
         version: 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@aws-sdk/credential-providers@3.1173.0)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@3.6.0)(encoding@0.1.14)(socks@2.8.11)(typescript@5.9.3)(vitest@1.6.1(@types/node@26.6.6)(jsdom@26.1.0))(ws@8.23.0)
       tsc-alias:
         specifier: ^1.8.16
@@ -12180,7 +12180,7 @@ snapshots:
       '@memberjunction/search-engine': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@3.6.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
       '@memberjunction/storage': 6.2.2(encoding@0.1.14)(typescript@5.9.3)
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@3.6.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       exceljs: 4.4.0
       lodash: 4.18.1
       mammoth: 1.13.0
@@ -12231,7 +12231,7 @@ snapshots:
       '@memberjunction/search-engine': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@5.0.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
       '@memberjunction/storage': 6.2.2(encoding@0.1.14)(typescript@5.9.3)
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@5.0.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       exceljs: 4.4.0
       lodash: 4.18.1
       mammoth: 1.13.0
@@ -12582,7 +12582,7 @@ snapshots:
       '@memberjunction/templates-base-types': 6.2.2
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       rxjs: 7.8.2
     transitivePeerDependencies:
       - supports-color
@@ -12662,7 +12662,7 @@ snapshots:
       '@memberjunction/core-entities': 6.2.1
       '@memberjunction/global': 6.2.1
       '@memberjunction/templates-base-types': 6.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       rxjs: 7.8.2
     transitivePeerDependencies:
       - supports-color
@@ -13216,7 +13216,7 @@ snapshots:
       cosmiconfig: 9.0.0(typescript@5.9.3)
       date-fns: 2.30.0
       date-fns-tz: 2.0.1(date-fns@2.30.0)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       json5: 2.2.3
       rxjs: 7.8.2
       uuid: 13.0.2
@@ -13254,7 +13254,7 @@ snapshots:
       cosmiconfig: 9.0.0(typescript@5.9.3)
       date-fns: 2.30.0
       date-fns-tz: 2.0.1(date-fns@2.30.0)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       json5: 2.2.3
       rxjs: 7.8.2
       uuid: 13.0.2
@@ -13512,7 +13512,7 @@ snapshots:
       '@memberjunction/core-entities': 6.2.1
       '@memberjunction/global': 6.2.1
       '@memberjunction/network-utils': 6.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       env-var: 7.5.0
       openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)(zod@3.25.76)
     transitivePeerDependencies:
@@ -13882,7 +13882,7 @@ snapshots:
       '@memberjunction/global': 6.2.1
       '@memberjunction/record-comparison': 6.2.2
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@3.6.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@azure/msal-browser'
@@ -13917,7 +13917,7 @@ snapshots:
       '@memberjunction/global': 6.2.1
       '@memberjunction/record-comparison': 6.2.2
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@5.0.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@azure/msal-browser'
@@ -14027,7 +14027,7 @@ snapshots:
       '@memberjunction/global': 6.2.1
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@3.6.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
       '@memberjunction/templates-base-types': 6.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       mssql: 12.8.0
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -14064,7 +14064,7 @@ snapshots:
       '@memberjunction/global': 6.2.1
       '@memberjunction/templates': 6.2.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.2(zod@3.25.76))(@smithy/signature-v4@5.7.5)(@types/node@26.6.6)(axios@1.21.1)(chokidar@5.0.0)(encoding@0.1.14)(typescript@5.9.3)(ws@8.23.0)(zod@3.25.76)
       '@memberjunction/templates-base-types': 6.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       mssql: 12.8.0
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -14099,7 +14099,7 @@ snapshots:
       '@memberjunction/core': 6.2.1
       '@memberjunction/global': 6.2.1
       '@memberjunction/sql-dialect': 6.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
     transitivePeerDependencies:
       - supports-color
 
@@ -14135,7 +14135,7 @@ snapshots:
       '@memberjunction/ai-vectordb': 6.2.2
       '@memberjunction/core': 6.2.1
       '@memberjunction/global': 6.2.1
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       pg: 8.23.1
     transitivePeerDependencies:
       - pg-native
@@ -14173,7 +14173,7 @@ snapshots:
       '@memberjunction/core': 6.2.1
       '@memberjunction/global': 6.2.1
       '@pinecone-database/pinecone': 2.2.2
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)(zod@3.25.76)
       rxjs: 7.8.2
     transitivePeerDependencies:
@@ -14206,7 +14206,7 @@ snapshots:
       '@memberjunction/core': 6.2.1
       '@memberjunction/global': 6.2.1
       '@qdrant/js-client-rest': 1.20.0(typescript@5.9.3)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -14225,7 +14225,7 @@ snapshots:
       '@memberjunction/ai-vectordb': 6.2.2
       '@memberjunction/core': 6.2.1
       '@memberjunction/global': 6.2.1
-      dotenv: 17.2.4
+      dotenv: 17.4.2
     transitivePeerDependencies:
       - supports-color
 
@@ -14262,7 +14262,7 @@ snapshots:
       '@memberjunction/core': 6.2.1
       '@memberjunction/core-entities': 6.2.1
       '@memberjunction/global': 6.2.1
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)(zod@3.25.76)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
@@ -14350,7 +14350,7 @@ snapshots:
   '@memberjunction/ai@6.2.2':
     dependencies:
       '@memberjunction/global': 6.2.1
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       rxjs: 7.8.2
 
   '@memberjunction/aiengine@6.2.1(encoding@0.1.14)(typescript@5.9.3)':
@@ -14385,7 +14385,7 @@ snapshots:
       '@memberjunction/core-entities': 6.2.1
       '@memberjunction/global': 6.2.1
       '@memberjunction/storage': 6.2.2(encoding@0.1.14)(typescript@5.9.3)
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       rxjs: 7.8.2
     transitivePeerDependencies:
       - '@azure/msal-browser'
@@ -15240,7 +15240,7 @@ snapshots:
       date-fns: 3.6.0
       date-fns-tz: 3.2.0(date-fns@3.6.0)
       domhandler: 5.0.3
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       officeparser: 6.1.1(encoding@0.1.14)
       openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)(zod@3.25.76)
       pdf-parse: 1.1.4
@@ -15294,7 +15294,7 @@ snapshots:
       date-fns: 3.6.0
       date-fns-tz: 3.2.0(date-fns@3.6.0)
       domhandler: 5.0.3
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       officeparser: 6.1.1(encoding@0.1.14)
       openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)(zod@3.25.76)
       pdf-parse: 1.1.4
@@ -16160,7 +16160,7 @@ snapshots:
       '@oclif/plugin-help': 6.3.0
       chalk: 5.6.2
       commander: 14.0.3
-      dotenv: 17.2.4
+      dotenv: 17.4.2
       inquirer: 8.2.7(@types/node@26.6.6)
       mssql: 12.8.0
       mysql2: 3.24.6(@types/node@26.6.6)
