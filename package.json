@@ -18,7 +18,8 @@
     "mj:migrate:convert": "mj migrate convert --source-dir ./migrations --output-dir ./migrations-pg --schema __mj_BizAppsReferrals",
     "mj:codegen": "mj codegen",
     "change": "changeset",
-    "version": "changeset version"
+    "version": "changeset version",
+    "version:prepare": "changeset version && node ci/sync-mj-app-version.mjs && pnpm install --lockfile-only"
   },
   "repository": {
     "type": "git",

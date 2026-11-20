@@ -4,6 +4,7 @@
     "autoCreateMissingRecords": true
   },
   "directoryOrder": [
+    "entities",
     "practice-areas",
     "jurisdictions",
     "referral-tiers",
