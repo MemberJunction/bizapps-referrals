@@ -91,7 +91,7 @@ describe('Wave 3 Slice 4 OpenApp v3 Readiness (AC-42..AC-46)', () => {
     expect(dev['@angular/platform-browser']).toBe('21.1.3');
     expect(dev['@angular/platform-browser-dynamic']).toBe('21.1.3');
     expect(dev['jsdom']).toBeDefined();
-    expect(dev['@memberjunction/ng-ui-components']).toBe('6.2.1');
+    expect(dev['@memberjunction/ng-ui-components']).toBe('6.3.0-edge.1');
   });
 
   it('AC-37/AC-38/AC-39: Escalation Console and Reciprocity Scorecard are registered as BaseResourceComponent resources', () => {
