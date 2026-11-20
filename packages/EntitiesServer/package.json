@@ -36,9 +36,9 @@
     "@mj-biz-apps/referrals-entities": "^1.0.0"
   },
   "peerDependencies": {
-    "@memberjunction/core": "^6.2.1",
-    "@memberjunction/core-entities": "^6.2.1",
-    "@memberjunction/global": "^6.2.1"
+    "@memberjunction/core": ">=6.2.1 <6.3.0",
+    "@memberjunction/core-entities": ">=6.2.1 <6.3.0",
+    "@memberjunction/global": ">=6.2.1 <6.3.0"
   },
   "repository": {
     "type": "git",
