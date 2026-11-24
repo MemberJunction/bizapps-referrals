@@ -1,7 +1,7 @@
 {
   "name": "@mj-biz-apps/referrals-entities",
   "type": "module",
-  "version": "1.0.0",
+  "version": "6.3.0-edge.1",
   "description": "BizApps Referrals Entity Subclasses and Zod Schemas",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,7 +37,7 @@
   "peerDependencies": {
     "@memberjunction/core": "^6.3.0-edge.1",
     "@memberjunction/global": "^6.3.0-edge.1",
-    "@mj-biz-apps/common-entities": "^5.62.0"
+    "@mj-biz-apps/common-entities": ">=5.62.0 <7.0.0"
   },
   "repository": {
     "type": "git",

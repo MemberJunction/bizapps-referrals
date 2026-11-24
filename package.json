@@ -1,7 +1,7 @@
 {
   "name": "bizapps-referrals",
   "private": true,
-  "version": "1.0.0",
+  "version": "6.3.0-edge.1",
   "license": "BUSL-1.1",
   "description": "BizApps Referrals - Professional Referral & Verified Directory Open App for MemberJunction",
   "workspaces": [
