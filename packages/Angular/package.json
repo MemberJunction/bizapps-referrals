@@ -1,7 +1,7 @@
 {
   "name": "@mj-biz-apps/referrals-ng",
   "type": "module",
-  "version": "1.0.0",
+  "version": "6.3.0-edge.1",
   "description": "BizApps Referrals Angular UI - Seeker Intake, Member Pro Lead Inbox, Ops Telemetry, and Custom BaseFormPanel Forms",
   "main": "dist/public-api.js",
   "types": "dist/public-api.d.ts",
@@ -26,8 +26,8 @@
   "author": "MemberJunction.com",
   "license": "BUSL-1.1",
   "dependencies": {
-    "@mj-biz-apps/referrals-core": "^1.0.0",
-    "@mj-biz-apps/referrals-entities": "^1.0.0",
+    "@mj-biz-apps/referrals-core": "^6.3.0-edge.1",
+    "@mj-biz-apps/referrals-entities": "^6.3.0-edge.1",
     "rxjs": "^7.8.2"
   },
   "peerDependencies": {

@@ -1,7 +1,7 @@
 {
   "name": "@mj-biz-apps/referrals-entities-server",
   "type": "module",
-  "version": "1.0.0",
+  "version": "6.3.0-edge.1",
   "description": "BizApps Referrals Server Entity Subclasses",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,8 +32,8 @@
     "vitest": "1.6.1"
   },
   "dependencies": {
-    "@mj-biz-apps/referrals-core": "^1.0.0",
-    "@mj-biz-apps/referrals-entities": "^1.0.0"
+    "@mj-biz-apps/referrals-core": "^6.3.0-edge.1",
+    "@mj-biz-apps/referrals-entities": "^6.3.0-edge.1"
   },
   "peerDependencies": {
     "@memberjunction/core": "^6.3.0-edge.1",
