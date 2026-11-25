@@ -129,7 +129,7 @@ import { ProInboxPreferences, ReferralsUiStateHelper } from '../services/referra
             }
           </div>
         }
-        <div class="split-workbench">
+        <div class="split-workbench" data-mj-tour-anchor="referrals.inbox.workbench">
           <aside class="lead-list">
             @for (a of Assignments; track a.ID) {
               <button

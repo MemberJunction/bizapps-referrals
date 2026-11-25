@@ -1,0 +1,298 @@
+[
+  {
+    "fields": {
+      "Name": "Seeker Intake, Conflict Checks & Pro Matching",
+      "TourKey": "referrals.intake-matching",
+      "Description": "Guide seekers through structured matter intake, automated conflict-of-interest party screening, hybrid matching, and SLA-governed Pro Lead Inbox cascade dispatch.",
+      "ApplicationID": "@lookup:MJ: Applications.Name=Referrals",
+      "RunInAuthenticatedHosts": true,
+      "Status": "Draft",
+      "EstimatedMinutes": 3,
+      "Priority": 90,
+      "DefaultGuideMode": "Visual",
+      "AllowAgentActions": false,
+      "Goal": {
+        "Type": "Navigation",
+        "Application": "Referrals",
+        "Description": "User learns how Seeker Intake, conflict checks, and Pro Lead Inbox SLA cascades work together."
+      },
+      "StartLocation": {
+        "Application": "Referrals"
+      }
+    },
+    "primaryKey": {
+      "ID": "E4E83395-5DBA-431C-A09B-3A7176F2B5FB"
+    },
+    "relatedEntities": {
+      "MJ: Tour Steps": [
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "intake-welcome",
+            "Sequence": 1,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Modal",
+            "Title": "Editorial Concierge Seeker Intake",
+            "Body": "Capture seeker matters, screen adverse parties for conflicts of interest, and match against verified jurisdiction-admitted professionals with SLA-backed routing.",
+            "Configuration": {
+              "Variant": "welcome",
+              "PrimaryButtonText": "Start Intake Tour",
+              "ShowProgress": true
+            },
+            "Placement": "Center",
+            "Mode": "Show",
+            "Prepare": {
+              "ApplicationName": "Referrals",
+              "DriverClass": "ReferralsSeekerIntakeResource"
+            },
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "64D7A175-564C-48B5-9DEC-D47C8D70AE17"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "intake-matter-matching",
+            "Sequence": 2,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Spotlight",
+            "Title": "Practice Area, Jurisdiction & Hybrid Matching",
+            "Body": "Quick-parse structured notes or select Practice Area, Jurisdiction, Service Tier SLA, and Urgency, then run Preview Matches to inspect ranked candidate scores.",
+            "Configuration": {
+              "ShowProgress": true
+            },
+            "Anchor": {
+              "Strategy": "Registered",
+              "Key": "referrals.intake.card"
+            },
+            "Placement": "Right",
+            "Mode": "Guide",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "DBF9FE97-9CBC-4432-866C-13825D6AC881"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "conflict-screening-parties",
+            "Sequence": 3,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Spotlight",
+            "Title": "Automated Conflict-of-Interest Screening",
+            "Body": "List adverse, client, and related entities before submitting. Normalized party names are screened automatically against each candidate firm prior to cascade offer creation.",
+            "Configuration": {
+              "ShowProgress": true
+            },
+            "Anchor": {
+              "Strategy": "Registered",
+              "Key": "referrals.intake.conflicts"
+            },
+            "Placement": "Top",
+            "Mode": "Guide",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "1370DE10-E83B-4809-A058-6DBED5FAE5C9"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "pro-inbox-cascade-summary",
+            "Sequence": 4,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Modal",
+            "Title": "Pro Lead Inbox & SLA Cascade Routing",
+            "Body": "Matched professionals review offers in the Member Pro Lead Inbox — inspecting readiness capacity, SLA countdowns, and conflict parties to Accept Lead, Decline, or Flag Conflict before the cascade advances.",
+            "Configuration": {
+              "Variant": "summary",
+              "PrimaryButtonText": "Next: Directory & Reciprocity",
+              "NextTourKey": "referrals.directory-reciprocity",
+              "LearningPathKey": "referrals.essentials",
+              "ShowProgress": true
+            },
+            "Placement": "Center",
+            "Mode": "Show",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "17CE8923-580A-4F42-B77F-AE214B8D44E2"
+          }
+        }
+      ],
+      "MJ: Tour Triggers": [
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "TriggerType": "FirstVisit",
+            "Configuration": {
+              "Application": "Referrals"
+            },
+            "Delivery": "Offer",
+            "CooldownDays": 30,
+            "Priority": 90,
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "C9816D19-B115-4D2A-8C8F-1D23C1AC4F48"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "fields": {
+      "Name": "Specialty Directory, Escalations & Reciprocity Scorecard",
+      "TourKey": "referrals.directory-reciprocity",
+      "Description": "Search the verified member directory, clear coordinator credential queues, resolve SLA escalations, and track quarterly give/receive reciprocity balance.",
+      "ApplicationID": "@lookup:MJ: Applications.Name=Referrals",
+      "RunInAuthenticatedHosts": true,
+      "Status": "Draft",
+      "EstimatedMinutes": 3,
+      "Priority": 80,
+      "DefaultGuideMode": "Visual",
+      "AllowAgentActions": false,
+      "Goal": {
+        "Type": "Navigation",
+        "Application": "Referrals",
+        "Description": "User learns how credential verification, escalation recovery, and quarterly reciprocity scoring keep the referral network healthy."
+      },
+      "StartLocation": {
+        "Application": "Referrals"
+      }
+    },
+    "primaryKey": {
+      "ID": "A83BE3FE-7E69-432F-A1FB-A31E340EBA92"
+    },
+    "relatedEntities": {
+      "MJ: Tour Steps": [
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "directory-welcome",
+            "Sequence": 1,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Modal",
+            "Title": "Verified Member Directory & Governance",
+            "Body": "Ensure every listed professional holds verified active credentials, monitor breached cascade SLAs, and balance network reciprocity quarter by quarter.",
+            "Configuration": {
+              "Variant": "welcome",
+              "PrimaryButtonText": "Explore Directory",
+              "ShowProgress": true
+            },
+            "Placement": "Center",
+            "Mode": "Show",
+            "Prepare": {
+              "ApplicationName": "Referrals",
+              "DriverClass": "ReferralsCredentialDirectoryResource"
+            },
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "5AE7C79B-EB52-458A-8468-2C9984222134"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "directory-filters-queue",
+            "Sequence": 2,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Spotlight",
+            "Title": "Specialty Search & Credential Verification Queue",
+            "Body": "Filter members by firm, license number, practice specialty, availability, and verification status — or open the Coordinator Verification Queue to approve pending credentials.",
+            "Configuration": {
+              "ShowProgress": true
+            },
+            "Anchor": {
+              "Strategy": "Registered",
+              "Key": "referrals.directory.filters"
+            },
+            "Placement": "Bottom",
+            "Mode": "Guide",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "176809F4-1999-44A0-9E48-E5E3DFA8408B"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "escalations-console",
+            "Sequence": 3,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Spotlight",
+            "Title": "SLA Escalations & Cascade Recovery",
+            "Body": "Open Escalations to inspect level-grouped SLA breaches and exhausted cascades, review AI escalation recommendations, and Acknowledge, Resolve, or Reopen assignments.",
+            "Configuration": {
+              "ShowProgress": true
+            },
+            "Anchor": {
+              "Strategy": "NavItem",
+              "NavItemKey": "ReferralsEscalationConsoleResource",
+              "DriverClass": "ReferralsEscalationConsoleResource"
+            },
+            "Placement": "Bottom",
+            "Mode": "Guide",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "F6FB2978-235B-4D45-9874-CE5F4770F98A"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@parent:ID",
+            "StepKey": "reciprocity-scorecard-summary",
+            "Sequence": 4,
+            "StepTypeID": "@lookup:MJ: Tour Step Types.Name=Modal",
+            "Title": "Reciprocity Scorecard & Readiness Index",
+            "Body": "In the Reciprocity tab, recompute quarterly snapshots across Sent, Received, Accepted, and Resolved counts, median response hours, attributed fees, and Readiness scores.",
+            "Configuration": {
+              "Variant": "summary",
+              "PrimaryButtonText": "Finish Path",
+              "LearningPathKey": "referrals.essentials",
+              "ShowProgress": true
+            },
+            "Placement": "Center",
+            "Mode": "Show",
+            "Completion": {
+              "Type": "NextButton"
+            },
+            "OnMissing": "Center",
+            "IsOptional": false
+          },
+          "primaryKey": {
+            "ID": "7CF0006B-1F88-4AB4-8715-FB34BD60A7BD"
+          }
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "fields": {
+      "Name": "Referral Network Mastery",
+      "PathKey": "referrals.essentials",
+      "Description": "Complete workflow training for the Referrals OpenApp covering Seeker Intake, conflict screening, Pro Lead Inbox cascades, verified directories, SLA escalations, and reciprocity scorecards.",
+      "ApplicationID": "@lookup:MJ: Applications.Name=Referrals",
+      "Status": "Active",
+      "Configuration": {
+        "AllowSkipOptional": true,
+        "ShowNextConcreteStep": true
+      }
+    },
+    "primaryKey": {
+      "ID": "23EAD460-C02B-4F14-97F9-29283C0C5E16"
+    },
+    "relatedEntities": {
+      "MJ: Tour Learning Path Tour Links": [
+        {
+          "fields": {
+            "TourID": "@lookup:MJ: Tours.TourKey=referrals.intake-matching",
+            "Sequence": 1,
+            "IsRequired": true,
+            "TourLearningPathID": "@parent:ID"
+          },
+          "primaryKey": {
+            "ID": "C2D222B5-EE1C-4B49-9658-5754A9B720B1"
+          }
+        },
+        {
+          "fields": {
+            "TourID": "@lookup:MJ: Tours.TourKey=referrals.directory-reciprocity",
+            "Sequence": 2,
+            "IsRequired": true,
+            "TourLearningPathID": "@parent:ID"
+          },
+          "primaryKey": {
+            "ID": "13FA4BAE-8B19-4C2A-BE3C-8966139C7C9B"
+          }
+        }
+      ]
+    }
+  }
+]
