@@ -353,7 +353,7 @@ export interface VerificationQueueItem {
             </section>
           }
 
-          <section class="filter-bar">
+          <section class="filter-bar" data-mj-tour-anchor="referrals.directory.filters">
             <div class="form-group">
               <label>Search Name, Firm, License, or {{ Vocab.PracticeAreaLabel }}</label>
               <input

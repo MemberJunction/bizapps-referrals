@@ -12,7 +12,10 @@
     "actions",
     "prompts",
     "agents",
-    "applications"
+    "applications",
+    "tours",
+    "learning-paths",
+    "tour-publications"
   ],
   "emitSyncNotes": false,
   "sqlLogging": {

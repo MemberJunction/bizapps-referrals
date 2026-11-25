@@ -68,7 +68,7 @@ export interface ConflictCheckPartyDraft {
       </mj-page-header>
       <mj-page-body>
         <div class="concierge-shell" [class.drawer-open]="Prefs.DrawerOpen">
-          <section class="editorial-card">
+          <section class="editorial-card" data-mj-tour-anchor="referrals.intake.card">
             <p class="eyebrow">CONCIERGE INTAKE</p>
             <h2 class="headline">Tell us about your matter</h2>
             <p class="subcopy">
@@ -160,7 +160,7 @@ export interface ConflictCheckPartyDraft {
               <textarea rows="4" [(ngModel)]="MatterSummary" placeholder="Describe key facts, timeline, and adverse parties..."></textarea>
             </label>
 
-            <div class="conflict-parties-box">
+            <div class="conflict-parties-box" data-mj-tour-anchor="referrals.intake.conflicts">
               <div class="conflict-header">
                 <strong>Conflict-Check Parties ({{ ConflictParties.length }})</strong>
                 <span class="hint">Add adverse, opposing, or related entities for automated conflict screening.</span>
