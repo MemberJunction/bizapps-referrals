@@ -29,6 +29,7 @@ import {
   ReferralAssignmentEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import { ReferralsUiStateHelper, SeekerFilterPreferences } from '../services/referrals-ui-state.service.js';
 
@@ -545,23 +546,13 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
   }
 
   public async LoadReferenceData(): Promise<void> {
-    const rv = new RunView();
     const md = new Metadata();
-    const results = await rv.RunViews(
-      [
-        { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: 'IsActive = 1', OrderBy: 'DisplayRank ASC', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: 'IsActive = 1', OrderBy: 'Name ASC', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Tiers', ExtraFilter: 'IsActive = 1', OrderBy: 'SLAResponseHours DESC', ResultType: 'entity_object' },
-      ],
-      md.CurrentUser,
-    );
-    if (results[0]?.Success) this.PracticeAreas = results[0].Results as PracticeAreaEntity[];
-    if (results[1]?.Success) this.Jurisdictions = results[1].Results as JurisdictionEntity[];
-    if (results[2]?.Success) {
-      this.ReferralTiers = results[2].Results as ReferralTierEntity[];
-      if (!this.SelectedTierID && this.ReferralTiers.length > 0) {
-        this.SelectedTierID = this.ReferralTiers[0].ID;
-      }
+    await ReferralsEngineBase.Instance.Config(false, md.CurrentUser);
+    this.PracticeAreas = [...ReferralsEngineBase.Instance.ActivePracticeAreas];
+    this.Jurisdictions = [...ReferralsEngineBase.Instance.ActiveJurisdictions];
+    this.ReferralTiers = [...ReferralsEngineBase.Instance.ActiveReferralTiers];
+    if (!this.SelectedTierID && this.ReferralTiers.length > 0) {
+      this.SelectedTierID = this.ReferralTiers[0].ID;
     }
     await this.LoadSeekerFeedbackAssignments();
   }
@@ -573,13 +564,16 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     if (!seekerEmail) {
       return;
     }
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const seekerRequests = await rv.RunView<ReferralRequestEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Requests',
         ExtraFilter: `SeekerEmail = '${seekerEmail.replace(/'/g, "''")}'`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -592,7 +586,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
         EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
         ExtraFilter: `Status = 'Accepted' AND ReferralRequestID IN (${requestIds.join(', ')})`,
         OrderBy: '__mj_UpdatedAt DESC',
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -611,7 +605,7 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: `ID IN (${professionalIds.join(', ')})`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -683,13 +677,16 @@ export class ReferralsSeekerIntakeComponent extends BaseResourceComponent implem
     if (this.Candidates.length === 0) {
       return;
     }
-    const rv = new RunView();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const profileIds = [...new Set(this.Candidates.map((c) => `'${c.ProfessionalProfileID}'`))];
     const result = await rv.RunView<ProfessionalProfileEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: `ID IN (${profileIds.join(', ')})`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );

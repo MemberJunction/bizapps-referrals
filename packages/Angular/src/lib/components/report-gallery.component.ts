@@ -31,6 +31,7 @@ import {
   ReferralAssignmentEntity,
   ReferralFeedbackEntity,
   ReferralRequestEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 
 export interface SlaDistributionBucket {
@@ -630,52 +631,38 @@ export class ReferralsReportGalleryComponent extends BaseResourceComponent imple
 
   public async LoadRealTelemetry(): Promise<void> {
     try {
-      const rv = new RunView();
       const md = new Metadata();
       const user = md.CurrentUser;
-      const [reqRes, assignRes, fbRes, proRes, paRes, jurRes, ppaRes, pjurRes] = await Promise.all([
-        rv.RunView<ReferralRequestEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<ReferralAssignmentEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<ReferralFeedbackEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<ProfessionalProfileEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<PracticeAreaEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<JurisdictionEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<ProfessionalPracticeAreaEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'entity_object' },
-          user,
-        ),
-        rv.RunView<ProfessionalJurisdictionEntity>(
-          { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'entity_object' },
+      const rv =
+        Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+          ? RunView.FromMetadataProvider(Metadata.Provider)
+          : new RunView();
+
+      const [, batchResults] = await Promise.all([
+        ReferralsEngineBase.Instance.Config(false, user),
+        rv.RunViews(
+          [
+            { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks', ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'simple' },
+          ],
           user,
         ),
       ]);
 
-      if (reqRes.Success) this._cachedRequests = reqRes.Results;
-      if (assignRes.Success) this._cachedAssignments = assignRes.Results;
-      if (fbRes.Success) this._cachedFeedbacks = fbRes.Results;
-      if (proRes.Success) this._cachedProfiles = proRes.Results;
-      if (paRes.Success) this._cachedPracticeAreas = paRes.Results;
-      if (jurRes.Success) this._cachedJurisdictions = jurRes.Results;
-      if (ppaRes.Success) this._cachedProPracticeAreas = ppaRes.Results;
-      if (pjurRes.Success) this._cachedProJurisdictions = pjurRes.Results;
+      const [reqRes, assignRes, fbRes, proRes, ppaRes, pjurRes] = batchResults;
+
+      if (reqRes?.Success) this._cachedRequests = reqRes.Results as ReferralRequestEntity[];
+      if (assignRes?.Success) this._cachedAssignments = assignRes.Results as ReferralAssignmentEntity[];
+      if (fbRes?.Success) this._cachedFeedbacks = fbRes.Results as ReferralFeedbackEntity[];
+      if (proRes?.Success) this._cachedProfiles = proRes.Results as ProfessionalProfileEntity[];
+      this._cachedPracticeAreas = [...ReferralsEngineBase.Instance.PracticeAreas];
+      this._cachedJurisdictions = [...ReferralsEngineBase.Instance.Jurisdictions];
+      if (ppaRes?.Success) this._cachedProPracticeAreas = ppaRes.Results as ProfessionalPracticeAreaEntity[];
+      if (pjurRes?.Success) this._cachedProJurisdictions = pjurRes.Results as ProfessionalJurisdictionEntity[];
 
       this.ComputeMetricsFromCache();
     } catch {

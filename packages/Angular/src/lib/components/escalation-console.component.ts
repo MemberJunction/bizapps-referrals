@@ -332,25 +332,28 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
     this.IsLoading = true;
     this.cdr.markForCheck();
     try {
-      const rv = new RunView();
       const md = new Metadata();
+      const rv =
+        Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+          ? RunView.FromMetadataProvider(Metadata.Provider)
+          : new RunView();
       const results = await rv.RunViews(
         [
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
             ExtraFilter: "Status = 'Open' OR Status = 'Acknowledged'",
             OrderBy: 'EscalationLevel DESC, RaisedAt ASC',
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Escalations',
             ExtraFilter: "TriggerType = 'SLABreach'",
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Requests',
             ExtraFilter: "Status = 'Exhausted'",
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
         ],
         md.CurrentUser,
@@ -379,18 +382,21 @@ export class ReferralsEscalationConsoleComponent extends BaseResourceComponent i
     if (this.Escalations.length === 0) {
       return;
     }
-    const rv = new RunView();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const requestIds = [...new Set(this.Escalations.map((e) => `'${e.ReferralRequestID}'`))];
     const assignmentIds = [...new Set(this.Escalations.filter((e) => e.ReferralAssignmentID).map((e) => `'${e.ReferralAssignmentID}'`))];
 
     const queries = [
-      { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ExtraFilter: `ID IN (${requestIds.join(', ')})`, ResultType: 'entity_object' as const },
+      { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ExtraFilter: `ID IN (${requestIds.join(', ')})`, ResultType: 'simple' as const },
     ];
     if (assignmentIds.length > 0) {
       queries.push({
         EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
         ExtraFilter: `ID IN (${assignmentIds.join(', ')})`,
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       });
     }
 

@@ -5,6 +5,7 @@ import {
   ReferralEscalationEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import { IsCoordinatorOrAdmin, ResolvePersonIdForUser } from './CredentialVerification.js';
 import { CapacityReadinessService } from './CapacityReadinessService.js';
@@ -232,24 +233,28 @@ export class SlaEscalationService {
     let urgentRaised = 0;
     let skipped = 0;
 
-    const [offeredRes, tiersRes] = await rv.RunViews(
-      [
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-          ExtraFilter: "Status = 'Offered' AND SLAWarningSentAt IS NULL",
-          ResultType: 'entity_object',
-        },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Tiers', ResultType: 'entity_object' },
-      ],
-      contextUser,
-    );
+    const [, [offeredRes, urgentRes]] = await Promise.all([
+      ReferralsEngineBase.Instance.Config(false, contextUser, dp),
+      rv.RunViews(
+        [
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+            ExtraFilter: "Status = 'Offered' AND SLAWarningSentAt IS NULL",
+            ResultType: 'entity_object',
+          },
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+            ExtraFilter: "UrgencyLevel = 'Urgent' AND Status NOT IN ('Accepted', 'InProgress', 'Completed')",
+            ResultType: 'simple',
+          },
+        ],
+        contextUser,
+      ),
+    ]);
 
-    if (offeredRes.Success && tiersRes.Success) {
-      const tiersById = new Map<string, ReferralTierEntity>();
-      for (const t of tiersRes.Results as ReferralTierEntity[]) {
-        tiersById.set(t.ID.toLowerCase(), t);
-      }
+    const engine = ReferralsEngineBase.Instance;
 
+    if (offeredRes?.Success) {
       const offeredAssignments = offeredRes.Results as ReferralAssignmentEntity[];
       if (offeredAssignments.length > 0) {
         const reqIds = Array.from(new Set(offeredAssignments.map((a) => AssertValidUUID(a.ReferralRequestID, 'ReferralRequestID'))));
@@ -257,7 +262,7 @@ export class SlaEscalationService {
           {
             EntityName: 'MJ_BizApps_Referrals: Referral Requests',
             ExtraFilter: `ID IN (${reqIds.map((id) => `'${id}'`).join(',')})`,
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
           contextUser,
         );
@@ -270,7 +275,7 @@ export class SlaEscalationService {
 
         for (const assignment of offeredAssignments) {
           const request = requestsById.get(assignment.ReferralRequestID.toLowerCase());
-          const tier = request ? tiersById.get(request.ReferralTierID.toLowerCase()) : undefined;
+          const tier = request ? engine.ReferralTierById(request.ReferralTierID) : undefined;
           if (!request || !tier || assignment.OfferedAt == null || assignment.SLADeadlineAt == null) {
             skipped++;
             continue;
@@ -316,33 +321,9 @@ export class SlaEscalationService {
       }
     }
 
-    const urgentRes = await rv.RunView<ReferralRequestEntity>(
-      {
-        EntityName: 'MJ_BizApps_Referrals: Referral Requests',
-        ExtraFilter: "UrgencyLevel = 'Urgent' AND Status NOT IN ('Accepted', 'InProgress', 'Completed')",
-        ResultType: 'entity_object',
-      },
-      contextUser,
-    );
-    if (urgentRes.Success && urgentRes.Results.length > 0) {
-      const tierIds = Array.from(new Set(urgentRes.Results.map((r) => AssertValidUUID(r.ReferralTierID, 'ReferralTierID'))));
-      const tierRes2 = await rv.RunView<ReferralTierEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Tiers',
-          ExtraFilter: `ID IN (${tierIds.map((id) => `'${id}'`).join(',')})`,
-          ResultType: 'entity_object',
-        },
-        contextUser,
-      );
-      const urgentTiersById = new Map<string, ReferralTierEntity>();
-      if (tierRes2.Success) {
-        for (const t of tierRes2.Results) {
-          urgentTiersById.set(t.ID.toLowerCase(), t);
-        }
-      }
-
-      for (const request of urgentRes.Results) {
-        const tier = urgentTiersById.get(request.ReferralTierID.toLowerCase());
+    if (urgentRes?.Success && urgentRes.Results.length > 0) {
+      for (const request of urgentRes.Results as ReferralRequestEntity[]) {
+        const tier = engine.ReferralTierById(request.ReferralTierID);
         if (!tier || !request.SubmittedAt) {
           skipped++;
           continue;

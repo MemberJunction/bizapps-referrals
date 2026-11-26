@@ -10,13 +10,11 @@ import {
 } from '@mj-biz-apps/referrals-core';
 import {
   ConflictCheckPartyEntity,
-  JurisdictionEntity,
-  PracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralAssignmentEntity,
   ReferralEscalationEntity,
   ReferralRequestEntity,
-  ReferralTierEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import {
   IReferralPromptExecutor,
@@ -268,22 +266,23 @@ export class ReferralAIRationaleService {
       }
 
       const rv = new RunView(provider);
-      const [paRes, jurRes, tierRes, partiesRes, assignRes] = await rv.RunViews(
-        [
-          { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: `ID = '${request.PracticeAreaID}'`, ResultType: 'entity_object' },
-          { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: `ID = '${request.JurisdictionID}'`, ResultType: 'entity_object' },
-          { EntityName: 'MJ_BizApps_Referrals: Referral Tiers', ExtraFilter: `ID = '${request.ReferralTierID}'`, ResultType: 'entity_object' },
-          { EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties', ExtraFilter: `ReferralRequestID = '${validRequestId}'`, ResultType: 'entity_object' },
-          { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status IN ('Offered', 'Queued')`, ResultType: 'entity_object' },
-        ],
-        contextUser,
-      );
+      const [, [partiesRes, assignRes]] = await Promise.all([
+        ReferralsEngineBase.Instance.Config(false, contextUser, provider),
+        rv.RunViews(
+          [
+            { EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties', ExtraFilter: `ReferralRequestID = '${validRequestId}'`, ResultType: 'simple' },
+            { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status IN ('Offered', 'Queued')`, ResultType: 'entity_object' },
+          ],
+          contextUser,
+        ),
+      ]);
 
-      const practiceArea = paRes.Success ? (paRes.Results as PracticeAreaEntity[])[0] : undefined;
-      const jurisdiction = jurRes.Success ? (jurRes.Results as JurisdictionEntity[])[0] : undefined;
-      const tier = tierRes.Success ? (tierRes.Results as ReferralTierEntity[])[0] : undefined;
-      const conflictParties = partiesRes.Success ? (partiesRes.Results as ConflictCheckPartyEntity[]) : [];
-      const assignments = assignRes.Success ? (assignRes.Results as ReferralAssignmentEntity[]) : [];
+      const engine = ReferralsEngineBase.Instance;
+      const practiceArea = engine.PracticeAreaById(request.PracticeAreaID);
+      const jurisdiction = engine.JurisdictionById(request.JurisdictionID);
+      const tier = engine.ReferralTierById(request.ReferralTierID);
+      const conflictParties = partiesRes?.Success ? (partiesRes.Results as ConflictCheckPartyEntity[]) : [];
+      const assignments = assignRes?.Success ? (assignRes.Results as ReferralAssignmentEntity[]) : [];
 
       if (!practiceArea || !jurisdiction || !tier || assignments.length === 0) {
         return emptyResult;
@@ -310,7 +309,7 @@ export class ReferralAIRationaleService {
 
       const profileIds = relevantCandidates.map((c) => `'${c.ProfessionalProfileID}'`).join(',');
       const profilesRes = await rv.RunView<ProfessionalProfileEntity>(
-        { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: `ID IN (${profileIds})`, ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: `ID IN (${profileIds})`, ResultType: 'simple' },
         contextUser,
       );
       const readinessByProfileId = new Map(
@@ -436,46 +435,40 @@ export class ReferralAIRationaleService {
       cascadeCandidateCount: 0,
     };
 
+    const validRequestId = AssertValidUUID(escalation.ReferralRequestID, 'ReferralRequestID');
     const rv = new RunView(provider);
-    const requestRes = await rv.RunView<ReferralRequestEntity>(
-      {
-        EntityName: 'MJ_BizApps_Referrals: Referral Requests',
-        ExtraFilter: `ID = '${AssertValidUUID(escalation.ReferralRequestID, 'ReferralRequestID')}'`,
-        ResultType: 'entity_object',
-      },
-      contextUser,
-    );
-    const request = requestRes.Success ? requestRes.Results[0] : undefined;
+    const [, [requestRes, candidatesRes]] = await Promise.all([
+      ReferralsEngineBase.Instance.Config(false, contextUser, provider),
+      rv.RunViews(
+        [
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Requests',
+            ExtraFilter: `ID = '${validRequestId}'`,
+            ResultType: 'simple',
+          },
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+            ExtraFilter: `ReferralRequestID = '${validRequestId}' AND (Status = 'Queued' OR Status = 'Offered')`,
+            ResultType: 'simple',
+          },
+        ],
+        contextUser,
+      ),
+    ]);
+    const request = requestRes?.Success ? (requestRes.Results as ReferralRequestEntity[])[0] : undefined;
     if (!request) {
       return base;
     }
     base.urgencyLevel = request.UrgencyLevel;
 
-    const [practiceAreaRes, tierRes, candidatesRes] = await rv.RunViews(
-      [
-        {
-          EntityName: 'MJ_BizApps_Referrals: Practice Areas',
-          ExtraFilter: `ID = '${request.PracticeAreaID}'`,
-          ResultType: 'entity_object',
-        },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Tiers',
-          ExtraFilter: `ID = '${request.ReferralTierID}'`,
-          ResultType: 'entity_object',
-        },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-          ExtraFilter: `ReferralRequestID = '${request.ID}' AND (Status = 'Queued' OR Status = 'Offered')`,
-          ResultType: 'entity_object',
-        },
-      ],
-      contextUser,
-    );
-    if (practiceAreaRes?.Success && practiceAreaRes.Results.length > 0) {
-      base.practiceAreaName = (practiceAreaRes.Results[0] as PracticeAreaEntity).Name;
+    const engine = ReferralsEngineBase.Instance;
+    const practiceArea = engine.PracticeAreaById(request.PracticeAreaID);
+    const tier = engine.ReferralTierById(request.ReferralTierID);
+    if (practiceArea) {
+      base.practiceAreaName = practiceArea.Name;
     }
-    if (tierRes?.Success && tierRes.Results.length > 0) {
-      base.tierName = (tierRes.Results[0] as ReferralTierEntity).Name;
+    if (tier) {
+      base.tierName = tier.Name;
     }
     if (candidatesRes?.Success) {
       base.cascadeCandidateCount = candidatesRes.Results.length;

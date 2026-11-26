@@ -283,8 +283,11 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
 
   public async Refresh(): Promise<void> {
     const period = this.GetSelectedPeriod();
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const periodStartIso = period.Start.toISOString().slice(0, 10);
     const periodEndIso = period.End.toISOString().slice(0, 10);
 
@@ -293,7 +296,7 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
         EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
         ExtraFilter: `PeriodStart = '${periodStartIso}' AND PeriodEnd = '${periodEndIso}'`,
         OrderBy: 'ReciprocityIndex DESC',
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -308,7 +311,7 @@ export class ReferralsReciprocityScorecardComponent extends BaseResourceComponen
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: `ID IN (${profileIds.join(', ')})`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
