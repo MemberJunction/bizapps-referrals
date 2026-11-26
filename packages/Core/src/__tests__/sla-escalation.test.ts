@@ -484,6 +484,52 @@ describe('SlaEscalationService', () => {
     expect(result.RequestEscalationLevelReset).toBe(false);
     expect(store.requests.get(REQ_1_ID.toLowerCase())?.EscalationLevel).toBe(2);
   });
+
+  it('EvaluateEscalations batches Offered assignments and Urgent requests in 1 RunViews call and reuses cached Referral Tiers across repeat sweeps', async () => {
+    const store: MockStore = {
+      tiers: new Map([[TIER_ID.toLowerCase(), makeTier({ SLAResponseHours: 4, UrgentSLAMultiplier: 1 })]]),
+      requests: new Map([
+        [
+          REQ_2_ID.toLowerCase(),
+          makeRequest(REQ_2_ID, {
+            UrgencyLevel: 'Urgent',
+            Status: 'Routed',
+            SubmittedAt: new Date(Date.now() - 10 * 60 * 60 * 1000),
+          }),
+        ],
+      ]),
+      assignments: new Map(),
+      escalations: new Map(),
+    };
+    const baseProvider = new MockEscalationProvider(store);
+    const queriedEntities: string[] = [];
+    const instrumentedProvider: IMetadataProvider & IRunViewProvider = {
+      Entities: baseProvider.Entities,
+      GetEntityObject: baseProvider.GetEntityObject.bind(baseProvider),
+      RunView: async <T>(params: RunViewParams) => {
+        if (params.EntityName) queriedEntities.push(params.EntityName);
+        return baseProvider.RunView<T>(params);
+      },
+      RunViews: async <T>(params: RunViewParams[]) => {
+        for (const p of params) {
+          if (p.EntityName) queriedEntities.push(p.EntityName);
+        }
+        return baseProvider.RunViews<T>(params);
+      },
+    } as object as IMetadataProvider & IRunViewProvider;
+
+    const user = makeUser(['Coordinator']);
+    // First sweep warms ReferralsEngineBase once for Referral Tiers
+    await SlaEscalationService.EvaluateEscalations(new Date(), user, instrumentedProvider);
+    const firstTierQueries = queriedEntities.filter((e) => e === 'MJ_BizApps_Referrals: Referral Tiers').length;
+    expect(firstTierQueries).toBe(1);
+
+    // Second sweep on the same provider & user executes ZERO Referral Tiers queries
+    queriedEntities.length = 0;
+    await SlaEscalationService.EvaluateEscalations(new Date(), user, instrumentedProvider);
+    const secondTierQueries = queriedEntities.filter((e) => e === 'MJ_BizApps_Referrals: Referral Tiers').length;
+    expect(secondTierQueries).toBe(0);
+  });
 });
 
 describe('BizAppsTasksEscalationNotifier (AC-24)', () => {

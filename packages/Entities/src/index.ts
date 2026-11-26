@@ -1,5 +1,9 @@
 export * from './generated/entity_subclasses.js';
 export {
+  ReferralsEngineBase,
+  REFERRALS_ENGINE_ENTITY_NAMES,
+} from './ReferralsEngineBase.js';
+export {
   mjBizAppsReferralsPracticeAreaEntity as PracticeAreaEntity,
   mjBizAppsReferralsJurisdictionEntity as JurisdictionEntity,
   mjBizAppsReferralsReferralTierEntity as ReferralTierEntity,

@@ -351,4 +351,41 @@ describe('ReciprocityScorecardService.RecomputeSnapshots', () => {
     expect(secondSnapshot.ReferralsReceived).toBe(firstSnapshot.ReferralsReceived);
     expect(secondSnapshot.ReferralsAccepted).toBe(firstSnapshot.ReferralsAccepted);
   });
+
+  it('batches Profiles, Requests, Assignments, Outcomes, Availability Windows, and existing Snapshots into 1 single RunViews call (zero N+1 RunView queries)', async () => {
+    const store: MockStore = {
+      profiles: new Map(),
+      requests: [],
+      assignments: [
+        { ID: 'a1', ReferralRequestID: 'x1', ProfessionalProfileID: PROFILE_ID, Status: 'Accepted', ResponseHours: 1, OfferedAt: withinPeriod(1), RespondedAt: null },
+        { ID: 'a2', ReferralRequestID: 'x2', ProfessionalProfileID: OTHER_PROFILE_ID, Status: 'Accepted', ResponseHours: 2, OfferedAt: withinPeriod(2), RespondedAt: null },
+      ],
+      outcomes: [],
+      snapshots: new Map(),
+    };
+    store.profiles.set(PROFILE_ID.toLowerCase(), attachProfileSave(store, makeProfile(PROFILE_ID)));
+    store.profiles.set(OTHER_PROFILE_ID.toLowerCase(), attachProfileSave(store, makeProfile(OTHER_PROFILE_ID)));
+
+    let runViewsCalls = 0;
+    let directRunViewCalls = 0;
+    const baseProvider = new MockReciprocityProvider(store);
+    const instrumentedProvider: IMetadataProvider & IRunViewProvider = {
+      Entities: baseProvider.Entities,
+      GetEntityObject: baseProvider.GetEntityObject.bind(baseProvider),
+      RunView: async <T>(params: RunViewParams) => {
+        directRunViewCalls++;
+        return baseProvider.RunView<T>(params);
+      },
+      RunViews: async <T>(params: RunViewParams[]) => {
+        runViewsCalls++;
+        return Promise.all(params.map((p) => baseProvider.RunView<T>(p)));
+      },
+    } as object as IMetadataProvider & IRunViewProvider;
+
+    const user = { ID: 'u1', Name: 'Test' } as UserInfo;
+    const res = await ReciprocityScorecardService.RecomputeSnapshots(user, instrumentedProvider, PERIOD);
+    expect(res.ProcessedCount).toBe(2);
+    expect(runViewsCalls).toBe(1);
+    expect(directRunViewCalls).toBe(0);
+  });
 });

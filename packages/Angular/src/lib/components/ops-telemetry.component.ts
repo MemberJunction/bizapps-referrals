@@ -21,6 +21,7 @@ import {
   ReferralAssignmentEntity,
   ReferralEscalationEntity,
   ReferralRequestEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import { OpsTelemetryPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
 
@@ -377,29 +378,34 @@ export class ReferralsOpsTelemetryComponent extends BaseResourceComponent implem
   }
 
   public async Refresh(): Promise<void> {
-    const rv = new RunView();
     const md = new Metadata();
-    const results = await rv.RunViews(
-      [
-        { EntityName: 'MJ_BizApps_Referrals: Referral Requests', OrderBy: '__mj_CreatedAt DESC', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', OrderBy: '__mj_CreatedAt DESC', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Practice Areas', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Jurisdictions', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Escalations', ResultType: 'entity_object' },
-      ],
-      md.CurrentUser,
-    );
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
+
+    const [, results] = await Promise.all([
+      ReferralsEngineBase.Instance.Config(false, md.CurrentUser),
+      rv.RunViews(
+        [
+          { EntityName: 'MJ_BizApps_Referrals: Referral Requests', OrderBy: '__mj_CreatedAt DESC', ResultType: 'simple' },
+          { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', OrderBy: '__mj_CreatedAt DESC', ResultType: 'simple' },
+          { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: 'IsActive = 1', ResultType: 'simple' },
+          { EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas', ResultType: 'simple' },
+          { EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions', ResultType: 'simple' },
+          { EntityName: 'MJ_BizApps_Referrals: Referral Escalations', ResultType: 'simple' },
+        ],
+        md.CurrentUser,
+      ),
+    ]);
     this.Requests = results[0]?.Success ? (results[0].Results as ReferralRequestEntity[]) : [];
     this.Assignments = results[1]?.Success ? (results[1].Results as ReferralAssignmentEntity[]) : [];
-    this.PracticeAreas = results[2]?.Success ? (results[2].Results as PracticeAreaEntity[]) : [];
-    this.Jurisdictions = results[3]?.Success ? (results[3].Results as JurisdictionEntity[]) : [];
-    this.Profiles = results[4]?.Success ? (results[4].Results as ProfessionalProfileEntity[]) : [];
-    this.PracticeLinks = results[5]?.Success ? (results[5].Results as ProfessionalPracticeAreaEntity[]) : [];
-    this.JurisdictionLinks = results[6]?.Success ? (results[6].Results as ProfessionalJurisdictionEntity[]) : [];
-    this.Escalations = results[7]?.Success ? (results[7].Results as ReferralEscalationEntity[]) : [];
+    this.PracticeAreas = [...ReferralsEngineBase.Instance.ActivePracticeAreas];
+    this.Jurisdictions = [...ReferralsEngineBase.Instance.ActiveJurisdictions];
+    this.Profiles = results[2]?.Success ? (results[2].Results as ProfessionalProfileEntity[]) : [];
+    this.PracticeLinks = results[3]?.Success ? (results[3].Results as ProfessionalPracticeAreaEntity[]) : [];
+    this.JurisdictionLinks = results[4]?.Success ? (results[4].Results as ProfessionalJurisdictionEntity[]) : [];
+    this.Escalations = results[5]?.Success ? (results[5].Results as ReferralEscalationEntity[]) : [];
     this.SupplyDemandMatrix = this.computeSupplyDemandMatrix();
     this.cdr.markForCheck();
   }

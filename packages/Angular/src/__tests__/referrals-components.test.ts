@@ -35,13 +35,28 @@ const mockCurrentUser = { ID: '50000000-0000-4000-8000-000000000001', Name: 'Tes
 const runViewMock = vi.fn();
 const runViewsMock = vi.fn();
 
+const mockMetadataProvider = {
+  CurrentUser: mockCurrentUser,
+  Entities: [],
+  EntityByName: () => undefined,
+  RunView: runViewMock,
+  RunViews: runViewsMock,
+};
+
 vi.mock('@memberjunction/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@memberjunction/core')>();
+  class MockRunView {
+    static FromMetadataProvider() {
+      return new MockRunView();
+    }
+    RunView = runViewMock;
+    RunViews = runViewsMock;
+  }
   return {
     ...actual,
     Metadata: class {
       static get Provider() {
-        return undefined;
+        return mockMetadataProvider;
       }
       get CurrentUser() {
         return mockCurrentUser;
@@ -68,10 +83,7 @@ vi.mock('@memberjunction/core', async (importOriginal) => {
         return record as object as T;
       }
     },
-    RunView: class {
-      RunView = runViewMock;
-      RunViews = runViewsMock;
-    },
+    RunView: MockRunView,
   };
 });
 
@@ -142,14 +154,15 @@ import {
   ReferralsProInboxComponent,
   ReferralsSeekerIntakeComponent,
 } from '../../dist/public-api.js';
-import type {
-  JurisdictionEntity,
-  PracticeAreaEntity,
-  ProfessionalJurisdictionEntity,
-  ProfessionalPracticeAreaEntity,
-  ProfessionalProfileEntity,
-  ReferralAssignmentEntity,
-  ReferralRequestEntity,
+import {
+  ReferralsEngineBase,
+  type JurisdictionEntity,
+  type PracticeAreaEntity,
+  type ProfessionalJurisdictionEntity,
+  type ProfessionalPracticeAreaEntity,
+  type ProfessionalProfileEntity,
+  type ReferralAssignmentEntity,
+  type ReferralRequestEntity,
 } from '@mj-biz-apps/referrals-entities';
 
 describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-2 / RR-09)', () => {
@@ -168,6 +181,7 @@ describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-
     settingsStore.clear();
     runViewMock.mockReset();
     runViewsMock.mockReset();
+    ReferralsEngineBase.Instance.InvalidateCache();
     vi.restoreAllMocks();
   });
 
@@ -177,11 +191,20 @@ describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-
 
   it('renders ReferralsSeekerIntakeComponent DOM, passes draft ConflictParties to FindMatches, persists preferences across recreation, and aborts Draft on party failure', async () => {
     runViewMock.mockResolvedValue({ Success: true, Results: [] });
-    runViewsMock.mockResolvedValue([
-      { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A' }] },
-      { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware' }] },
-      { Success: true, Results: [{ ID: '30000000-0000-4000-8000-000000000001', Name: 'Priority', SLAResponseHours: 8 }] },
-    ]);
+    runViewsMock.mockImplementation(async (views: Array<{ EntityName: string }>) =>
+      views.map((v) => {
+        if (v.EntityName === 'MJ_BizApps_Referrals: Practice Areas') {
+          return { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A', IsActive: true }] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Jurisdictions') {
+          return { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware', IsActive: true }] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Referral Tiers') {
+          return { Success: true, Results: [{ ID: '30000000-0000-4000-8000-000000000001', Name: 'Priority', SLAResponseHours: 8, IsActive: true }] };
+        }
+        return { Success: true, Results: [] };
+      }),
+    );
     const findMatchesSpy = vi.spyOn(MatchingEngine, 'FindMatches').mockResolvedValue([
       {
         ProfessionalProfileID: '40000000-0000-4000-8000-000000000001',
@@ -349,28 +372,45 @@ describe('@mj-biz-apps/referrals-ng DOM rendering & interaction tests (ART-TEST-
     const jurId = '20000000-0000-4000-8000-000000000001';
     const proId = '40000000-0000-4000-8000-000000000001';
 
-    runViewsMock.mockResolvedValue([
-      {
-        Success: true,
-        Results: [
-          { ID: 'req-1', RequestNumber: 'REF-1', MatterTitle: 'M&A Deal', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Accepted', CurrentCascadeStep: 2 },
-          { ID: 'req-2', RequestNumber: 'REF-2', MatterTitle: 'Patent Litigation', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Exhausted', CurrentCascadeStep: 3 },
-        ] as ReferralRequestEntity[],
-      },
-      {
-        Success: true,
-        Results: [
-          { ID: 'a-1', Status: 'ConflictRejected' },
-          { ID: 'a-2', Status: 'Expired' },
-          { ID: 'a-3', Status: 'Accepted' },
-        ] as ReferralAssignmentEntity[],
-      },
-      { Success: true, Results: [{ ID: paId, Name: 'Corporate M&A' }] as PracticeAreaEntity[] },
-      { Success: true, Results: [{ ID: jurId, Name: 'Delaware' }] as JurisdictionEntity[] },
-      { Success: true, Results: [{ ID: proId, IsActive: true, VerificationStatus: 'Verified' }] as ProfessionalProfileEntity[] },
-      { Success: true, Results: [{ ProfessionalProfileID: proId, PracticeAreaID: paId }] as ProfessionalPracticeAreaEntity[] },
-      { Success: true, Results: [{ ProfessionalProfileID: proId, JurisdictionID: jurId, StandingStatus: 'GoodStanding' }] as ProfessionalJurisdictionEntity[] },
-    ]);
+    runViewsMock.mockImplementation(async (views: Array<{ EntityName: string }>) =>
+      views.map((v) => {
+        if (v.EntityName === 'MJ_BizApps_Referrals: Referral Requests') {
+          return {
+            Success: true,
+            Results: [
+              { ID: 'req-1', RequestNumber: 'REF-1', MatterTitle: 'M&A Deal', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Accepted', CurrentCascadeStep: 2 },
+              { ID: 'req-2', RequestNumber: 'REF-2', MatterTitle: 'Patent Litigation', PracticeAreaID: paId, JurisdictionID: jurId, Status: 'Exhausted', CurrentCascadeStep: 3 },
+            ] as ReferralRequestEntity[],
+          };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Referral Assignments') {
+          return {
+            Success: true,
+            Results: [
+              { ID: 'a-1', Status: 'ConflictRejected' },
+              { ID: 'a-2', Status: 'Expired' },
+              { ID: 'a-3', Status: 'Accepted' },
+            ] as ReferralAssignmentEntity[],
+          };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Practice Areas') {
+          return { Success: true, Results: [{ ID: paId, Name: 'Corporate M&A', IsActive: true }] as PracticeAreaEntity[] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Jurisdictions') {
+          return { Success: true, Results: [{ ID: jurId, Name: 'Delaware', IsActive: true }] as JurisdictionEntity[] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Professional Profiles') {
+          return { Success: true, Results: [{ ID: proId, IsActive: true, VerificationStatus: 'Verified' }] as ProfessionalProfileEntity[] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Professional Practice Areas') {
+          return { Success: true, Results: [{ ProfessionalProfileID: proId, PracticeAreaID: paId }] as ProfessionalPracticeAreaEntity[] };
+        }
+        if (v.EntityName === 'MJ_BizApps_Referrals: Professional Jurisdictions') {
+          return { Success: true, Results: [{ ProfessionalProfileID: proId, JurisdictionID: jurId, StandingStatus: 'GoodStanding' }] as ProfessionalJurisdictionEntity[] };
+        }
+        return { Success: true, Results: [] };
+      }),
+    );
 
     TestBed.configureTestingModule({
       imports: [ReferralsOpsTelemetryComponent],

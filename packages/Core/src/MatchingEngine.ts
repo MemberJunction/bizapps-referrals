@@ -327,22 +327,30 @@ export class MatchingEngine {
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: "IsActive = 1 AND VerificationStatus = 'Verified'",
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       },
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
         ExtraFilter: `PracticeAreaID = '${practiceAreaId}'`,
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       },
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
         ExtraFilter: `JurisdictionID = '${jurisdictionId}'`,
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       },
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
         ExtraFilter: "Status IN ('Offered', 'Accepted')",
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
+      },
+      {
+        EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
+        ResultType: 'simple' as const,
+      },
+      {
+        EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+        ResultType: 'simple' as const,
       },
     ];
 
@@ -350,18 +358,21 @@ export class MatchingEngine {
       viewsToRun.push({
         EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
         ExtraFilter: `ReferralRequestID = '${validatedRequestId}'`,
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       });
       viewsToRun.push({
         EntityName: 'MJ_BizApps_Referrals: Referral Requests',
         ExtraFilter: `ID = '${validatedRequestId}'`,
-        ResultType: 'entity_object' as const,
+        ResultType: 'simple' as const,
       });
     }
 
     const results = await rv.RunViews(viewsToRun, contextUser);
 
-    for (let i = 0; i < viewsToRun.length; i++) {
+    // Core matching & conflict-screening views fail closed; credentials (idx 4) and
+    // availability windows (idx 5) degrade gracefully to preserve existing semantics.
+    const requiredIndices = validatedRequestId ? [0, 1, 2, 3, 6, 7] : [0, 1, 2, 3];
+    for (const i of requiredIndices) {
       if (!results[i]?.Success) {
         throw new ConflictScreeningUnavailableError(
           `Batched matching query '${viewsToRun[i].EntityName}' failed: ${results[i]?.ErrorMessage ?? 'Unknown error'}.`,
@@ -373,13 +384,15 @@ export class MatchingEngine {
     const practiceLinks = results[1].Results as ProfessionalPracticeAreaEntity[];
     const jurisdictionLinks = results[2].Results as ProfessionalJurisdictionEntity[];
     const activeAssignments = results[3].Results as ReferralAssignmentEntity[];
+    const credRes = results[4];
+    const windowRes = results[5];
     const requestConflictParties = validatedRequestId
-      ? (results[4].Results as ConflictCheckPartyEntity[])
+      ? (results[6].Results as ConflictCheckPartyEntity[])
       : [];
 
     let effectiveCriteria = { ...criteria };
-    if (validatedRequestId && results[5]?.Results?.length) {
-      const requestEntity = results[5].Results[0] as ReferralRequestEntity;
+    if (validatedRequestId && results[7]?.Results?.length) {
+      const requestEntity = results[7].Results[0] as ReferralRequestEntity;
       effectiveCriteria = {
         ...effectiveCriteria,
         MatterTitle: effectiveCriteria.MatterTitle ?? requestEntity.MatterTitle,
@@ -395,7 +408,7 @@ export class MatchingEngine {
         {
           EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
           ExtraFilter: `ReferralRequestID IN (${activeReqIdsSql})`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
         contextUser,
       );
@@ -430,17 +443,10 @@ export class MatchingEngine {
     const credsByPro = new Map<string, ProfessionalCredentialEntity[]>();
     let credentialQueryFailed = false;
     if (profiles.length > 0) {
-      const credRes = await rv.RunView<ProfessionalCredentialEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
-          ResultType: 'entity_object',
-        },
-        contextUser,
-      );
-      if (!credRes.Success) {
+      if (!credRes?.Success) {
         credentialQueryFailed = true;
       } else if (credRes.Results) {
-        for (const cred of credRes.Results) {
+        for (const cred of credRes.Results as ProfessionalCredentialEntity[]) {
           const key = cred.ProfessionalProfileID.toLowerCase();
           const list = credsByPro.get(key) ?? [];
           list.push(cred);
@@ -450,21 +456,12 @@ export class MatchingEngine {
     }
 
     const windowsByPro = new Map<string, ProfessionalAvailabilityWindowEntity[]>();
-    if (profiles.length > 0) {
-      const windowRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
-          ResultType: 'entity_object',
-        },
-        contextUser,
-      );
-      if (windowRes.Success) {
-        for (const w of windowRes.Results) {
-          const key = w.ProfessionalProfileID.toLowerCase();
-          const list = windowsByPro.get(key) ?? [];
-          list.push(w);
-          windowsByPro.set(key, list);
-        }
+    if (profiles.length > 0 && windowRes?.Success && windowRes.Results) {
+      for (const w of windowRes.Results as ProfessionalAvailabilityWindowEntity[]) {
+        const key = w.ProfessionalProfileID.toLowerCase();
+        const list = windowsByPro.get(key) ?? [];
+        list.push(w);
+        windowsByPro.set(key, list);
       }
     }
 

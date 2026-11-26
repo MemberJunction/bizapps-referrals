@@ -215,27 +215,27 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
     return profileId.toLowerCase();
   }
 
-  private async primeOverlapCache(): Promise<void> {
+  private async primeOverlapCache(): Promise<CachedWindow[] | null> {
     if (!this.ProfessionalProfileID) {
-      return;
+      return null;
     }
     const rawProvider: object | undefined = this.ProviderToUse;
     const isMetadataAndRunView = (p: object | undefined): p is IMetadataProvider & IRunViewProvider =>
       Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
     if (!isMetadataAndRunView(rawProvider) || !this.ContextCurrentUser) {
-      return;
+      return null;
     }
     const rv = new RunView(rawProvider);
     const siblingsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
         ExtraFilter: `ProfessionalProfileID = '${this.ProfessionalProfileID}' AND IsActive = 1`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       this.ContextCurrentUser,
     );
     if (!siblingsRes.Success) {
-      return;
+      return null;
     }
     const cached: CachedWindow[] = siblingsRes.Results.filter((w) => w.StartsAt && w.EndsAt).map((w) => ({
       ID: w.ID,
@@ -248,6 +248,7 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
       ProfessionalAvailabilityWindowServerEntity.cacheKeyFor(this.ProfessionalProfileID),
       cached,
     );
+    return cached;
   }
 
   /**
@@ -328,7 +329,7 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
    * base `Save()`.
    */
   public override async Save(options?: EntitySaveOptions): Promise<boolean> {
-    await this.primeOverlapCache();
+    const freshActiveSiblings = await this.primeOverlapCache();
 
     if (this.IsActive !== false && this.StartsAt && this.EndsAt && this.ProfessionalProfileID) {
       const rawProvider: object | undefined = this.ProviderToUse;
@@ -337,8 +338,6 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
       ): p is IMetadataProvider & IRunViewProvider =>
         Boolean(p && 'GetEntityObject' in p && 'RunView' in p);
       if (isMetadataAndRunView(rawProvider) && this.ContextCurrentUser) {
-        const rv = new RunView(rawProvider);
-
         // CR-07: enforce owner/coordinator/admin authorization on the window's
         // ProfessionalProfileID. On an update, also re-verify against the persisted
         // (pre-edit) ProfessionalProfileID so a non-admin cannot reparent someone else's
@@ -361,22 +360,14 @@ export class ProfessionalAvailabilityWindowServerEntity extends ProfessionalAvai
           }
         }
 
-        const siblingsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
-            ExtraFilter: `ProfessionalProfileID = '${this.ProfessionalProfileID}' AND WindowType = '${this.WindowType}' AND IsActive = 1${this.ID ? ` AND ID <> '${this.ID}'` : ''}`,
-            ResultType: 'entity_object',
-          },
-          this.ContextCurrentUser,
-        );
-        if (siblingsRes.Success) {
+        // Reuse freshly fetched active siblings from primeOverlapCache() instead of
+        // issuing a redundant second RunView for the same ProfessionalProfileID.
+        if (freshActiveSiblings) {
           const newStart = new Date(this.StartsAt).getTime();
           const newEnd = new Date(this.EndsAt).getTime();
-          const overlapping = siblingsRes.Results.find((w) => {
-            if (!w.StartsAt || !w.EndsAt) return false;
-            const existingStart = new Date(w.StartsAt).getTime();
-            const existingEnd = new Date(w.EndsAt).getTime();
-            return newStart < existingEnd && newEnd > existingStart;
+          const overlapping = freshActiveSiblings.find((w) => {
+            if (w.WindowType !== this.WindowType || (this.ID && w.ID === this.ID)) return false;
+            return newStart < w.EndsAt.getTime() && newEnd > w.StartsAt.getTime();
           });
           if (overlapping) {
             throw new PersistenceError(

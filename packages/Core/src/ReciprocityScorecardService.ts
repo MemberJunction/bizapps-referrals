@@ -174,13 +174,22 @@ export class ReciprocityScorecardService {
     }
     const effectivePeriod = period ?? CurrentUtcQuarter();
     const rv = new RunView(dp);
+    const toDateOnly = (d: Date): string => d.toISOString().slice(0, 10);
+    const periodStartDateOnly = toDateOnly(effectivePeriod.Start);
+    const periodEndDateOnly = toDateOnly(effectivePeriod.End);
 
-    const [profilesRes, requestsRes, assignmentsRes, outcomesRes] = await rv.RunViews(
+    const [profilesRes, requestsRes, assignmentsRes, outcomesRes, windowsRes, existingSnapshotsRes] = await rv.RunViews(
       [
         { EntityName: 'MJ_BizApps_Referrals: Professional Profiles', ExtraFilter: 'IsActive = 1', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ResultType: 'entity_object' },
-        { EntityName: 'MJ_BizApps_Referrals: Referral Outcomes', ResultType: 'entity_object' },
+        { EntityName: 'MJ_BizApps_Referrals: Referral Requests', ResultType: 'simple' },
+        { EntityName: 'MJ_BizApps_Referrals: Referral Assignments', ResultType: 'simple' },
+        { EntityName: 'MJ_BizApps_Referrals: Referral Outcomes', ResultType: 'simple' },
+        { EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows', ResultType: 'simple' },
+        {
+          EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
+          ExtraFilter: `PeriodStart = '${periodStartDateOnly}' AND PeriodEnd = '${periodEndDateOnly}'`,
+          ResultType: 'entity_object',
+        },
       ],
       contextUser,
     );
@@ -195,32 +204,27 @@ export class ReciprocityScorecardService {
       outcomes: outcomesRes.Results as ReferralOutcomeEntity[],
     };
 
-    const toDateOnly = (d: Date): string => d.toISOString().slice(0, 10);
-    const periodStartDateOnly = toDateOnly(effectivePeriod.Start);
-    const periodEndDateOnly = toDateOnly(effectivePeriod.End);
+    const allWindows: ProfessionalAvailabilityWindowEntity[] = windowsRes?.Success
+      ? (windowsRes.Results as ProfessionalAvailabilityWindowEntity[])
+      : [];
 
-    const [windowsRes] = await rv.RunViews(
-      [{ EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows', ResultType: 'entity_object' }],
-      contextUser,
-    );
+    const existingSnapshotsByProfileId = new Map<string, ReciprocitySnapshotEntity>();
+    if (existingSnapshotsRes?.Success) {
+      for (const snap of existingSnapshotsRes.Results as ReciprocitySnapshotEntity[]) {
+        if (snap.ProfessionalProfileID) {
+          existingSnapshotsByProfileId.set(snap.ProfessionalProfileID.toLowerCase(), snap);
+        }
+      }
+    }
 
     let processedCount = 0;
     for (const profile of profilesRes.Results as ProfessionalProfileEntity[]) {
       const scorecard = ReciprocityScorecardService.ComputeScorecard(profile.ID, effectivePeriod, data);
 
-      const existingRes = await rv.RunView<ReciprocitySnapshotEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Reciprocity Snapshots',
-          ExtraFilter: `ProfessionalProfileID = '${profile.ID}' AND PeriodStart = '${periodStartDateOnly}' AND PeriodEnd = '${periodEndDateOnly}'`,
-          ResultType: 'entity_object',
-        },
-        contextUser,
-      );
-
+      const existingSnapshot = existingSnapshotsByProfileId.get(profile.ID.toLowerCase());
       const snapshot: ReciprocitySnapshotEntity =
-        existingRes.Success && existingRes.Results.length > 0
-          ? existingRes.Results[0]
-          : await dp.GetEntityObject<ReciprocitySnapshotEntity>('MJ_BizApps_Referrals: Reciprocity Snapshots', contextUser);
+        existingSnapshot ??
+        (await dp.GetEntityObject<ReciprocitySnapshotEntity>('MJ_BizApps_Referrals: Reciprocity Snapshots', contextUser));
 
       snapshot.ProfessionalProfileID = profile.ID;
       snapshot.ComputedAt = new Date();
@@ -241,9 +245,6 @@ export class ReciprocityScorecardService {
       }
 
       profile.ReciprocityIndex = scorecard.ReciprocityIndex;
-      const allWindows: ProfessionalAvailabilityWindowEntity[] = windowsRes?.Success
-        ? (windowsRes.Results as ProfessionalAvailabilityWindowEntity[])
-        : [];
       const profileWindows = allWindows.filter((w) => UUIDsEqual(w.ProfessionalProfileID, profile.ID));
       const recentAssignments = data.assignments.filter((a) => UUIDsEqual(a.ProfessionalProfileID, profile.ID));
       const readiness = CapacityReadinessService.ComputeReadinessScore({

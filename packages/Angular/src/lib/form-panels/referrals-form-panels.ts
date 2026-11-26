@@ -176,13 +176,16 @@ export class ReferralRequestHeroPanel extends BaseFormPanel implements OnInit {
     } catch {
       return;
     }
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const res = await rv.RunView<ReferralAssignmentEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
         ExtraFilter: `ReferralRequestID = '${rec.ID}'`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -884,19 +887,22 @@ export class PersonReferralsOverviewPanel extends BaseFormPanel implements OnIni
     } catch {
       return;
     }
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const [proRes, reqRes] = await rv.RunViews(
       [
         {
           EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
           ExtraFilter: `PersonID = '${recId}'`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Requests',
           ExtraFilter: `SeekerPersonID = '${recId}'`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
       ],
       md.CurrentUser,
@@ -975,13 +981,16 @@ export class OrganizationReferralsOverviewPanel extends BaseFormPanel implements
     } catch {
       return;
     }
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const proRes = await rv.RunView<ProfessionalProfileEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: `OrganizationID = '${recId}'`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );
@@ -1060,13 +1069,16 @@ export class UserReferralsOverviewPanel extends BaseFormPanel implements OnInit 
     } catch {
       return;
     }
-    const rv = new RunView();
     const md = new Metadata();
+    const rv =
+      Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+        ? RunView.FromMetadataProvider(Metadata.Provider)
+        : new RunView();
     const res = await rv.RunView<ProfessionalProfileEntity>(
       {
         EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
         ExtraFilter: `UserID = '${recId}'`,
-        ResultType: 'entity_object',
+        ResultType: 'simple',
       },
       md.CurrentUser,
     );

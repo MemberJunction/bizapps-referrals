@@ -23,22 +23,34 @@ const settingsStore = new Map<string, string>();
 const runViewMock = vi.fn();
 const runViewsMock = vi.fn();
 
+const mockMetadataProvider = {
+  CurrentUser: mockCurrentUser,
+  Entities: [],
+  EntityByName: () => undefined,
+  RunView: runViewMock,
+  RunViews: runViewsMock,
+};
+
 vi.mock('@memberjunction/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@memberjunction/core')>();
+  class MockRunView {
+    static FromMetadataProvider() {
+      return new MockRunView();
+    }
+    RunView = runViewMock;
+    RunViews = runViewsMock;
+  }
   return {
     ...actual,
     Metadata: class {
       static get Provider() {
-        return undefined;
+        return mockMetadataProvider;
       }
       get CurrentUser() {
         return mockCurrentUser;
       }
     },
-    RunView: class {
-      RunView = runViewMock;
-      RunViews = runViewsMock;
-    },
+    RunView: MockRunView,
   };
 });
 
@@ -83,6 +95,7 @@ import { ReferralsProInboxComponent } from '../lib/components/pro-inbox.componen
 import { ReferralsSeekerIntakeComponent } from '../lib/components/seeker-intake.component.js';
 import { NavigationService } from '@memberjunction/ng-shared';
 import { CapacityReadinessService, CascadeRoutingService, MatchingEngine } from '@mj-biz-apps/referrals-core';
+import { ReferralsEngineBase } from '@mj-biz-apps/referrals-entities';
 
 describe('Wave 3 Slice 4 Pro Inbox (AC-40) & Seeker Intake (AC-41) enhancements', () => {
   beforeAll(() => {
@@ -94,6 +107,7 @@ describe('Wave 3 Slice 4 Pro Inbox (AC-40) & Seeker Intake (AC-41) enhancements'
     settingsStore.clear();
     runViewMock.mockReset();
     runViewsMock.mockReset();
+    ReferralsEngineBase.Instance.InvalidateCache();
     vi.restoreAllMocks();
   });
 
@@ -259,14 +273,23 @@ describe('Wave 3 Slice 4 Pro Inbox (AC-40) & Seeker Intake (AC-41) enhancements'
 
   describe('ReferralsSeekerIntakeComponent', () => {
     function mockIntakeViews(): void {
-      runViewsMock.mockResolvedValue([
-        { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A' }] },
-        { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware' }] },
-        {
-          Success: true,
-          Results: [{ ID: '30000000-0000-4000-8000-000000000001', Name: 'Priority', SLAResponseHours: 8, UrgentSLAMultiplier: 0.5 }],
-        },
-      ]);
+      runViewsMock.mockImplementation(async (views: Array<{ EntityName: string }>) =>
+        views.map((v) => {
+          if (v.EntityName === 'MJ_BizApps_Referrals: Practice Areas') {
+            return { Success: true, Results: [{ ID: '10000000-0000-4000-8000-000000000001', Name: 'Corporate M&A', IsActive: true }] };
+          }
+          if (v.EntityName === 'MJ_BizApps_Referrals: Jurisdictions') {
+            return { Success: true, Results: [{ ID: '20000000-0000-4000-8000-000000000001', Name: 'Delaware', IsActive: true }] };
+          }
+          if (v.EntityName === 'MJ_BizApps_Referrals: Referral Tiers') {
+            return {
+              Success: true,
+              Results: [{ ID: '30000000-0000-4000-8000-000000000001', Name: 'Priority', SLAResponseHours: 8, UrgentSLAMultiplier: 0.5, IsActive: true }],
+            };
+          }
+          return { Success: true, Results: [] };
+        }),
+      );
       runViewMock.mockResolvedValue({ Success: true, Results: [] });
     }
 

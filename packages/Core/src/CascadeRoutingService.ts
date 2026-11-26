@@ -18,6 +18,7 @@ import {
   ReferralOutcomeEntity,
   ReferralRequestEntity,
   ReferralTierEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import { CapacityReadinessService } from './CapacityReadinessService.js';
 import { ActiveMatterPartyRecord, ConflictScreeningService, NormalizePartyName } from './ConflictScreeningService.js';
@@ -744,20 +745,41 @@ export class CascadeRoutingService {
           );
         }
 
-        // CR-22: re-verify effective availability at accept-time - an OnLeave/Paused
-        // window added, or a ReducedCapacity override reached, since the offer was made
-        // must still block acceptance even though the coarse AvailabilityStatus passed above.
-        const acceptWindowsRes = await rv.RunView<ProfessionalAvailabilityWindowEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
-            ExtraFilter: `ProfessionalProfileID = '${pro.ID}' AND IsActive = 1`,
-            ResultType: 'entity_object',
-          },
+        // CR-22: batch availability windows together with standing & conflict screening context
+        // in a single RunViews round-trip, then validate availability -> capacity -> standing -> conflicts.
+        const validProId = AssertValidUUID(pro.ID, 'ProfessionalProfileID');
+        const validRequestId = AssertValidUUID(request.ID, 'ReferralRequestID');
+        const validJurisdictionId = AssertValidUUID(request.JurisdictionID, 'JurisdictionID');
+
+        const revalBatch = await rv.RunViews(
+          [
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
+              ExtraFilter: `ProfessionalProfileID = '${validProId}' AND IsActive = 1`,
+              ResultType: 'simple',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
+              ExtraFilter: `ProfessionalProfileID = '${validProId}' AND JurisdictionID = '${validJurisdictionId}'`,
+              ResultType: 'simple',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
+              ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
+              ResultType: 'simple',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+              ExtraFilter: "Status IN ('Offered', 'Accepted')",
+              ResultType: 'simple',
+            },
+          ],
           contextUser,
         );
+
         const acceptAvailability = CapacityReadinessService.ResolveEffectiveAvailability(
           pro,
-          acceptWindowsRes.Success ? acceptWindowsRes.Results : [],
+          revalBatch[0]?.Success ? (revalBatch[0].Results as ProfessionalAvailabilityWindowEntity[]) : [],
         );
         if (acceptAvailability.IsBlocked) {
           throw new InvalidLifecycleStateError(
@@ -771,38 +793,13 @@ export class CascadeRoutingService {
           );
         }
 
-        const validProId = AssertValidUUID(pro.ID, 'ProfessionalProfileID');
-        const validRequestId = AssertValidUUID(request.ID, 'ReferralRequestID');
-        const validJurisdictionId = AssertValidUUID(request.JurisdictionID, 'JurisdictionID');
-
-        const revalBatch = await rv.RunViews(
-          [
-            {
-              EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
-              ExtraFilter: `ProfessionalProfileID = '${validProId}' AND JurisdictionID = '${validJurisdictionId}'`,
-              ResultType: 'entity_object',
-            },
-            {
-              EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
-              ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
-              ResultType: 'entity_object',
-            },
-            {
-              EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-              ExtraFilter: "Status IN ('Offered', 'Accepted')",
-              ResultType: 'entity_object',
-            },
-          ],
-          contextUser,
-        );
-
-        if (!revalBatch[0]?.Success || !revalBatch[1]?.Success || !revalBatch[2]?.Success) {
+        if (!revalBatch[1]?.Success || !revalBatch[2]?.Success || !revalBatch[3]?.Success) {
           throw new ConflictScreeningUnavailableError(
             'Failed to load licensing standing and conflict screening context during acceptance.',
           );
         }
 
-        const jurLinks = revalBatch[0].Results as ProfessionalJurisdictionEntity[];
+        const jurLinks = revalBatch[1].Results as ProfessionalJurisdictionEntity[];
         const standingOk = jurLinks.some(
           (l) => l.StandingStatus === 'GoodStanding' || l.StandingStatus === 'ProHacVice',
         );
@@ -812,8 +809,8 @@ export class CascadeRoutingService {
           );
         }
 
-        const requestParties = revalBatch[1].Results as ConflictCheckPartyEntity[];
-        const otherActiveAssignments = (revalBatch[2].Results as ReferralAssignmentEntity[]).filter(
+        const requestParties = revalBatch[2].Results as ConflictCheckPartyEntity[];
+        const otherActiveAssignments = (revalBatch[3].Results as ReferralAssignmentEntity[]).filter(
           (a) => !UUIDsEqual(a.ID, assignment.ID),
         );
         const activeMatterParties: ActiveMatterPartyRecord[] = [];
@@ -1013,27 +1010,30 @@ export class CascadeRoutingService {
     const validPracticeId = AssertValidUUID(request.PracticeAreaID, 'PracticeAreaID');
     const validJurisdictionId = AssertValidUUID(request.JurisdictionID, 'JurisdictionID');
 
-    const batchRes = await rv.RunViews(
-      [
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-          ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Queued'`,
-          OrderBy: 'CascadeOrder ASC',
-          ResultType: 'entity_object',
-        },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
-          ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
-          ResultType: 'entity_object',
-        },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
-          ExtraFilter: "Status IN ('Offered', 'Accepted')",
-          ResultType: 'entity_object',
-        },
-      ],
-      contextUser,
-    );
+    const [, batchRes] = await Promise.all([
+      ReferralsEngineBase.Instance.Config(false, contextUser, provider),
+      rv.RunViews(
+        [
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+            ExtraFilter: `ReferralRequestID = '${validRequestId}' AND Status = 'Queued'`,
+            OrderBy: 'CascadeOrder ASC',
+            ResultType: 'entity_object',
+          },
+          {
+            EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
+            ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
+            ResultType: 'simple',
+          },
+          {
+            EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
+            ExtraFilter: "Status IN ('Offered', 'Accepted')",
+            ResultType: 'simple',
+          },
+        ],
+        contextUser,
+      ),
+    ]);
 
     if (!batchRes[0]?.Success || !batchRes[1]?.Success || !batchRes[2]?.Success) {
       throw new ConflictScreeningUnavailableError('Failed to load cascade revalidation context.');
@@ -1052,7 +1052,7 @@ export class CascadeRoutingService {
         {
           EntityName: 'MJ_BizApps_Referrals: Conflict Check Parties',
           ExtraFilter: `ReferralRequestID IN (${reqIds})`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
         contextUser,
       );
@@ -1074,9 +1074,13 @@ export class CascadeRoutingService {
       }
     }
 
-    const tier = await md.GetEntityObject<ReferralTierEntity>('MJ_BizApps_Referrals: Referral Tiers', contextUser);
-    if (!(await tier.Load(request.ReferralTierID))) {
-      throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
+    let tier = ReferralsEngineBase.Instance.ReferralTierById(request.ReferralTierID);
+    if (!tier) {
+      const loadedTier = await md.GetEntityObject<ReferralTierEntity>('MJ_BizApps_Referrals: Referral Tiers', contextUser);
+      if (!(await loadedTier.Load(request.ReferralTierID))) {
+        throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
+      }
+      tier = loadedTier;
     }
     for (const candidateAssignment of queuedList) {
       const validProId = AssertValidUUID(candidateAssignment.ProfessionalProfileID, 'ProfessionalProfileID');
@@ -1091,17 +1095,17 @@ export class CascadeRoutingService {
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
             ExtraFilter: `ProfessionalProfileID = '${validProId}' AND PracticeAreaID = '${validPracticeId}'`,
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
             ExtraFilter: `ProfessionalProfileID = '${validProId}' AND JurisdictionID = '${validJurisdictionId}'`,
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Availability Windows',
             ExtraFilter: `ProfessionalProfileID = '${validProId}' AND IsActive = 1`,
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
         ],
         contextUser,
@@ -1608,16 +1612,22 @@ export class CascadeRoutingService {
         );
       }
 
-      const tier = await md.GetEntityObject<ReferralTierEntity>('MJ_BizApps_Referrals: Referral Tiers', contextUser);
-      if (!(await tier.Load(AssertValidUUID(request.ReferralTierID, 'ReferralTierID')))) {
-        throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
+      await ReferralsEngineBase.Instance.Config(false, contextUser, txProvider);
+      const validTierId = AssertValidUUID(request.ReferralTierID, 'ReferralTierID');
+      let tier = ReferralsEngineBase.Instance.ReferralTierById(validTierId);
+      if (!tier) {
+        const loadedTier = await md.GetEntityObject<ReferralTierEntity>('MJ_BizApps_Referrals: Referral Tiers', contextUser);
+        if (!(await loadedTier.Load(validTierId))) {
+          throw new PersistenceError(`ReferralTier '${request.ReferralTierID}' not found.`);
+        }
+        tier = loadedTier;
       }
 
       const allAssignmentsRes = await rv.RunView<ReferralAssignmentEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
           ExtraFilter: `ReferralRequestID = '${validRequestId}'`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
         contextUser,
       );
@@ -1629,8 +1639,14 @@ export class CascadeRoutingService {
 
       let practiceAreaId = AssertValidUUID(request.PracticeAreaID, 'PracticeAreaID');
       if (options.ExpandToAncestorPracticeArea) {
-        const pa = await md.GetEntityObject<PracticeAreaEntity>('MJ_BizApps_Referrals: Practice Areas', contextUser);
-        if ((await pa.Load(practiceAreaId)) && pa.ParentID) {
+        let pa = ReferralsEngineBase.Instance.PracticeAreaById(practiceAreaId);
+        if (!pa) {
+          const loadedPa = await md.GetEntityObject<PracticeAreaEntity>('MJ_BizApps_Referrals: Practice Areas', contextUser);
+          if (await loadedPa.Load(practiceAreaId)) {
+            pa = loadedPa;
+          }
+        }
+        if (pa?.ParentID) {
           practiceAreaId = AssertValidUUID(pa.ParentID, 'ParentPracticeAreaID');
         }
       }

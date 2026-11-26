@@ -24,12 +24,11 @@ import {
   VocabularyService,
 } from '@mj-biz-apps/referrals-core';
 import {
-  JurisdictionEntity,
-  PracticeAreaEntity,
   ProfessionalCredentialEntity,
   ProfessionalJurisdictionEntity,
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 import { DirectoryPreferences, ReferralsUiStateHelper } from '../services/referrals-ui-state.service.js';
 
@@ -520,81 +519,59 @@ export class ReferralsCredentialDirectoryComponent extends BaseResourceComponent
 
   public async LoadProfiles(): Promise<void> {
     try {
-      const rv = new RunView();
       const md = new Metadata();
-      const [proRes, ppaRes, paRes, pjRes, jurRes, credRes] = await Promise.all([
-        rv.RunView<ProfessionalProfileEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
-            ExtraFilter: 'IsActive = 1',
-            ResultType: 'entity_object',
-            OrderBy: 'DisplayName ASC',
-          },
-          md.CurrentUser,
-        ),
-        rv.RunView<ProfessionalPracticeAreaEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
-            ResultType: 'entity_object',
-          },
-          md.CurrentUser,
-        ),
-        rv.RunView<PracticeAreaEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Practice Areas',
-            ResultType: 'entity_object',
-          },
-          md.CurrentUser,
-        ),
-        rv.RunView<ProfessionalJurisdictionEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
-            ResultType: 'entity_object',
-          },
-          md.CurrentUser,
-        ),
-        rv.RunView<JurisdictionEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Jurisdictions',
-            ResultType: 'entity_object',
-          },
-          md.CurrentUser,
-        ),
-        rv.RunView<ProfessionalCredentialEntity>(
-          {
-            EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
-            ResultType: 'entity_object',
-          },
+      const rv =
+        Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+          ? RunView.FromMetadataProvider(Metadata.Provider)
+          : new RunView();
+
+      const [, batchResults] = await Promise.all([
+        ReferralsEngineBase.Instance.Config(false, md.CurrentUser),
+        rv.RunViews(
+          [
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
+              ExtraFilter: 'IsActive = 1',
+              ResultType: 'simple',
+              OrderBy: 'DisplayName ASC',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
+              ResultType: 'simple',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
+              ResultType: 'simple',
+            },
+            {
+              EntityName: 'MJ_BizApps_Referrals: Professional Credentials',
+              ResultType: 'simple',
+            },
+          ],
           md.CurrentUser,
         ),
       ]);
 
-      if (proRes.Success) {
-        const paMap = new Map<string, string>();
-        if (paRes.Success) {
-          paRes.Results.forEach((pa) => paMap.set(pa.ID.toLowerCase(), pa.Name));
-        }
+      const [proRes, ppaRes, pjRes, credRes] = batchResults;
 
-        const jurMap = new Map<string, string>();
-        if (jurRes.Success) {
-          jurRes.Results.forEach((j) => jurMap.set(j.ID.toLowerCase(), j.Name));
-        }
-
-        const ppaList = ppaRes.Success ? ppaRes.Results : [];
-        const pjList = pjRes.Success ? pjRes.Results : [];
-        const credList = credRes.Success ? credRes.Results : [];
+      if (proRes?.Success) {
+        const engine = ReferralsEngineBase.Instance;
+        const profiles = proRes.Results as ProfessionalProfileEntity[];
+        const ppaList = ppaRes?.Success ? (ppaRes.Results as ProfessionalPracticeAreaEntity[]) : [];
+        const pjList = pjRes?.Success ? (pjRes.Results as ProfessionalJurisdictionEntity[]) : [];
+        const credList = credRes?.Success ? (credRes.Results as ProfessionalCredentialEntity[]) : [];
         const profileNameMap = new Map<string, string>();
-        proRes.Results.forEach((p) => profileNameMap.set(p.ID.toLowerCase(), p.DisplayName));
+        profiles.forEach((p) => profileNameMap.set(p.ID.toLowerCase(), p.DisplayName));
 
-        this.AllCards = proRes.Results.map((p) => {
+        this.AllCards = profiles.map((p) => {
           const paNames = ppaList
             .filter((l) => UUIDsEqual(l.ProfessionalProfileID, p.ID))
-            .map((l) => paMap.get(l.PracticeAreaID.toLowerCase()) || '')
+            .map((l) => engine.PracticeAreaById(l.PracticeAreaID)?.Name ?? '')
             .filter(Boolean);
 
           const jurNames = pjList
             .filter((l) => UUIDsEqual(l.ProfessionalProfileID, p.ID))
-            .map((l) => jurMap.get(l.JurisdictionID.toLowerCase()) || '')
+            .map((l) => engine.JurisdictionById(l.JurisdictionID)?.Name ?? '')
             .filter(Boolean);
 
           const creds = credList.filter((c) => UUIDsEqual(c.ProfessionalProfileID, p.ID));

@@ -4,7 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { BaseFormsModule } from '@memberjunction/ng-base-forms';
 import { EntityViewerModule } from '@memberjunction/ng-entity-viewer';
 import { LinkDirectivesModule } from '@memberjunction/ng-link-directives';
-import { loadModule as loadReferralsEntitiesModule } from '@mj-biz-apps/referrals-entities';
+import {
+  ReferralsEngineBase,
+  loadModule as loadReferralsEntitiesModule,
+} from '@mj-biz-apps/referrals-entities';
 
 import { ReferralsCredentialDirectoryComponent } from './components/credential-directory.component.js';
 import { ReferralsEscalationConsoleComponent } from './components/escalation-console.component.js';
@@ -120,8 +123,9 @@ import {
 export class ReferralsModule {}
 
 export function LoadBizAppsReferralsClient(): void {
-  // Ensures entity subclasses & schemas are loaded
+  // Ensures entity subclasses, schemas, and startup engines are loaded
   loadReferralsEntitiesModule();
+  void ReferralsEngineBase;
 
   // Ensures client workspace resources, form panels, and left-rail form components are preserved
   void ReferralsSeekerIntakeComponent;

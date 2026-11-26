@@ -1927,32 +1927,29 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
     }
 
     const rv = new RunView(dp);
-    const [fbRes, assignRes] = await Promise.all([
-      rv.RunView<ReferralFeedbackEntity>(
+    const [fbRes, assignRes] = await rv.RunViews(
+      [
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Feedbacks',
           ExtraFilter: `ProfessionalProfileID = '${validProfileId}'`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
-        contextUser,
-      ),
-      rv.RunView<ReferralAssignmentEntity>(
         {
           EntityName: 'MJ_BizApps_Referrals: Referral Assignments',
           ExtraFilter: `ProfessionalProfileID = '${validProfileId}'`,
-          ResultType: 'entity_object',
+          ResultType: 'simple',
         },
-        contextUser,
-      ),
-    ]);
+      ],
+      contextUser,
+    );
 
-    if (!fbRes.Success) {
+    if (!fbRes?.Success) {
       throw new PersistenceError(
-        `Failed to query ReferralFeedbacks: ${fbRes.ErrorMessage ?? 'RunView failed'}.`,
+        `Failed to query ReferralFeedbacks: ${fbRes?.ErrorMessage ?? 'RunView failed'}.`,
       );
     }
 
-    const rows = fbRes.Results ?? [];
+    const rows = (fbRes.Results ?? []) as ReferralFeedbackEntity[];
     const ratedRows = rows.filter((r) => Number(r.Rating) >= 1 && Number(r.Rating) <= 5);
     const avgRating =
       ratedRows.length > 0
@@ -1966,8 +1963,8 @@ export class ReferralCredentialService extends BaseSingleton<ReferralCredentialS
         completedAssignmentIds.add(fb.ReferralAssignmentID.toLowerCase());
       }
     }
-    if (assignRes.Success && assignRes.Results) {
-      for (const a of assignRes.Results) {
+    if (assignRes?.Success && assignRes.Results) {
+      for (const a of assignRes.Results as ReferralAssignmentEntity[]) {
         if (String(a.Status) === 'Completed') {
           completedAssignmentIds.add(a.ID.toLowerCase());
         }

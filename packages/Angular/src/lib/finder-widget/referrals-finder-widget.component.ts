@@ -25,7 +25,7 @@ import {
   ProfessionalPracticeAreaEntity,
   ProfessionalProfileEntity,
   ReferralRequestEntity,
-  ReferralTierEntity,
+  ReferralsEngineBase,
 } from '@mj-biz-apps/referrals-entities';
 
 export interface FinderMatchItem {
@@ -503,30 +503,10 @@ export class ReferralsFinderWidgetComponent implements OnInit {
 
   public async LoadLookups(): Promise<void> {
     try {
-      const rv = new RunView();
       const md = new Metadata();
-      const user = md.CurrentUser;
-      const res = await rv.RunViews([
-        {
-          EntityName: 'MJ_BizApps_Referrals: Practice Areas',
-          ExtraFilter: 'IsActive = 1',
-          ResultType: 'entity_object',
-          OrderBy: 'DisplayRank ASC, Name ASC',
-        },
-        {
-          EntityName: 'MJ_BizApps_Referrals: Jurisdictions',
-          ExtraFilter: 'IsActive = 1',
-          ResultType: 'entity_object',
-          OrderBy: 'Name ASC',
-        },
-      ], user);
-
-      if (res[0]?.Success) {
-        this.PracticeAreas = res[0].Results as PracticeAreaEntity[];
-      }
-      if (res[1]?.Success) {
-        this.Jurisdictions = res[1].Results as JurisdictionEntity[];
-      }
+      await ReferralsEngineBase.Instance.Config(false, md.CurrentUser);
+      this.PracticeAreas = [...ReferralsEngineBase.Instance.ActivePracticeAreas];
+      this.Jurisdictions = [...ReferralsEngineBase.Instance.ActiveJurisdictions];
     } catch {
       // In standalone unauthenticated widget embed mode, gracefully handle lookups
     }
@@ -538,8 +518,11 @@ export class ReferralsFinderWidgetComponent implements OnInit {
     this.cdr.markForCheck();
 
     try {
-      const rv = new RunView();
       const md = new Metadata();
+      const rv =
+        Metadata.Provider && typeof RunView.FromMetadataProvider === 'function'
+          ? RunView.FromMetadataProvider(Metadata.Provider)
+          : new RunView();
       const criteria = {
         PracticeAreaID: this.SelectedPracticeAreaID,
         JurisdictionID: this.SelectedJurisdictionID,
@@ -548,53 +531,45 @@ export class ReferralsFinderWidgetComponent implements OnInit {
         MatterTitle: this.MatterSummary,
       };
 
-      const [proRes, ppaRes, pjRes] = await Promise.all([
-        rv.RunView<ProfessionalProfileEntity>(
+      const [proRes, ppaRes, pjRes] = await rv.RunViews(
+        [
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Profiles',
             ExtraFilter: "IsActive = 1 AND VerificationStatus = 'Verified'",
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
-          md.CurrentUser,
-        ),
-        rv.RunView<ProfessionalPracticeAreaEntity>(
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Practice Areas',
             ExtraFilter: this.SelectedPracticeAreaID ? `PracticeAreaID = '${this.SelectedPracticeAreaID}'` : '1=1',
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
-          md.CurrentUser,
-        ),
-        rv.RunView<ProfessionalJurisdictionEntity>(
           {
             EntityName: 'MJ_BizApps_Referrals: Professional Jurisdictions',
             ExtraFilter: this.SelectedJurisdictionID ? `JurisdictionID = '${this.SelectedJurisdictionID}'` : '1=1',
-            ResultType: 'entity_object',
+            ResultType: 'simple',
           },
-          md.CurrentUser,
-        ),
-      ]);
+        ],
+        md.CurrentUser,
+      );
 
-      if (proRes.Success) {
-        const rawPros = proRes.Results;
+      if (proRes?.Success) {
+        const rawPros = proRes.Results as ProfessionalProfileEntity[];
+        const ppaRows = ppaRes?.Success ? (ppaRes.Results as ProfessionalPracticeAreaEntity[]) : [];
+        const pjRows = pjRes?.Success ? (pjRes.Results as ProfessionalJurisdictionEntity[]) : [];
         const matchItems: FinderMatchItem[] = [];
 
         for (const p of rawPros) {
-          const practiceLink = ppaRes?.Success
-            ? ppaRes.Results.find(
-                (pl) =>
-                  pl.ProfessionalProfileID === p.ID &&
-                  (!this.SelectedPracticeAreaID || pl.PracticeAreaID === this.SelectedPracticeAreaID),
-              )
-            : undefined;
+          const practiceLink = ppaRows.find(
+            (pl) =>
+              pl.ProfessionalProfileID === p.ID &&
+              (!this.SelectedPracticeAreaID || pl.PracticeAreaID === this.SelectedPracticeAreaID),
+          );
 
-          const jurisdictionLink = pjRes?.Success
-            ? pjRes.Results.find(
-                (jl) =>
-                  jl.ProfessionalProfileID === p.ID &&
-                  (!this.SelectedJurisdictionID || jl.JurisdictionID === this.SelectedJurisdictionID),
-              )
-            : undefined;
+          const jurisdictionLink = pjRows.find(
+            (jl) =>
+              jl.ProfessionalProfileID === p.ID &&
+              (!this.SelectedJurisdictionID || jl.JurisdictionID === this.SelectedJurisdictionID),
+          );
 
           const scoreResult = MatchingEngine.ScoreCandidate({
             profile: p,
@@ -704,19 +679,9 @@ export class ReferralsFinderWidgetComponent implements OnInit {
       }
 
       const md = new Metadata();
-      let tierId = '';
-      const tierRes = await new RunView().RunView<ReferralTierEntity>(
-        {
-          EntityName: 'MJ_BizApps_Referrals: Referral Tiers',
-          ExtraFilter: 'IsActive = 1',
-          ResultType: 'entity_object',
-          OrderBy: 'DisplayRank ASC, TierLevel ASC',
-        },
-        md.CurrentUser,
-      );
-      if (tierRes.Success && tierRes.Results.length > 0) {
-        tierId = tierRes.Results[0].ID;
-      }
+      await ReferralsEngineBase.Instance.Config(false, md.CurrentUser);
+      const activeTiers = ReferralsEngineBase.Instance.ActiveReferralTiers;
+      const tierId = activeTiers.length > 0 ? activeTiers[0].ID : '';
 
       const req = await md.GetEntityObject<ReferralRequestEntity>('MJ_BizApps_Referrals: Referral Requests');
       req.SeekerName = this.IntakeSeekerName.trim();
