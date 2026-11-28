@@ -12,7 +12,8 @@
     "actions",
     "prompts",
     "agents",
-    "applications"
+    "applications",
+    "chief-of-staff-skills"
   ],
   "emitSyncNotes": false,
   "sqlLogging": {
