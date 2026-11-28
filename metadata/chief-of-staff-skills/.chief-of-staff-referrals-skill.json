@@ -1,0 +1,176 @@
+[
+  {
+    "fields": {
+      "Name": "Referrals",
+      "Description": "Query and manage professional referrals, verified directory matching, conflict screening, SLA escalations, availability windows, and reciprocity scorecards. Installed by the BizApps Referrals app.",
+      "Instructions": "@file:templates/referrals-chief-of-staff.skill.md",
+      "Status": "Active",
+      "ActivationMode": "Auto",
+      "Category": "Business",
+      "IconClass": "fa-solid fa-scale-balanced",
+      "CreatedByUserID": "@lookup:MJ: Users.Name=System"
+    },
+    "relatedEntities": {
+      "MJ: AI Agent Skills": [
+        {
+          "fields": {
+            "AgentID": "@lookup:MJ: AI Agents.Name=Chief of Staff",
+            "SkillID": "@parent:ID",
+            "Status": "Active"
+          },
+          "primaryKey": {
+            "ID": "C6C5ABDF-0835-4FEF-BF6A-C834289D8B8F"
+          }
+        }
+      ],
+      "MJ: AI Skill Actions": [
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.MatchProfessionals",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "1D498BC6-D6E3-42D6-A473-08480EC79A0D"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SubmitReferralIntake",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "CAAA37FA-FB02-4681-A7D4-342CEACE2567"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RouteReferral",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "AB89E724-AED5-4EBB-8314-2C5FA2384078"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RespondToReferral",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "ADB59984-4460-4DE0-932A-5971F70AD8F6"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.MarkReferralInProgress",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "B7CF7ADC-5E28-4078-9166-F73B5EB353ED"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.CompleteReferral",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "6F044305-9272-4941-968C-6D2EAE64D93D"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.EvaluateEscalations",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "C00FC86A-40DF-4065-97BC-E2827CE27F62"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.AcknowledgeEscalation",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "BA6D2227-863B-47AD-B63B-013581E6D97B"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.ResolveEscalation",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "54B47029-63D6-4473-8398-495819ADCF57"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.RecommendEscalationAction",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "2ED0E21C-28B2-4589-9D92-FC572C2E49B5"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.ExplainMatch",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "E32B9793-524D-4F22-8396-B09D73B6F5CC"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.GetReciprocityScorecard",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "BDD01B42-584A-4AFA-ACB6-9C2B9308457A"
+          }
+        },
+        {
+          "fields": {
+            "SkillID": "@parent:ID",
+            "ActionID": "@lookup:MJ: Actions.Name=Referrals.SetAvailabilityWindow",
+            "Role": "Tool",
+            "ExposeToModel": true
+          },
+          "primaryKey": {
+            "ID": "4490C745-21AC-4384-ABB7-B9E00C4DC0AE"
+          }
+        }
+      ]
+    },
+    "primaryKey": {
+      "ID": "0C7D72FF-DD1B-49A8-9F6A-048A9B64DA50"
+    }
+  }
+]
